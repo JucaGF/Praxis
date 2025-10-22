@@ -11,3 +11,8 @@ starlette==0.48.0
 typing-extensions==4.15.0
 typing-inspection==0.4.2
 uvicorn==0.37.0
+
+alembic==1.17.0 
+psycopg2-binary==2.9.11
+python-dotenv==1.1.1
+sqlmodel==0.0.27
