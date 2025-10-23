@@ -13,4 +13,9 @@ if not DATABASE_URL:
     raise ValueError("❌ DATABASE_URL não encontrada no .env")
 
 # Cria a engine conectando ao banco do Supabase
-engine = create_engine(DATABASE_URL, echo=True)
+engine = create_engine(
+    DATABASE_URL,
+    echo=False,  # Desabilita logs SQL verbosos
+    connect_args={"connect_timeout": 10},
+    pool_pre_ping=True,  # Verifica conexão antes de usar
+)
