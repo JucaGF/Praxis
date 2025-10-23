@@ -1,8 +1,8 @@
-# backend/deps.py
+# backend/app/deps.py
 import math
 from typing import Dict
-from infra.repo_sql import SqlRepo
-from infra.ai_fake import FakeAI
+from backend.app.infra.repo_sql import SqlRepo
+from backend.app.infra.ai_fake import FakeAI
 
 _repo = SqlRepo()
 _ai = FakeAI()

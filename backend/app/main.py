@@ -1,13 +1,21 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import health
 from fastapi.staticfiles import StaticFiles
+from pathlib import Path
+
+from backend.app.routers.session import router as session_router
+from backend.app.routers.attributes import router as attributes_router
+from backend.app.routers.health import router as health_router
+
 
 
 app = FastAPI()
 
 # para o dataset
-app.mount("/static", StaticFiles(directory="static"), name="static")
+BASE_DIR = Path(__file__).resolve().parent.parent
+static_dir = BASE_DIR / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 app.add_middleware(
     CORSMiddleware,
@@ -18,4 +26,10 @@ app.add_middleware(
 )
 
 # registra as rotas
-app.include_router(health.router)
+app.include_router(health_router)
+app.include_router(session_router)
+app.include_router(attributes_router)
+
+@app.get("/")
+def read_root():
+    return {"message": "API is running"}

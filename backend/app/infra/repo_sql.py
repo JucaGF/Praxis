@@ -47,7 +47,7 @@ def _challenge_out(ch: Challenge) -> dict:
         difficulty["level"] = _norm_level(difficulty["level"])
     return {
         "id": ch.id,
-        "profile_id": str(ch.user_id),  # no banco está como user_id
+        "profile_id": str(ch.profile_id),
         "title": ch.title,
         "description": ch.description or {},
         "difficulty": difficulty,
@@ -142,7 +142,7 @@ class SqlRepo:
     # -------------- CHALLENGES --------------
     def create_challenges_for_profile(self, profile_id: str, challenges: List[dict]) -> List[dict]:
         """
-        Cria N desafios para o profile. Requer que NÃO haja UNIQUE em challenges.user_id.
+        Cria N desafios para o profile. Requer que NÃO haja UNIQUE em challenges.profile_id.
         """
         pid = uuid.UUID(profile_id)
         out = []
@@ -152,7 +152,7 @@ class SqlRepo:
                 if "level" in diff:
                     diff["level"] = _norm_level(diff["level"])
                 row = Challenge(
-                    user_id=pid,
+                    profile_id=pid,
                     title=ch["title"],
                     description=ch.get("description"),
                     difficulty=diff,
@@ -169,7 +169,7 @@ class SqlRepo:
             pid = uuid.UUID(profile_id)
             rows = s.exec(
                 select(Challenge)
-                .where(Challenge.user_id == pid)
+                .where(Challenge.profile_id == pid)
                 .order_by(Challenge.created_at.desc())
                 .limit(limit)
             ).all()

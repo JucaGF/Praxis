@@ -2,7 +2,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional
 
 
-class SessionIn(BaseModel):
+class SessionMockIn(BaseModel):
     """Schema for login mock request body - accepts email or track"""
     email: Optional[EmailStr] = None
     track: Optional[str] = None
@@ -10,7 +10,7 @@ class SessionIn(BaseModel):
 
 class ProfileOut(BaseModel):
     """Schema for user data returned by API"""
-    id: int
-    name: str
+    id: str
+    full_name: str
     email: str
 
