@@ -20,8 +20,7 @@ class Profile(SQLModel, table=True):
     id: uuid.UUID = Field(primary_key=True)
     full_name: Optional[str] = None
     email: str = Field(index=True, nullable=False, unique=True)
-    attributes: Optional["Attributes"] = Relationship(back_populates="profile")
-
+    
     resumes: List["Resume"] = Relationship(back_populates="profile")
     submissions: List["Submission"] = Relationship(back_populates="profile")
     attributes: Optional["Attributes"] = Relationship(back_populates="profile")
@@ -93,7 +92,7 @@ class Challenge(SQLModel, table=True):
     __tablename__ = "challenges"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: uuid.UUID = Field(foreign_key="profiles.id", unique=True)
+    profile_id: uuid.UUID = Field(foreign_key="profiles.id")
     title: str = Field(index=True)
     description: JsonB = Field(default=None, sa_column=Column(JSONB))
     difficulty: JsonB = Field(
@@ -138,7 +137,7 @@ class Submission(SQLModel, table=True):
     submitted_code: Optional[JsonB] = Field(
         default=None, sa_column=Column(JSONB))
     # Ex: 'Processando', 'Concluído', 'Erro'
-    status: str = Field(default="Enviado")
+    status: str = Field(default="sent")
     attempt_number: int = Field(default=1)
     commit_message: Optional[str] = None
     notes: Optional[str] = None
