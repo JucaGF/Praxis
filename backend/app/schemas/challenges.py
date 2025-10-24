@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Dict, Optional, Literal, Any
+from datetime import datetime
 
 # Tipos aceitos para "level" (vamos normalizar internamente)
 LevelPT = Literal["Fácil", "Médio", "Difícil"]
@@ -22,7 +23,7 @@ class Difficulty(BaseModel):
     level: str = Field(description="easy|medium|hard (normalizado)")
     time_limit: int = Field(gt=0, description="Tempo em minutos")
 
-    @validator("level", pre=True)
+    @field_validator("level", mode='before')
     def _norm_level(cls, v):
         return normalize_level(v)
 
@@ -56,6 +57,7 @@ class ChallengeOut(BaseModel):
     difficulty: Difficulty
     fs: Optional[FS] = None
     category: Optional[str] = None
+    created_at: datetime
     # template_code: opcional; seu time pode centralizar tudo em fs
     template_code: Optional[Dict[str, Any]] = None
 

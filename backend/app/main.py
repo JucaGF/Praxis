@@ -6,6 +6,9 @@ from pathlib import Path
 from backend.app.routers.session import router as session_router
 from backend.app.routers.attributes import router as attributes_router
 from backend.app.routers.health import router as health_router
+from backend.app.routers.challenges import router as challenges_router
+from backend.app.routers.submissions import router as submissions_router
+
 
 
 
@@ -29,6 +32,8 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(session_router)
 app.include_router(attributes_router)
+app.include_router(challenges_router)
+app.include_router(submissions_router)
 
 @app.get("/")
 def read_root():

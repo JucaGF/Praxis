@@ -145,24 +145,23 @@ class SqlRepo:
         Cria N desafios para o profile. Requer que NÃO haja UNIQUE em challenges.profile_id.
         """
         pid = uuid.UUID(profile_id)
-        out = []
+        rows = []
         with Session(self.engine) as s:
             for ch in challenges:
-                diff = ch.get("difficulty") or {}
-                if "level" in diff:
-                    diff["level"] = _norm_level(diff["level"])
-                row = Challenge(
+                rows.append(Challenge(
                     profile_id=pid,
                     title=ch["title"],
                     description=ch.get("description"),
-                    difficulty=diff,
+                    difficulty=ch.get("difficulty"),
                     fs=ch.get("fs"),
                     category=ch.get("category"),
                     template_code=ch.get("template_code"),
-                )
-                s.add(row); s.commit(); s.refresh(row)
-                out.append(_challenge_out(row))
-        return out
+                ))
+            s.add_all(rows)
+            s.commit()
+            for row in rows:
+                s.refresh(row)
+        return [_challenge_out(r) for r in rows]
 
     def list_active_challenges(self, profile_id: str, limit: int = 3) -> List[dict]:
         with Session(self.engine) as s:

@@ -1,19 +1,26 @@
-from pydantic import BaseModel
-from typing import Dict, Optional
+# backend/app/schemas/submissions.py
+from pydantic import BaseModel, Field, conint
+from typing import Optional, Dict, Any
 
+Score = conint(ge=0, le=100)
 
-class SubmissionIn(BaseModel):
-    """Schema for POST /submissions request body"""
-    files: Dict[str, str]  # {path: content} for code submissions
-    answer: str  # String for text/planning submissions
-    commit_message: Optional[str] = None  # Optional metadata
-    notes: Optional[str] = None  # Optional metadata
+class SubmissionCreateIn(BaseModel):
+    profile_id: str
+    challenge_id: int
+    # Flexível: para "codigo" mande {"type":"codigo","files":{path:conteudo}}
+    # para texto/planejamento: {"type":"texto_livre","content":"..."}
+    submitted_code: Dict[str, Any]
+    commit_message: Optional[str] = None
+    notes: Optional[str] = None
+    time_taken_sec: Optional[int] = None
 
-
-class SubmissionOut(BaseModel):
-    """Schema for submission response from API"""
-    score: float
-    metrics: Dict[str, float]  # Additional metrics
-    feedback_summary: str
-    # Add other response fields as needed
-
+class SubmissionResultOut(BaseModel):
+    submission_id: int
+    status: str = Field(description="sent | evaluating | scored | error")
+    score: Optional[Score] = None
+    metrics: Optional[Dict[str, Score]] = None
+    feedback: Optional[str] = None
+    # progressão
+    target_skill: Optional[str] = None
+    delta_applied: Optional[int] = None
+    updated_skill_value: Optional[int] = None
