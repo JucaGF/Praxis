@@ -1,0 +1,215 @@
+"""
+Router de desenvolvimento para criar dados mock.
+
+Este router só deve ser usado em desenvolvimento!
+Ele cria dados fictícios para testes sem precisar do relatório de currículo.
+"""
+
+from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+from pydantic import BaseModel
+
+from backend.app.deps import get_repo, get_current_user
+from backend.app.domain.ports import IRepository
+from backend.app.domain.auth_service import AuthUser
+from backend.app.config import get_settings
+
+router = APIRouter(prefix="/dev", tags=["desenvolvimento"])
+
+settings = get_settings()
+
+
+class MockDataResponse(BaseModel):
+    """Resposta com dados mock criados."""
+    message: str
+    profile_id: str
+    profile_created: bool
+    attributes_created: bool
+
+
+def create_mock_profile_data(user_id: str, email: str) -> dict:
+    """
+    Cria dados de profile mockados para um usuário.
+    
+    Estes são dados fictícios mas realistas, usados para:
+    - Testes de desenvolvimento
+    - Novos usuários antes do relatório de currículo
+    
+    Returns:
+        dict com dados do profile
+    """
+    return {
+        "name": f"Usuário Teste ({email.split('@')[0]})",
+        "track": "backend",  # Pode ser: backend, frontend, fullstack
+        "email": email,
+        "linkedin": None,
+        "github": None,
+        "portfolio": None,
+    }
+
+
+def create_mock_attributes_data() -> dict:
+    """
+    Cria atributos mockados para um usuário.
+    
+    Valores médios para permitir geração de desafios balanceados.
+    Em produção, virão do relatório de currículo.
+    
+    Returns:
+        dict com atributos
+    """
+    return {
+        "career_goal": "Desenvolver habilidades técnicas e soft skills de forma equilibrada",
+        "soft_skills": {
+            "comunicacao": 50,
+            "trabalho_em_equipe": 50,
+            "resolucao_problemas": 50,
+            "adaptabilidade": 50,
+            "lideranca": 40,
+        },
+        "tech_skills": {
+            "Python": 60,
+            "FastAPI": 55,
+            "React": 45,
+            "JavaScript": 50,
+            "SQL": 55,
+            "Git": 60,
+            "Docker": 40,
+            "APIs REST": 65,
+        }
+    }
+
+
+@router.post("/setup-mock-data", response_model=MockDataResponse)
+def setup_mock_data_for_current_user(
+    current_user: AuthUser = Depends(get_current_user),
+    repo: IRepository = Depends(get_repo)
+):
+    """
+    Cria dados mock para o usuário autenticado atual.
+    
+    **Quando usar:**
+    - Você fez login com Supabase mas não tem dados no banco ainda
+    - Quer testar o sistema sem passar pelo relatório de currículo
+    
+    **O que faz:**
+    1. Verifica se profile existe, se não cria com dados mock
+    2. Verifica se attributes existe, se não cria com dados mock
+    3. Retorna sucesso
+    
+    **Exemplo:**
+    ```bash
+    # Com token Supabase
+    curl -X POST http://localhost:8000/dev/setup-mock-data \\
+      -H "Authorization: Bearer SEU_TOKEN"
+    ```
+    
+    **⚠️ IMPORTANTE:**
+    - Use apenas em desenvolvimento!
+    - Em produção, dados virão do relatório de currículo
+    """
+    profile_created = False
+    attributes_created = False
+    
+    # 1. Verificar/criar profile
+    try:
+        profile = repo.get_profile(current_user.id)
+    except Exception:
+        # Profile não existe, criar
+        profile_data = create_mock_profile_data(current_user.id, current_user.email)
+        profile = repo.create_profile(current_user.id, profile_data)
+        profile_created = True
+    
+    # 2. Verificar/criar attributes
+    try:
+        attributes = repo.get_attributes(current_user.id)
+    except Exception:
+        # Attributes não existem, criar
+        attributes_data = create_mock_attributes_data()
+        attributes = repo.update_attributes(current_user.id, attributes_data)
+        attributes_created = True
+    
+    return MockDataResponse(
+        message="Dados mock configurados com sucesso! Agora você pode gerar desafios.",
+        profile_id=current_user.id,
+        profile_created=profile_created,
+        attributes_created=attributes_created
+    )
+
+
+@router.post("/create-dev-user", response_model=MockDataResponse)
+def create_dev_user(repo: IRepository = Depends(get_repo)):
+    """
+    Cria o usuário mock de desenvolvimento no banco.
+    
+    **Quando usar:**
+    - Primeira vez que vai usar AUTH_ENABLED=false
+    - Usuário "dev-user-mock" não existe no banco
+    
+    **O que faz:**
+    1. Cria profile com ID fixo "dev-user-mock"
+    2. Cria attributes para esse usuário
+    3. Permite desenvolvimento sem autenticação
+    
+    **Exemplo:**
+    ```bash
+    curl -X POST http://localhost:8000/dev/create-dev-user
+    ```
+    
+    **⚠️ IMPORTANTE:**
+    - Use apenas uma vez (ou quando resetar banco)
+    - ID fixo: "dev-user-mock"
+    - Email: "dev@mock.local"
+    """
+    # ID fixo usado no modo AUTH_ENABLED=false
+    dev_user_id = "dev-user-mock"
+    dev_email = "dev@mock.local"
+    
+    profile_created = False
+    attributes_created = False
+    
+    # 1. Criar/verificar profile
+    try:
+        profile = repo.get_profile(dev_user_id)
+    except Exception:
+        profile_data = create_mock_profile_data(dev_user_id, dev_email)
+        profile = repo.create_profile(dev_user_id, profile_data)
+        profile_created = True
+    
+    # 2. Criar/verificar attributes
+    try:
+        attributes = repo.get_attributes(dev_user_id)
+    except Exception:
+        attributes_data = create_mock_attributes_data()
+        attributes = repo.update_attributes(dev_user_id, attributes_data)
+        attributes_created = True
+    
+    return MockDataResponse(
+        message="Usuário dev mock criado! Agora você pode usar AUTH_ENABLED=false",
+        profile_id=dev_user_id,
+        profile_created=profile_created,
+        attributes_created=attributes_created
+    )
+
+
+@router.get("/health")
+def dev_health():
+    """
+    Verifica se o router de dev está ativo.
+    
+    **⚠️ SEGURANÇA:**
+    Em produção, este router deve ser DESABILITADO!
+    """
+    if settings.ENVIRONMENT == "production":
+        raise HTTPException(
+            status_code=403,
+            detail="Endpoints de desenvolvimento desabilitados em produção"
+        )
+    
+    return {
+        "status": "ok",
+        "message": "Endpoints de desenvolvimento ativos",
+        "environment": settings.ENVIRONMENT,
+        "auth_enabled": settings.AUTH_ENABLED
+    }
+

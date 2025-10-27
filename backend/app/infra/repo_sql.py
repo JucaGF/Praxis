@@ -18,6 +18,9 @@ from models import (
     Profile, Attributes, Challenge, Submission, SubmissionFeedback
 )
 
+# ✅ Importa a interface que vamos implementar
+from backend.app.domain.ports import IRepository
+
 # normalização simples de nível de dificuldade
 LEVEL_MAP = {
     "Fácil": "easy", "Médio": "medium", "Difícil": "hard",
@@ -57,8 +60,17 @@ def _challenge_out(ch: Challenge) -> dict:
         "created_at": ch.created_at,
     }
 
-class SqlRepo:
-    """Adapter que conversa com o Postgres (Supabase) via SQLModel."""
+class SqlRepo(IRepository):
+    """
+    Implementação SQL do repositório.
+    
+    Herda de IRepository, o que significa:
+    - "Eu prometo implementar TODOS os métodos definidos na interface"
+    - Se esquecer algum método, Python vai dar erro
+    - Qualquer código que espera IRepository pode usar SqlRepo
+    
+    Adapter que conversa com o Postgres (Supabase) via SQLModel.
+    """
     def __init__(self, engine_=None):
         self.engine = engine_ or engine
 
@@ -130,11 +142,21 @@ class SqlRepo:
     def get_tech_skills(self, profile_id: str) -> Dict[str, int]:
         with Session(self.engine) as s:
             a = s.exec(select(Attributes).where(Attributes.user_id == uuid.UUID(profile_id))).first()
+            
+            # ✅ CORREÇÃO: Verificar se 'a' existe antes de acessar
+            if not a:
+                raise ValueError(f"Attributes não encontrados para profile_id: {profile_id}")
+            
             return dict(a.tech_skills or {})
 
     def update_tech_skills(self, profile_id: str, tech_skills: Dict[str, int]) -> None:
         with Session(self.engine) as s:
             a = s.exec(select(Attributes).where(Attributes.user_id == uuid.UUID(profile_id))).first()
+            
+            # ✅ CORREÇÃO: Verificar se 'a' existe antes de usar
+            if not a:
+                raise ValueError(f"Attributes não encontrados para profile_id: {profile_id}")
+            
             a.tech_skills = tech_skills
             a.updated_at = datetime.utcnow()
             s.add(a); s.commit()
