@@ -1,6 +1,9 @@
 # backend/ai_fake.py
 from typing import List, Dict
 
+# ✅ Importa a interface que vamos implementar
+from backend.app.domain.ports import IAIService
+
 def _front():
     return [
         {
@@ -164,7 +167,21 @@ def _de():
         }
     ]
 
-class FakeAI:
+class FakeAI(IAIService):
+    """
+    Implementação fake/mock do serviço de IA.
+    
+    Herda de IAIService, cumprindo o contrato:
+    - Implementa generate_challenges()
+    - Implementa evaluate_submission()
+    
+    Usado para:
+    - Desenvolvimento (sem gastar API calls de IA real)
+    - Testes automatizados
+    - Demonstrações
+    
+    No futuro, criaremos GeminiAI(IAIService) com IA real!
+    """
     def _track(self, attributes: dict) -> str:
         goal = (attributes.get("career_goal") or "").lower()
         if "front" in goal: return "frontend"

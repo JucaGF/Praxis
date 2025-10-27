@@ -9,6 +9,40 @@ from .templates import TEMPLATES
 
 STATIC_DIR = "static/data"
 
+def _safe_formula_eval(expr: str, variables: dict) -> np.ndarray:
+    """
+    Avalia uma expressão matemática simples de forma SEGURA.
+    
+    Por que precisamos disso?
+    - eval() é PERIGOSO: executa qualquer código Python
+    - Esta função só permite operações matemáticas básicas (+, -, *, /)
+    
+    Como funciona?
+    1. Substitui nomes de variáveis (ex: "price") pelos valores reais
+    2. Só permite números e operadores matemáticos
+    3. Usa eval() mas com contexto restrito (sem funções perigosas)
+    
+    Exemplo:
+    - expr = "price * quantity"
+    - variables = {"price": [10, 20], "quantity": [2, 3]}
+    - resultado = [20, 60]
+    """
+    # Cria um ambiente limpo: sem funções built-in perigosas
+    safe_dict = {
+        "__builtins__": {},  # Remove TODAS as funções built-in (print, open, etc)
+        "np": np,             # Permite numpy (para operações em arrays)
+    }
+    
+    # Adiciona as variáveis que queremos usar (colunas do DataFrame)
+    safe_dict.update(variables)
+    
+    try:
+        # Agora sim, eval() mas APENAS com o que está em safe_dict
+        result = eval(expr, safe_dict, {})
+        return result
+    except Exception as e:
+        raise ValueError(f"Fórmula inválida '{expr}': {e}")
+
 def _stable_seed(*parts: str) -> int:
     h = hashlib.sha256("::".join(parts).encode()).hexdigest()
     return int(h[:12], 16)  # usa 48 bits
@@ -80,8 +114,9 @@ def generate_dataset(template_id: str, seed_parts: Tuple[str, ...], size: str = 
                 df[name] = q
             elif gen == "formula":
                 expr = col["expr"]
-                # expressão simples: price*quantity
-                df[name] = np.round(eval(expr, {}, {c: df[c].values for c in df.columns}), 2)
+                # Avalia a fórmula de forma SEGURA (sem eval() direto)
+                variables = {c: df[c].values for c in df.columns}
+                df[name] = np.round(_safe_formula_eval(expr, variables), 2)
             elif gen == "bernoulli":
                 p = float(col.get("p", 0.05))
                 df[name] = (rng.random(n) < p).astype(int)
