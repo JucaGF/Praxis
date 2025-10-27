@@ -14,7 +14,9 @@ from backend.app.deps import get_repo
 from backend.app.domain.ports import IRepository
 from backend.app.schemas.attributes import AttributesOut, AttributesPatchIn
 from backend.app.domain.exceptions import PraxisError, get_http_status_code
+from backend.app.logging_config import get_logger
 
+logger = get_logger(__name__)
 router = APIRouter(prefix="/attributes", tags=["attributes"])
 
 
@@ -37,6 +39,10 @@ def get_attributes(profile_id: str, repo: IRepository = Depends(get_repo)):
         status_code = get_http_status_code(e)
         raise HTTPException(status_code=status_code, detail=str(e))
     except Exception as e:
+        logger.exception(
+            "Erro inesperado ao buscar atributos",
+            extra={"extra_data": {"profile_id": profile_id}}
+        )
         raise HTTPException(status_code=500, detail="Erro inesperado ao buscar atributos")
 
 
@@ -70,4 +76,8 @@ def patch_attributes(
         status_code = get_http_status_code(e)
         raise HTTPException(status_code=status_code, detail=str(e))
     except Exception as e:
+        logger.exception(
+            "Erro inesperado ao atualizar atributos",
+            extra={"extra_data": {"profile_id": profile_id, "payload": payload}}
+        )
         raise HTTPException(status_code=500, detail="Erro inesperado ao atualizar atributos")

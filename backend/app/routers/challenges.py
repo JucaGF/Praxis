@@ -17,7 +17,9 @@ from backend.app.domain.services import ChallengeService
 from backend.app.domain.auth_service import AuthUser
 from backend.app.schemas.challenges import ChallengeOut
 from backend.app.domain.exceptions import PraxisError, get_http_status_code
+from backend.app.logging_config import get_logger
 
+logger = get_logger(__name__)
 router = APIRouter(prefix="/challenges", tags=["challenges"])
 
 
@@ -60,6 +62,10 @@ def generate_challenges(
         status_code = get_http_status_code(e)
         raise HTTPException(status_code=status_code, detail=str(e))
     except Exception as e:
+        logger.exception(
+            "Erro inesperado ao gerar desafios",
+            extra={"extra_data": {"profile_id": current_user.id}}
+        )
         raise HTTPException(status_code=500, detail="Erro inesperado ao gerar desafios")
 
 
@@ -101,4 +107,8 @@ def get_one(
         status_code = get_http_status_code(e)
         raise HTTPException(status_code=status_code, detail=str(e))
     except Exception as e:
+        logger.exception(
+            "Erro inesperado ao buscar desafio",
+            extra={"extra_data": {"challenge_id": challenge_id}}
+        )
         raise HTTPException(status_code=500, detail="Erro inesperado ao buscar desafio")

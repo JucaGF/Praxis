@@ -18,7 +18,9 @@ from backend.app.deps import get_submission_service
 from backend.app.domain.services import SubmissionService
 from backend.app.schemas.submissions import SubmissionCreateIn, SubmissionResultOut
 from backend.app.domain.exceptions import PraxisError, get_http_status_code
+from backend.app.logging_config import get_logger
 
+logger = get_logger(__name__)
 router = APIRouter(prefix="/submissions", tags=["submissions"])
 
 
@@ -61,7 +63,11 @@ def create_and_score_submission(
         
     except Exception as e:
         # Apenas erros INESPERADOS (bugs) caem aqui
-        # Em produção, você logaria isso para investigar
+        # Log completo com traceback para investigação
+        logger.exception(
+            "Erro inesperado ao processar submissão",
+            extra={"extra_data": {"submission_data": submission_data}}
+        )
         raise HTTPException(
             status_code=500, 
             detail="Erro inesperado ao processar submissão. Por favor, tente novamente."
