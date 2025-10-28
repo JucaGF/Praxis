@@ -38,32 +38,53 @@ logger = get_logger(__name__)
 
 def calculate_skill_delta(
     skill_atual: int, 
-    nota: int, 
+    skill_assessment: dict,
     dificuldade_level: str, 
     tentativas: int
 ) -> int:
     """
-    Calcula quanto uma skill deve aumentar/diminuir baseado na performance.
+    Calcula quanto uma skill deve aumentar/diminuir baseado na avaliação da IA.
+    
+    NOVA ABORDAGEM: Usa análise qualitativa da IA em vez de apenas nota numérica!
+    
+    A IA avalia:
+    - Nível real demonstrado (pode ser diferente da nota)
+    - Qualidade vs expectativa do nível atual
+    - Boas/más práticas (não só se funciona)
+    - Sinais de evolução ou estagnação
+    - Complexidade da solução vs dificuldade
     
     Fórmula não-linear que considera:
-    - Diferença entre nota e skill atual
+    - Gap entre nível demonstrado e skill atual (pode ser negativo!)
+    - Intensidade de progressão da IA (-1.0 a +1.0)
     - Peso da dificuldade (easy=0.7, medium=1.0, hard=1.3)
     - Curva de aprendizado (mais difícil subir quando skill já é alta)
     - Penalidade por tentativas (diminui ganho a cada nova tentativa)
     
-    Exemplo:
-    - skill_atual = 50, nota = 85, dificuldade = medium, tentativas = 1
-    - ganho = (85 - 50) * 1.0 * 0.73 * 1.0 / 20 ≈ +1.27 → +1 ponto
+    Exemplo 1 - Progressão:
+    - skill_atual = 50, demonstrated = 75, intensity = 0.7
+    - ganho = (75 - 50) * 0.7 * 1.0 * 0.73 * 1.0 / 15 ≈ +0.85 → +1 ponto
+    
+    Exemplo 2 - Regressão (más práticas):
+    - skill_atual = 70, demonstrated = 65, intensity = -0.4
+    - ganho = (65 - 70) * -0.4 * 1.0 * 0.5 * 1.0 / 15 ≈ -0.06 → -1 ponto
     
     Args:
         skill_atual: Nível atual da skill (0-100)
-        nota: Nota obtida no desafio (0-100)
+        skill_assessment: Dict da IA com skill_level_demonstrated, progression_intensity, etc
         dificuldade_level: "easy", "medium" ou "hard"
         tentativas: Número da tentativa (1, 2, 3...)
         
     Returns:
         Delta (variação) a aplicar na skill (pode ser negativo!)
     """
+    # Extrai dados do assessment da IA
+    skill_demonstrated = skill_assessment.get("skill_level_demonstrated", skill_atual)
+    intensity = skill_assessment.get("progression_intensity", 0.0)
+    
+    # Gap: diferença entre nível demonstrado e atual
+    gap = skill_demonstrated - skill_atual
+    
     # Pesos por dificuldade
     pesos = {"easy": 0.7, "medium": 1.0, "hard": 1.3}
     peso = pesos.get(dificuldade_level, 1.0)
@@ -75,8 +96,10 @@ def calculate_skill_delta(
     # Penalidade por tentativas: -10% a cada tentativa adicional (mínimo 60%)
     penal = max(0.6, 1 - 0.1 * (tentativas - 1))
     
-    # Fórmula final
-    ganho = (nota - skill_atual) * peso * curva * penal / 20.0
+    # Fórmula final: usa intensity da IA (pode amplificar ou inverter o gap!)
+    # Divisor menor (15 em vez de 20) para mudanças mais perceptíveis
+    ganho = gap * intensity * peso * curva * penal / 15.0
+    
     return int(round(ganho))
 
 
@@ -147,10 +170,11 @@ class ChallengeService:
         Fluxo:
         1. Busca dados do perfil
         2. Busca atributos (skills, career_goal)
-        3. Chama IA para gerar desafios personalizados
-        4. Limita ao número solicitado
-        5. Salva no banco
-        6. Retorna desafios criados
+        3. **DELETA desafios antigos do usuário**
+        4. Chama IA para gerar desafios personalizados
+        5. Limita ao número solicitado
+        6. Salva no banco
+        7. Retorna desafios criados
         
         Args:
             profile_id: ID do perfil
@@ -170,14 +194,21 @@ class ChallengeService:
         # 2. Busca atributos
         attributes = self.repo.get_attributes(profile_id)
         
-        # 3. Gera desafios via IA
+        # 3. Deleta desafios antigos (sempre gera conjunto novo)
+        deleted_count = self.repo.delete_challenges_for_profile(profile_id)
+        if deleted_count > 0:
+            logger.info(f"Deletados {deleted_count} desafios antigos do perfil {profile_id}")
+        
+        # 4. Gera desafios via IA
         generated = self.ai.generate_challenges(profile, attributes)
         
-        # 4. Limita ao count solicitado
+        # 5. Limita ao count solicitado
         generated = generated[:count]
         
-        # 5. Salva no banco
+        # 6. Salva no banco
         created = self.repo.create_challenges_for_profile(profile_id, generated)
+        
+        logger.info(f"Gerados {len(created)} novos desafios para perfil {profile_id}")
         
         return created
     
@@ -314,6 +345,7 @@ class SubmissionService:
         score = int(eval_result.get("nota_geral", 0))
         metrics = eval_result.get("metricas", {})
         feedback_text = eval_result.get("feedback_detalhado", "Sem detalhes")
+        skill_assessment = eval_result.get("skill_assessment", {})
         
         ctx["score"] = score
         logger.info(f"Nota obtida: {score}", extra={"extra_data": ctx})
@@ -334,14 +366,15 @@ class SubmissionService:
         
         delta_applied: Optional[int] = None
         updated_value: Optional[int] = None
+        skill_reasoning: Optional[str] = None
         
         if target_skill:
             # Busca skills atuais
             current_skills = self.repo.get_tech_skills(submission_data["profile_id"])
             skill_atual = int(current_skills.get(target_skill, 50))
             
-            # Calcula quanto a skill deve mudar
-            delta = calculate_skill_delta(skill_atual, score, difficulty_level, attempts)
+            # Calcula quanto a skill deve mudar usando assessment da IA
+            delta = calculate_skill_delta(skill_atual, skill_assessment, difficulty_level, attempts)
             
             # Aplica a mudança
             new_skills = apply_skill_update(current_skills, target_skill, delta)
@@ -349,6 +382,7 @@ class SubmissionService:
             
             delta_applied = int(delta)
             updated_value = int(new_skills.get(target_skill, skill_atual))
+            skill_reasoning = skill_assessment.get("reasoning")
         
         # ===== PASSO 8: Marcar como 'scored' e retornar =====
         self.repo.update_submission(submission["id"], {"status": "scored"})
@@ -358,7 +392,8 @@ class SubmissionService:
             "status": "scored",
             "score": score,
             "skill_delta": delta_applied,
-            "skill_updated": updated_value
+            "skill_updated": updated_value,
+            "skill_reasoning": skill_reasoning
         })
         logger.info("Submissão processada com sucesso", extra={"extra_data": ctx})
         
@@ -370,6 +405,7 @@ class SubmissionService:
             "feedback": feedback_text,
             "target_skill": target_skill,
             "delta_applied": delta_applied,
-            "updated_skill_value": updated_value
+            "updated_skill_value": updated_value,
+            "skill_reasoning": skill_reasoning
         }
 

@@ -22,7 +22,7 @@ from typing import Optional
 from datetime import datetime, timezone
 from pydantic import BaseModel
 
-from backend.app.config import get_settings
+from backend.app.config import get_settings, DEV_USER_UUID
 from backend.app.logging_config import get_logger
 from backend.app.domain.exceptions import PraxisError
 
@@ -216,7 +216,7 @@ class AuthService:
             # Modo desenvolvimento: retorna usuário mock
             logger.warning("Auth desabilitado - retornando usuário mock")
             return AuthUser(
-                id="dev-user-mock",
+                id=str(DEV_USER_UUID),
                 email="dev@mock.local",
                 role="authenticated"
             )
@@ -253,7 +253,7 @@ class AuthService:
         # Modo desenvolvimento sem auth
         if not self.auth_enabled:
             return AuthUser(
-                id="dev-user-mock",
+                id=str(DEV_USER_UUID),
                 email="dev@mock.local",
                 role="authenticated"
             )
