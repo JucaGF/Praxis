@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <title>Praxis — Landing</title>
+
+    <!-- Tailwind Play CDN (como antes) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: {
+                50:'#fefce8',100:'#fef9c3',200:'#fef08a',300:'#fde047',
+                400:'#facc15',500:'#eab308',600:'#ca8a04',700:'#a16207',
+                800:'#854d0e',900:'#713f12'
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800;900&display=swap" rel="stylesheet">
+
+    <style>
+      @keyframes floatY{0%{transform:translateY(0)}50%{transform:translateY(-20px)}100%{transform:translateY(0)}}
+      @keyframes driftX{0%{transform:translateX(0)}50%{transform:translateX(25px)}100%{transform:translateX(0)}}
+      .floaty{animation:floatY 7s ease-in-out infinite alternate;}
+      .drifty{animation:driftX 10s ease-in-out infinite alternate;}
+      [data-delay="1"]{animation-delay:.5s}[data-delay="2"]{animation-delay:1.5s}[data-delay="3"]{animation-delay:2.5s}[data-delay="4"]{animation-delay:3.5s}[data-delay="5"]{animation-delay:4.5s}
+      .word-in{animation:wordIn .45s ease forwards}.word-out{animation:wordOut .35s ease forwards}
+      @keyframes wordIn{0%{opacity:0;transform:translateY(16px)}100%{opacity:1;transform:translateY(0)}}
+      @keyframes wordOut{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-16px)}}
+      .shadow-chip:hover{transform:scale(1.08) rotate(1deg) translateY(-3px);box-shadow:0 0 45px rgba(250,204,21,.55),0 0 70px rgba(250,204,21,.35);filter:blur(.5px)}
+    </style>
+  </head>
+  <body class="bg-white text-zinc-900 antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
