@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import List, Optional, Any
 
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy import Column, CheckConstraint, Text, ForeignKey, String
+from sqlalchemy import Column, CheckConstraint, Text, ForeignKey, String, Index
 from sqlmodel import Field, Relationship, SQLModel
 from sqlalchemy.types import DateTime
 from sqlalchemy.sql import func
@@ -20,11 +20,14 @@ class Profile(SQLModel, table=True):
     id: uuid.UUID = Field(primary_key=True)
     full_name: Optional[str] = None
     email: str = Field(index=True, nullable=False, unique=True)
-    
+
     resumes: List["Resume"] = Relationship(back_populates="profile")
     submissions: List["Submission"] = Relationship(back_populates="profile")
     attributes: Optional["Attributes"] = Relationship(back_populates="profile")
     challenges: List["Challenge"] = Relationship(back_populates="profile")
+    skill_history: List["SkillHistory"] = Relationship(
+        back_populates="profile")
+
 
 class Resume(SQLModel, table=True):
     """
@@ -37,7 +40,8 @@ class Resume(SQLModel, table=True):
     title: Optional[str] = Field(default=None, index=True)
     original_content: str
     created_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+        sa_column=Column(DateTime(timezone=True),
+                         server_default=func.now(), nullable=False)
     )
 
     # Relações: Cada currículo pertence a um perfil e tem uma análise
@@ -59,7 +63,8 @@ class Attributes(SQLModel, table=True):
     soft_skills: Optional[JsonB] = Field(default=None, sa_column=Column(JSONB))
     tech_skills: Optional[JsonB] = Field(default=None, sa_column=Column(JSONB))
     updated_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+        sa_column=Column(DateTime(timezone=True),
+                         server_default=func.now(), nullable=False)
     )
 
     # Relação com Profile
@@ -78,7 +83,8 @@ class ResumeAnalysis(SQLModel, table=True):
     improvements: Optional[str] = Field(default=None)
     full_report: Optional[JsonB] = Field(default=None, sa_column=Column(JSONB))
     created_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+        sa_column=Column(DateTime(timezone=True),
+                         server_default=func.now(), nullable=False)
     )
 
     # Relação: A análise pertence a um currículo
@@ -109,7 +115,8 @@ class Challenge(SQLModel, table=True):
     template_code: Optional[JsonB] = Field(
         default=None, sa_column=Column(JSONB))
     created_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+        sa_column=Column(DateTime(timezone=True),
+                         server_default=func.now(), nullable=False)
     )
 
     # Relação: Um desafio pode ter várias submissões
@@ -143,7 +150,8 @@ class Submission(SQLModel, table=True):
     notes: Optional[str] = None
     time_taken_sec: Optional[int] = None
     submitted_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+        sa_column=Column(DateTime(timezone=True),
+                         server_default=func.now(), nullable=False)
     )
 
     # Relações: Uma submissão pertence a um perfil, a um desafio e tem um feedback
@@ -151,9 +159,55 @@ class Submission(SQLModel, table=True):
     challenge: Challenge = Relationship(back_populates="submissions")
     feedback: Optional["SubmissionFeedback"] = Relationship(
         back_populates="submission")
+    skill_history: List["SkillHistory"] = Relationship(
+        back_populates="submission")
 
     __table_args__ = (CheckConstraint(
         "status IN ('sent', 'evaluating', 'scored', 'error')", name="submissions_status_chk"),)
+
+
+class SkillHistory(SQLModel, table=True):
+    """
+    Histórico de evolução de skills do usuário ao longo do tempo.
+    """
+    __tablename__ = "skill_history"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    profile_id: uuid.UUID = Field(foreign_key="profiles.id")
+    # Snapshot completo de skills naquele momento (ex: {"React": 70, "SQL": 60})
+    tech_skills: JsonB = Field(sa_column=Column(JSONB, nullable=False))
+    # O que causou a mudança: 'submission', 'manual_update', 'initial'
+    trigger: str = Field(
+        default="submission",
+        sa_column=Column(
+            String(50), server_default="submission", nullable=False),
+    )
+    # Submissão relacionada (quando o trigger for 'submission')
+    submission_id: Optional[int] = Field(
+        default=None, foreign_key="submissions.id")
+    # Mudanças pontuais (ex: {"React": {"from": 65, "to": 70, "delta": 5}})
+    changed_skills: Optional[JsonB] = Field(
+        default=None, sa_column=Column(JSONB))
+    created_at: datetime = Field(
+        sa_column=Column(DateTime(timezone=True),
+                         server_default=func.now(), nullable=False)
+    )
+
+    # Relações
+    profile: Profile = Relationship(back_populates="skill_history")
+    submission: Optional["Submission"] = Relationship(
+        back_populates="skill_history")
+
+    __table_args__ = (
+        # Índices para consultas por usuário e por período
+        Index("idx_skill_history_profile_id", "profile_id"),
+        Index("idx_skill_history_created_at", "created_at"),
+        # Validação do trigger
+        CheckConstraint(
+            "trigger IN ('submission','manual_update','initial')",
+            name="skill_history_trigger_chk",
+        ),
+    )
 
 
 class SubmissionFeedback(SQLModel, table=True):
@@ -171,7 +225,8 @@ class SubmissionFeedback(SQLModel, table=True):
     raw_ai_response: Optional[JsonB] = Field(
         default=None, sa_column=Column(JSONB))
     created_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+        sa_column=Column(DateTime(timezone=True),
+                         server_default=func.now(), nullable=False)
     )
 
     # Relação: O feedback pertence a uma submissão

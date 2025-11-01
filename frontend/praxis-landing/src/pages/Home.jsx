@@ -158,10 +158,11 @@ export default function Home() {
 
                     {/* Ações extras quando expandido */}
                     <div className="mt-5 flex flex-wrap gap-3">
-                    <PrimaryButton>
-                        {/* impedir que o clique no botão feche o card */}
-                        <span onClick={(e) => e.stopPropagation()}>Começar desafio</span>
-                    </PrimaryButton>
+                    <Link to={`/desafio/${c.id}`} onClick={(e) => e.stopPropagation()}>
+                      <PrimaryButton>
+                        Começar desafio
+                      </PrimaryButton>
+                    </Link>
 
                     <button
                         onClick={(e) => { e.stopPropagation(); setExpandedId(null); }}
