@@ -59,6 +59,20 @@ class IRepository(ABC):
         """
         pass
     
+    @abstractmethod
+    def create_profile(self, profile_id: str, profile_data: dict) -> dict:
+        """
+        Cria um novo perfil com ID específico.
+        
+        Args:
+            profile_id: ID do perfil (pode ser UUID ou string para dev)
+            profile_data: dict com {name, track, email, linkedin?, github?, portfolio?}
+            
+        Returns:
+            dict com dados do perfil criado
+        """
+        pass
+    
     # -------------- ATRIBUTOS --------------
     @abstractmethod
     def get_attributes(self, profile_id: str) -> dict:
@@ -111,6 +125,19 @@ class IRepository(ABC):
             
         Returns:
             lista de desafios criados (com IDs)
+        """
+        pass
+    
+    @abstractmethod
+    def delete_challenges_for_profile(self, profile_id: str) -> int:
+        """
+        Deleta todos os desafios de um perfil.
+        
+        Args:
+            profile_id: ID do perfil
+            
+        Returns:
+            Número de desafios deletados
         """
         pass
     
@@ -206,7 +233,13 @@ class IAIService(ABC):
                 "pontos_positivos": list[str],
                 "pontos_negativos": list[str],
                 "sugestoes_melhoria": list[str],
-                "feedback_detalhado": str
+                "feedback_detalhado": str,
+                "skill_assessment": {
+                    "skill_level_demonstrated": int (0-100),
+                    "should_progress": bool,
+                    "progression_intensity": float (-1.0 a +1.0),
+                    "reasoning": str
+                }
             }
         """
         pass

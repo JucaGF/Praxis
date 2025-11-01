@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from backend.app.deps import get_repo, get_current_user
 from backend.app.domain.ports import IRepository
 from backend.app.domain.auth_service import AuthUser
-from backend.app.config import get_settings
+from backend.app.config import get_settings, DEV_USER_UUID
 
 router = APIRouter(prefix="/dev", tags=["desenvolvimento"])
 
@@ -59,23 +59,24 @@ def create_mock_attributes_data() -> dict:
         dict com atributos
     """
     return {
-        "career_goal": "Desenvolver habilidades técnicas e soft skills de forma equilibrada",
+        "career_goal": "Desenvolvedor Backend Pleno - Evoluir em arquitetura de sistemas, testes automatizados e otimização de performance em APIs REST com Python/FastAPI",
         "soft_skills": {
-            "comunicacao": 50,
-            "trabalho_em_equipe": 50,
-            "resolucao_problemas": 50,
-            "adaptabilidade": 50,
-            "lideranca": 40,
+            "comunicacao": 55,
+            "trabalho_em_equipe": 60,
+            "resolucao_problemas": 65,
+            "adaptabilidade": 55,
+            "lideranca": 45,
         },
         "tech_skills": {
-            "Python": 60,
-            "FastAPI": 55,
-            "React": 45,
-            "JavaScript": 50,
-            "SQL": 55,
-            "Git": 60,
-            "Docker": 40,
-            "APIs REST": 65,
+            "Python": 70,
+            "FastAPI": 65,
+            "SQL": 60,
+            "PostgreSQL": 55,
+            "APIs REST": 70,
+            "Git": 65,
+            "Docker": 50,
+            "Testes Unitários": 45,
+            "Arquitetura de Software": 40,
         }
     }
 
@@ -112,19 +113,19 @@ def setup_mock_data_for_current_user(
     attributes_created = False
     
     # 1. Verificar/criar profile
-    try:
-        profile = repo.get_profile(current_user.id)
-    except Exception:
+    profile = repo.get_profile(current_user.id)
+    if not profile:
         # Profile não existe, criar
         profile_data = create_mock_profile_data(current_user.id, current_user.email)
         profile = repo.create_profile(current_user.id, profile_data)
         profile_created = True
     
-    # 2. Verificar/criar attributes
+    # 2. Verificar/criar attributes (só se profile existir)
     try:
         attributes = repo.get_attributes(current_user.id)
+        # Se chegou aqui, attributes já existe
     except Exception:
-        # Attributes não existem, criar
+        # Attributes não existe, criar
         attributes_data = create_mock_attributes_data()
         attributes = repo.update_attributes(current_user.id, attributes_data)
         attributes_created = True
@@ -144,10 +145,10 @@ def create_dev_user(repo: IRepository = Depends(get_repo)):
     
     **Quando usar:**
     - Primeira vez que vai usar AUTH_ENABLED=false
-    - Usuário "dev-user-mock" não existe no banco
+    - Usuário de desenvolvimento não existe no banco
     
     **O que faz:**
-    1. Cria profile com ID fixo "dev-user-mock"
+    1. Cria profile com UUID fixo de desenvolvimento
     2. Cria attributes para esse usuário
     3. Permite desenvolvimento sem autenticação
     
@@ -158,28 +159,30 @@ def create_dev_user(repo: IRepository = Depends(get_repo)):
     
     **⚠️ IMPORTANTE:**
     - Use apenas uma vez (ou quando resetar banco)
-    - ID fixo: "dev-user-mock"
+    - ID fixo: 00000000-0000-0000-0000-000000000001
     - Email: "dev@mock.local"
     """
-    # ID fixo usado no modo AUTH_ENABLED=false
-    dev_user_id = "dev-user-mock"
+    # UUID fixo usado no modo AUTH_ENABLED=false
+    dev_user_id = str(DEV_USER_UUID)
     dev_email = "dev@mock.local"
     
     profile_created = False
     attributes_created = False
     
     # 1. Criar/verificar profile
-    try:
-        profile = repo.get_profile(dev_user_id)
-    except Exception:
+    profile = repo.get_profile(dev_user_id)
+    if not profile:
+        # Profile não existe, criar
         profile_data = create_mock_profile_data(dev_user_id, dev_email)
         profile = repo.create_profile(dev_user_id, profile_data)
         profile_created = True
     
-    # 2. Criar/verificar attributes
+    # 2. Criar/verificar attributes (só se profile existir)
     try:
         attributes = repo.get_attributes(dev_user_id)
+        # Se chegou aqui, attributes já existe
     except Exception:
+        # Attributes não existe, criar
         attributes_data = create_mock_attributes_data()
         attributes = repo.update_attributes(dev_user_id, attributes_data)
         attributes_created = True

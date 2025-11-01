@@ -110,25 +110,75 @@ class SqlRepo(IRepository):
 
     def get_profile(self, profile_id: str) -> Optional[dict]:
         with Session(self.engine) as s:
-            p = s.get(Profile, uuid.UUID(profile_id))
+            # Tenta converter para UUID, se falhar busca por string diretamente
+            try:
+                pid = uuid.UUID(profile_id)
+                p = s.get(Profile, pid)
+            except ValueError:
+                # ID não é UUID válido, busca como string
+                p = s.exec(select(Profile).where(Profile.id == profile_id)).first()
             return _profile_out(p) if p else None
+    
+    def create_profile(self, profile_id: str, profile_data: dict) -> dict:
+        """
+        Cria um novo perfil com ID específico.
+        Permite tanto UUIDs válidos quanto strings.
+        """
+        with Session(self.engine) as s:
+            # Tenta usar como UUID, senão usa como string
+            try:
+                pid = uuid.UUID(profile_id)
+            except ValueError:
+                # Não é UUID, usa o profile_id como string
+                pid = profile_id
+            
+            new_profile = Profile(
+                id=pid,
+                full_name=profile_data.get("name"),
+                email=profile_data["email"],
+                # Campos opcionais do profile podem ser adicionados aqui
+            )
+            s.add(new_profile)
+            s.commit()
+            s.refresh(new_profile)
+            return _profile_out(new_profile)
 
     # -------------- ATRIBUTOS --------------
     def get_attributes(self, profile_id: str) -> dict:
         with Session(self.engine) as s:
-            pid = uuid.UUID(profile_id)
+            # Tenta converter para UUID, se falhar usa string diretamente
+            try:
+                pid = uuid.UUID(profile_id)
+            except ValueError:
+                # ID não é UUID válido
+                pid = profile_id
+            
             a = s.exec(select(Attributes).where(Attributes.user_id == pid)).first()
             if not a:
-                a = Attributes(user_id=pid, soft_skills={}, tech_skills={})
-                s.add(a); s.commit(); s.refresh(a)
+                raise ValueError(f"Attributes não encontrados para profile_id: {profile_id}")
             return _attributes_out(pid, a)
 
     def update_attributes(self, profile_id: str, patch: dict) -> dict:
         with Session(self.engine) as s:
-            pid = uuid.UUID(profile_id)
+            # Tenta converter para UUID, se falhar usa string diretamente
+            try:
+                pid = uuid.UUID(profile_id)
+            except ValueError:
+                # ID não é UUID válido
+                pid = profile_id
+            
             a = s.exec(select(Attributes).where(Attributes.user_id == pid)).first()
             if not a:
-                raise ValueError("attributes not found for profile")
+                # Se não existe, cria com os dados do patch
+                a = Attributes(
+                    user_id=pid,
+                    career_goal=patch.get("career_goal"),
+                    soft_skills=patch.get("soft_skills", {}),
+                    tech_skills=patch.get("tech_skills", {})
+                )
+                s.add(a); s.commit(); s.refresh(a)
+                return _attributes_out(pid, a)
+            
             if "career_goal" in patch and patch["career_goal"] is not None:
                 a.career_goal = patch["career_goal"]
             if "soft_skills" in patch and patch["soft_skills"]:
@@ -141,7 +191,14 @@ class SqlRepo(IRepository):
 
     def get_tech_skills(self, profile_id: str) -> Dict[str, int]:
         with Session(self.engine) as s:
-            a = s.exec(select(Attributes).where(Attributes.user_id == uuid.UUID(profile_id))).first()
+            # Tenta converter para UUID, se falhar usa string diretamente
+            try:
+                pid = uuid.UUID(profile_id)
+            except ValueError:
+                # ID não é UUID válido
+                pid = profile_id
+            
+            a = s.exec(select(Attributes).where(Attributes.user_id == pid)).first()
             
             # ✅ CORREÇÃO: Verificar se 'a' existe antes de acessar
             if not a:
@@ -151,7 +208,14 @@ class SqlRepo(IRepository):
 
     def update_tech_skills(self, profile_id: str, tech_skills: Dict[str, int]) -> None:
         with Session(self.engine) as s:
-            a = s.exec(select(Attributes).where(Attributes.user_id == uuid.UUID(profile_id))).first()
+            # Tenta converter para UUID, se falhar usa string diretamente
+            try:
+                pid = uuid.UUID(profile_id)
+            except ValueError:
+                # ID não é UUID válido
+                pid = profile_id
+            
+            a = s.exec(select(Attributes).where(Attributes.user_id == pid)).first()
             
             # ✅ CORREÇÃO: Verificar se 'a' existe antes de usar
             if not a:
@@ -166,7 +230,13 @@ class SqlRepo(IRepository):
         """
         Cria N desafios para o profile. Requer que NÃO haja UNIQUE em challenges.profile_id.
         """
-        pid = uuid.UUID(profile_id)
+        # Tenta converter para UUID, se falhar usa string diretamente
+        try:
+            pid = uuid.UUID(profile_id)
+        except ValueError:
+            # ID não é UUID válido
+            pid = profile_id
+        
         rows = []
         with Session(self.engine) as s:
             for ch in challenges:
@@ -184,10 +254,46 @@ class SqlRepo(IRepository):
             for row in rows:
                 s.refresh(row)
         return [_challenge_out(r) for r in rows]
+    
+    def delete_challenges_for_profile(self, profile_id: str) -> int:
+        """
+        Deleta todos os desafios de um perfil.
+        Também deleta submissions e feedbacks relacionados.
+        """
+        # Tenta converter para UUID, se falhar usa string diretamente
+        try:
+            pid = uuid.UUID(profile_id)
+        except ValueError:
+            # ID não é UUID válido
+            pid = profile_id
+        
+        with Session(self.engine) as s:
+            # Busca todos os challenges do usuário
+            challenges = s.exec(
+                select(Challenge)
+                .where(Challenge.profile_id == pid)
+            ).all()
+            
+            count = len(challenges)
+            
+            if count > 0:
+                # SQLAlchemy vai deletar em cascata as submissions e feedbacks
+                # graças aos relacionamentos definidos nos models
+                for ch in challenges:
+                    s.delete(ch)
+                s.commit()
+            
+            return count
 
     def list_active_challenges(self, profile_id: str, limit: int = 3) -> List[dict]:
         with Session(self.engine) as s:
-            pid = uuid.UUID(profile_id)
+            # Tenta converter para UUID, se falhar usa string diretamente
+            try:
+                pid = uuid.UUID(profile_id)
+            except ValueError:
+                # ID não é UUID válido
+                pid = profile_id
+            
             rows = s.exec(
                 select(Challenge)
                 .where(Challenge.profile_id == pid)
@@ -204,7 +310,13 @@ class SqlRepo(IRepository):
     # -------------- SUBMISSIONS --------------
     def count_attempts(self, profile_id: str, challenge_id: int) -> int:
         with Session(self.engine) as s:
-            pid = uuid.UUID(profile_id)
+            # Tenta converter para UUID, se falhar usa string diretamente
+            try:
+                pid = uuid.UUID(profile_id)
+            except ValueError:
+                # ID não é UUID válido
+                pid = profile_id
+            
             return int(s.exec(
                 select(func.count(Submission.id)).where(
                     Submission.profile_id == pid,
@@ -214,8 +326,15 @@ class SqlRepo(IRepository):
 
     def create_submission(self, payload: dict) -> dict:
         with Session(self.engine) as s:
+            # Tenta converter para UUID, se falhar usa string diretamente
+            try:
+                pid = uuid.UUID(payload["profile_id"])
+            except ValueError:
+                # ID não é UUID válido
+                pid = payload["profile_id"]
+            
             row = Submission(
-                profile_id=uuid.UUID(payload["profile_id"]),
+                profile_id=pid,
                 challenge_id=payload["challenge_id"],
                 submitted_code=payload.get("submitted_code"),
                 status=payload.get("status", "sent"),

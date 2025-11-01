@@ -26,9 +26,10 @@ Este projeto é construído com tecnologias modernas, visando performance e uma 
 | **Frontend** | [React](https://reactjs.org/) (com [Vite](https://vitejs.dev/))                                            |
 | **Estilização** | [TailwindCSS](https://tailwindcss.com/)                                                                    |
 | **Backend** | [Python 3.11+](https://www.python.org/) com [FastAPI](https://fastapi.tiangolo.com/)                         |
-| **IA** | [Google Gemini 1.5 Pro](https://ai.google.dev/)                                                            |
+| **Banco de Dados** | [PostgreSQL](https://www.postgresql.org/) com [SQLModel](https://sqlmodel.tiangolo.com/)                |
+| **IA** | [Google Gemini 1.5](https://ai.google.dev/) (Flash ou Pro)                                                 |
+| **Autenticação** | [Supabase Auth](https://supabase.com/docs/guides/auth)                                                    |
 | **Editor de Código** | [Monaco Editor](https://microsoft.github.io/monaco-editor/)                                          |
-| **Ambiente Python** | [uv](https://github.com/astral-sh/uv)                                                                      |
 
 ## 🚀 Começando
 
@@ -69,14 +70,26 @@ Para rodar este projeto localmente, siga os passos abaixo.
 
 4.  **Configure as variáveis de ambiente:**
     * Crie um arquivo chamado `.env` na pasta `backend`.
-    * Adicione sua chave da API do Gemini:
+    * **Para desenvolvimento** (IA mock, sem custos):
+        ```env
+        DATABASE_URL=postgresql://user:password@localhost:5432/praxis
+        AI_PROVIDER=fake
+        AUTH_ENABLED=false
         ```
-        GOOGLE_API_KEY="SUA_CHAVE_DE_API_AQUI"
+    * **Para usar IA real** (Google Gemini):
+        ```env
+        DATABASE_URL=postgresql://user:password@localhost:5432/praxis
+        AI_PROVIDER=gemini
+        GEMINI_API_KEY=sua_chave_aqui
+        AUTH_ENABLED=false
         ```
+    
+    📖 **Guia completo de configuração da IA**: Veja [`backend/AI_SETUP.md`](backend/AI_SETUP.md)
 
 5.  **Rode o servidor:**
     ```bash
-    uvicorn main:app --reload
+    cd backend
+    uvicorn app.main:app --reload
     ```
     O backend estará rodando em `http://127.0.0.1:8000`.
 

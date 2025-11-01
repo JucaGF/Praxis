@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+/* --- Texto de incentivo --- */
+@keyframes incentivo {
+  0% {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+.animate-incentivo {
+  animation: incentivo 3s ease-in-out infinite;
+}
+
+/* --- Escada Lateral --- */
+@keyframes step-1 {
+  0%,
+  100% {
+    transform: translateX(0) scaleY(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(2px) scaleY(1.05);
+    opacity: 0.8;
+  }
+}
+@keyframes step-2 {
+  0%,
+  100% {
+    transform: translateX(0) scaleY(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(2px) scaleY(1.05);
+    opacity: 0.8;
+  }
+}
+@keyframes step-3 {
+  0%,
+  100% {
+    transform: translateX(0) scaleY(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(2px) scaleY(1.05);
+    opacity: 0.8;
+  }
+}
+@keyframes step-4 {
+  0%,
+  100% {
+    transform: translateX(0) scaleY(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(2px) scaleY(1.05);
+    opacity: 0.8;
+  }
+}
+@keyframes step-5 {
+  0%,
+  100% {
+    transform: translateX(0) scaleY(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(2px) scaleY(1.05);
+    opacity: 0.8;
+  }
+}
+
+.animate-step-1 {
+  animation: step-1 2.5s ease-in-out infinite;
+}
+.animate-step-2 {
+  animation: step-2 2.5s ease-in-out infinite 0.3s;
+}
+.animate-step-3 {
+  animation: step-3 2.5s ease-in-out infinite 0.6s;
+}
+.animate-step-4 {
+  animation: step-4 2.5s ease-in-out infinite 0.9s;
+}
+.animate-step-5 {
+  animation: step-5 2.5s ease-in-out infinite 1.2s;
+}
+
+/* --- Glow do alvo preto --- */
+@keyframes pulse-glow {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.8));
+  }
+  50% {
+    transform: scale(1.15);
+    filter: drop-shadow(0 0 20px rgba(0, 0, 0, 1));
+  }
+}
+.animate-pulse-glow {
+  animation: pulse-glow 2.5s ease-in-out infinite;
+}

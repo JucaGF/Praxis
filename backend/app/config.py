@@ -16,8 +16,16 @@ Como funciona?
 - Gera erro claro se faltar algo obrigatório
 """
 
+import uuid
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+# ==================== CONSTANTES ====================
+
+# UUID fixo para o usuário de desenvolvimento (quando AUTH_ENABLED=false)
+# Este UUID é usado para permitir desenvolvimento sem autenticação
+DEV_USER_UUID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
 class Settings(BaseSettings):
@@ -178,6 +186,76 @@ class Settings(BaseSettings):
     NUNCA usar False em produção!
     """
     
+    # ==================== INTELIGÊNCIA ARTIFICIAL ====================
+    
+    AI_PROVIDER: str = "fake"
+    """
+    Provedor de IA a usar.
+    
+    Opções:
+    - "fake": IA mock para desenvolvimento (rápido, grátis, sem API calls)
+    - "gemini": Google Gemini (IA real, requer API key)
+    
+    Uso:
+    - Desenvolvimento/Testes: use "fake"
+    - Produção: use "gemini"
+    
+    Exemplo no .env:
+        AI_PROVIDER=fake  # ou gemini
+    """
+    
+    GEMINI_API_KEY: str = ""
+    """
+    API Key do Google Gemini.
+    
+    Onde conseguir:
+    1. Acesse: https://aistudio.google.com/app/apikey
+    2. Faça login com conta Google
+    3. Clique em "Create API Key"
+    4. Copie a chave
+    
+    IMPORTANTE:
+    - Obrigatório se AI_PROVIDER=gemini
+    - Mantenha secreta (não commite no git!)
+    - Grátis: 60 requests/minuto
+    
+    Exemplo no .env:
+        GEMINI_API_KEY=AIzaSyA...
+    """
+    
+    GEMINI_MODEL: str = "models/gemini-2.5-flash"
+    """
+    Modelo do Gemini a usar.
+    
+    Opções:
+    - "models/gemini-2.5-flash": Versão estável e rápida (RECOMENDADO)
+    - "models/gemini-2.5-pro": Versão mais inteligente
+    - "models/gemini-flash-latest": Sempre atualizado
+    
+    Gemini 2.5 Flash é excelente: rápido, inteligente e gratuito!
+    """
+    
+    AI_MAX_RETRIES: int = 3
+    """
+    Número máximo de tentativas em caso de erro na API.
+    
+    Se uma chamada falhar (timeout, rate limit, erro temporário),
+    o sistema retenta automaticamente com backoff exponencial.
+    
+    Recomendado: 3 (2s, 4s, 8s de espera)
+    """
+    
+    AI_TIMEOUT: int = 60
+    """
+    Timeout em segundos para chamadas à API de IA.
+    
+    Se a IA não responder em X segundos, cancela e retenta.
+    
+    Recomendado:
+    - Desenvolvimento: 30s
+    - Produção: 60s (prompts complexos podem demorar)
+    """
+    
     # ==================== CONFIGURAÇÃO DO PYDANTIC ====================
     
     model_config = SettingsConfigDict(
@@ -243,6 +321,17 @@ def print_settings():
     print(f"DEBUG: {settings.DEBUG}")
     print(f"ENVIRONMENT: {settings.ENVIRONMENT}")
     print(f"CORS_ORIGINS: {settings.CORS_ORIGINS}")
+    print(f"AI_PROVIDER: {settings.AI_PROVIDER}")
+    print(f"GEMINI_MODEL: {settings.GEMINI_MODEL}")
+    
+    # Oculta API key do Gemini
+    gemini_key = settings.GEMINI_API_KEY
+    if gemini_key:
+        gemini_key_safe = gemini_key[:8] + "..." + gemini_key[-4:] if len(gemini_key) > 12 else "***"
+    else:
+        gemini_key_safe = "(não configurada)"
+    print(f"GEMINI_API_KEY: {gemini_key_safe}")
+    
     print("="*50 + "\n")
 
 
