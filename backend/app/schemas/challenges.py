@@ -45,6 +45,8 @@ class Description(BaseModel):
     eval_criteria: List[str] = Field(default_factory=list)
     target_skill: Optional[str] = None
     hints: List[str] = Field(default_factory=list)
+    # Novo campo: contexto estruturado para novos layouts
+    enunciado: Optional[Dict[str, Any]] = None
 
 class ChallengeOut(BaseModel):
     """
@@ -58,8 +60,8 @@ class ChallengeOut(BaseModel):
     fs: Optional[FS] = None
     category: Optional[str] = None
     created_at: datetime
-    # template_code: opcional; seu time pode centralizar tudo em fs
-    template_code: Optional[Dict[str, Any]] = None
+    # template_code: pode ser dict (código simples) ou list (formulário híbrido para planejamento)
+    template_code: Optional[Dict[str, Any] | List[Dict[str, Any]]] = None
 
 class GenerateIn(BaseModel):
     """

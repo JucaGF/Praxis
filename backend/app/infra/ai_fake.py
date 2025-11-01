@@ -37,7 +37,14 @@ def _front():
             "language": "markdown",
             "eval_criteria": ["empatia","dados solicitados","clareza"],
             "target_skill": "comunicacao",
-            "hints": []
+            "hints": [],
+            "enunciado": {
+              "type": "email",
+              "de": "rodrigo.silva@xyz.com.br",
+              "assunto": "URGENTE: Erro 500 no Checkout - Perdendo Vendas!",
+              "data": "2024-11-01",
+              "corpo": "Prezados,\n\nEstou tentando finalizar uma compra há 2 horas e continuo recebendo erro 500. Já tentei 3 cartões diferentes. Isso é inaceitável! Estou perdendo tempo e o prazo para usar meu cupom de desconto está acabando. Preciso de uma solução IMEDIATA ou vou cancelar meu plano Premium.\n\nAguardo retorno urgente."
+            }
           },
           "difficulty": {"level": "easy", "time_limit": 20},
           "fs": None,
@@ -52,12 +59,50 @@ def _front():
             "language": "markdown",
             "eval_criteria": ["tecnologias adequadas","escalabilidade","clareza"],
             "target_skill": "arquitetura",
-            "hints": ["Considere WebSocket/Redis"]
+            "hints": ["Considere WebSocket/Redis"],
+            "enunciado": {
+              "type": "requisitos",
+              "funcionais": [
+                "Notificar usuários sobre novos eventos (likes, comentários, mensagens)",
+                "Exibir badge com contador de notificações não lidas",
+                "Histórico de notificações dos últimos 30 dias",
+                "Marcar notificações individuais como lidas"
+              ],
+              "nao_funcionais": [
+                "Suportar 10k usuários simultâneos",
+                "Latência máxima de 2 segundos para entrega",
+                "Disponibilidade de 99.9%"
+              ]
+            }
           },
           "difficulty": {"level": "hard", "time_limit": 45},
           "fs": None,
           "category": "planejamento",
-          "template_code": None
+          "template_code": [
+            {
+              "id": "tecnologias",
+              "label": "Tecnologias Principais",
+              "fields": [
+                {"id": "protocolo", "label": "Protocolo de Comunicação", "type": "dropdown", "options": ["WebSocket", "Server-Sent Events (SSE)", "Long Polling"]},
+                {"id": "message_broker", "label": "Message Broker", "type": "dropdown", "options": ["Redis Pub/Sub", "RabbitMQ", "Kafka", "Não usar"]},
+                {"id": "armazenamento", "label": "Armazenamento", "type": "dropdown", "options": ["PostgreSQL", "MongoDB", "Redis"]}
+              ]
+            },
+            {
+              "id": "justificativa",
+              "label": "Justificativa",
+              "fields": [
+                {"id": "porque", "label": "Por que escolheu essas tecnologias?", "type": "textarea"}
+              ]
+            },
+            {
+              "id": "tradeoffs",
+              "label": "Trade-offs",
+              "fields": [
+                {"id": "limitacoes", "label": "Principais limitações da solução", "type": "textarea"}
+              ]
+            }
+          ]
         }
     ]
 
@@ -94,7 +139,14 @@ def _back():
             "language": "markdown",
             "eval_criteria": ["clareza","priorização","dados solicitados"],
             "target_skill": "comunicacao",
-            "hints": []
+            "hints": [],
+            "enunciado": {
+              "type": "email",
+              "de": "suporte@empresa.com.br",
+              "assunto": "INC-4567: Lentidão na API - Múltiplos Clientes Afetados",
+              "data": "2024-11-01",
+              "corpo": "Olá equipe de backend,\n\nEstamos recebendo múltiplas reclamações de clientes sobre lentidão na API desde às 14h. Os clientes reportam timeouts e respostas demoradas. Já temos 12 tickets abertos. Conseguem investigar com urgência?\n\nAguardo retorno."
+            }
           },
           "difficulty": {"level": "easy", "time_limit": 20},
           "fs": None,
@@ -109,12 +161,51 @@ def _back():
             "language": "markdown",
             "eval_criteria": ["coerência","invalidação","escalabilidade"],
             "target_skill": "arquitetura",
-            "hints": ["Considere Redis"]
+            "hints": ["Considere Redis"],
+            "enunciado": {
+              "type": "requisitos",
+              "funcionais": [
+                "Cachear resposta do endpoint /api/products",
+                "Invalidar cache quando produto for atualizado/criado/deletado",
+                "Suportar filtros e paginação no cache",
+                "Cache deve ser compartilhado entre múltiplas instâncias da API"
+              ],
+              "nao_funcionais": [
+                "Reduzir latência de 800ms para <100ms",
+                "Suportar 10k requisições/minuto",
+                "Garantir consistência eventual (máximo 5 segundos de atraso)"
+              ]
+            }
           },
           "difficulty": {"level": "hard", "time_limit": 45},
           "fs": None,
           "category": "planejamento",
-          "template_code": None
+          "template_code": [
+            {
+              "id": "estrategia",
+              "label": "Estratégia de Cache",
+              "fields": [
+                {"id": "onde", "label": "Onde implementar o cache?", "type": "dropdown", "options": ["Redis", "Memcached", "Application Memory", "CDN"]},
+                {"id": "ttl", "label": "TTL (Time To Live)", "type": "dropdown", "options": ["30 segundos", "5 minutos", "1 hora", "Sem TTL"]},
+                {"id": "pattern", "label": "Padrão de Cache", "type": "dropdown", "options": ["Cache-Aside", "Write-Through", "Write-Behind"]}
+              ]
+            },
+            {
+              "id": "invalidacao",
+              "label": "Invalidação",
+              "fields": [
+                {"id": "quando", "label": "Como invalidar o cache?", "type": "textarea"},
+                {"id": "granularidade", "label": "Granularidade", "type": "dropdown", "options": ["Cache completo", "Por produto", "Por categoria"]}
+              ]
+            },
+            {
+              "id": "tradeoffs",
+              "label": "Trade-offs",
+              "fields": [
+                {"id": "problemas", "label": "Problemas potenciais dessa estratégia", "type": "textarea"}
+              ]
+            }
+          ]
         }
     ]
 
@@ -128,7 +219,14 @@ def _de():
             "language": "markdown",
             "eval_criteria": ["corretude","metodologia","reprodutibilidade","clareza/ação"],
             "target_skill": "SQL",
-            "hints": ["Se possível, inclua trechos de SQL ou Python"]
+            "hints": ["Se possível, inclua trechos de SQL ou Python"],
+            "enunciado": {
+              "type": "email",
+              "de": "maria.produto@empresa.com.br",
+              "assunto": "Análise de Vendas Q3 - Urgente",
+              "data": "2024-11-01",
+              "corpo": "Oi time de dados!\n\nPrecisamos de insights sobre o dataset de vendas do Q3 para a reunião de estratégia de amanhã. O que está vendendo bem? Onde estamos perdendo dinheiro? Tem alguma região problemática?\n\nPreciso de 3 insights acionáveis com números concretos até o fim do dia. Dataset está em: data/sales_q3.csv\n\nObrigada!"
+            }
           },
           "difficulty": {"level": "medium", "time_limit": 40},
           "fs": None,
@@ -143,12 +241,51 @@ def _de():
             "language": "markdown",
             "eval_criteria": ["orquestração","idempotência","particionamento","monitoramento"],
             "target_skill": "Airflow",
-            "hints": ["Considere DAG diária e retries"]
+            "hints": ["Considere DAG diária e retries"],
+            "enunciado": {
+              "type": "requisitos",
+              "funcionais": [
+                "Ingerir dados diários de API externa (endpoint: /api/v1/orders)",
+                "Pipeline: bronze (raw) → silver (staging) → gold (curado)",
+                "Dados devem ser particionados por data",
+                "Pipeline deve ser idempotente (reruns não duplicam dados)"
+              ],
+              "nao_funcionais": [
+                "Volume: 500k registros/dia (~20GB)",
+                "Janela de execução: 00:00 às 06:00",
+                "SLA: 95% de sucesso nos últimos 30 dias"
+              ]
+            }
           },
           "difficulty": {"level": "easy", "time_limit": 30},
           "fs": None,
           "category": "data-pipeline",
-          "template_code": None
+          "template_code": [
+            {
+              "id": "orquestracao",
+              "label": "Orquestração",
+              "fields": [
+                {"id": "ferramenta", "label": "Ferramenta de Orquestração", "type": "dropdown", "options": ["Apache Airflow", "Prefect", "Dagster", "Cron Jobs"]},
+                {"id": "schedule", "label": "Schedule", "type": "dropdown", "options": ["Diário 00:00", "Diário 06:00", "A cada 6 horas"]},
+                {"id": "retries", "label": "Retries em caso de falha", "type": "dropdown", "options": ["0", "2", "3", "5"]}
+              ]
+            },
+            {
+              "id": "idempotencia",
+              "label": "Idempotência",
+              "fields": [
+                {"id": "estrategia", "label": "Como garantir idempotência?", "type": "textarea"}
+              ]
+            },
+            {
+              "id": "monitoramento",
+              "label": "Monitoramento",
+              "fields": [
+                {"id": "alertas", "label": "Quando alertar?", "type": "textarea"},
+                {"id": "metricas", "label": "Métricas principais", "type": "textarea"}
+              ]
+            }
+          ]
         },
         {
           "title": "Comunicar incidente de atraso no DAG principal",
@@ -158,7 +295,14 @@ def _de():
             "language": "markdown",
             "eval_criteria": ["clareza","transparência","plano de ação"],
             "target_skill": "comunicacao",
-            "hints": ["Inclua métricas: atraso estimado, SLAs"]
+            "hints": ["Inclua métricas: atraso estimado, SLAs"],
+            "enunciado": {
+              "type": "email",
+              "de": "joao.negocio@empresa.com.br",
+              "assunto": "Dashboards de vendas desatualizados - O que está acontecendo?",
+              "data": "2024-11-01",
+              "corpo": "Oi pessoal,\n\nOs dashboards de vendas não estão atualizando desde às 10h. Tenho uma apresentação importante às 16h e preciso dos dados mais recentes. Conseguem resolver isso urgentemente e me explicar o que aconteceu?\n\nEstou preocupado que isso vire rotina.\n\nAguardo retorno."
+            }
           },
           "difficulty": {"level": "hard", "time_limit": 25},
           "fs": None,
@@ -255,119 +399,49 @@ class FakeAI(IAIService):
         
         # Nota base varia por tipo de desafio
         base = 82
-        if ch_type == "codigo" and submission.get("files"): 
-            base = 88
-        if ch_type == "planejamento": 
-            base = 78
+        if ch_type == "codigo" and submission.get("files"): base = 88
+        if ch_type == "planejamento": base = 78
+        if ch_type == "texto_livre": base = 85
         
-        # Métricas detalhadas
         metrics = (
             {"resolveu_problema": base, "qualidade_codigo": base-3, "boas_praticas": base-5}
             if ch_type == "codigo" else
             {"comunicacao": base-2, "conteudo_tecnico": base-3, "completude": base}
         )
         
-        # ===== SKILL ASSESSMENT - Lógica Inteligente =====
-        skill_assessment = self._assess_skill_progression(
-            nota=base,
-            ch_type=ch_type,
-            difficulty=difficulty,
-            metrics=metrics,
-            submission=submission
-        )
+        # Determina skill_level_demonstrated e progression_intensity
+        # Para o fake, usa lógica simples baseada na nota
+        skill_demonstrated = base + 3  # Ligeiramente acima da nota
+        should_progress = skill_demonstrated >= 70
+        
+        if base >= 90:
+            intensity = 0.9
+            reasoning = "Excelente execução! Demonstrou domínio sólido da skill."
+        elif base >= 80:
+            intensity = 0.7
+            reasoning = "Boa solução com práticas adequadas. Demonstrou competência clara."
+        elif base >= 70:
+            intensity = 0.5
+            reasoning = "Solução funcional e adequada. Demonstrou conhecimento satisfatório."
+        elif base >= 60:
+            intensity = 0.3
+            reasoning = "Solução básica mas funcional. Ainda há espaço para crescimento."
+        else:
+            intensity = -0.2
+            should_progress = False
+            reasoning = "Solução apresenta falhas significativas. Recomenda-se revisar conceitos fundamentais."
         
         return {
             "nota_geral": base,
             "metricas": metrics,
-            "pontos_positivos": ["Estrutura clara"],
+            "pontos_positivos": ["Estrutura clara", "Abordagem adequada"],
             "pontos_negativos": ["Cobertura de casos de erro limitada"] if ch_type=="codigo" else ["Faltaram exemplos numéricos"],
             "sugestoes_melhoria": ["Adicionar testes básicos"] if ch_type=="codigo" else ["Detalhar amostragem e limitações"],
             "feedback_detalhado": "Bom caminho. Pequenos ajustes elevam a qualidade.",
-            "skill_assessment": skill_assessment
-        }
-    
-    def _assess_skill_progression(
-        self, 
-        nota: int, 
-        ch_type: str, 
-        difficulty: str,
-        metrics: dict,
-        submission: dict
-    ) -> dict:
-        """
-        Avalia se a skill deve progredir/regredir e com qual intensidade.
-        
-        Simula análise qualitativa considerando:
-        - Qualidade vs expectativa do nível
-        - Boas/más práticas (métricas)
-        - Complexidade da solução
-        - Sinais de evolução ou estagnação
-        """
-        import random
-        random.seed(hash(str(submission)) % 10000)  # Determinístico por submissão
-        
-        # 1. Nível demonstrado base (pode ser diferente da nota!)
-        skill_demonstrated = nota
-        
-        # 2. Ajustes baseados em métricas de qualidade
-        if ch_type == "codigo":
-            boas_praticas = metrics.get("boas_praticas", nota)
-            qualidade = metrics.get("qualidade_codigo", nota)
-            
-            # Más práticas puxam o nível demonstrado pra baixo
-            if boas_praticas < 75:
-                skill_demonstrated -= 8
-            elif boas_praticas < 80:
-                skill_demonstrated -= 3
-            
-            # Qualidade baixa também afeta
-            if qualidade < nota - 5:
-                skill_demonstrated -= 5
-        
-        # 3. Ajuste por dificuldade (expectativa mais alta em challenges fáceis)
-        if difficulty == "easy" and nota < 85:
-            skill_demonstrated -= 5  # Esperava-se mais em easy
-        elif difficulty == "hard" and nota >= 75:
-            skill_demonstrated += 3  # Bom desempenho em hard vale mais
-        
-        # 4. Determina se deve progredir
-        should_progress = skill_demonstrated >= 70  # Threshold mínimo
-        
-        # 5. Intensidade de progressão (-1.0 a +1.0)
-        if skill_demonstrated >= 90:
-            intensity = 0.9  # Excelente
-        elif skill_demonstrated >= 85:
-            intensity = 0.7  # Muito bom
-        elif skill_demonstrated >= 80:
-            intensity = 0.5  # Bom
-        elif skill_demonstrated >= 75:
-            intensity = 0.3  # Satisfatório
-        elif skill_demonstrated >= 70:
-            intensity = 0.1  # Mínimo
-        elif skill_demonstrated >= 60:
-            intensity = -0.2  # Regressão leve
-        else:
-            intensity = -0.5  # Regressão significativa
-        
-        # 6. Variação aleatória para simular nuances (±10%)
-        intensity += random.uniform(-0.1, 0.1)
-        intensity = max(-1.0, min(1.0, intensity))  # Clamp
-        
-        # 7. Reasoning (explicação)
-        if intensity > 0.6:
-            reasoning = "Demonstrou domínio sólido com boas práticas. Progressão clara."
-        elif intensity > 0.3:
-            reasoning = "Boa execução, mas há espaço para melhorias técnicas."
-        elif intensity > 0:
-            reasoning = "Solução funcional, porém básica para o nível esperado."
-        elif intensity > -0.3:
-            reasoning = "Solução com falhas significativas ou más práticas detectadas."
-        else:
-            reasoning = "Abordagem inadequada ou demonstrou desconhecimento de conceitos fundamentais."
-        
-        return {
-            "skill_level_demonstrated": int(skill_demonstrated),
-            "should_progress": bool(should_progress),
-            "progression_intensity": round(float(intensity), 2),
-            "reasoning": reasoning
+            "skill_assessment": {
+                "skill_level_demonstrated": skill_demonstrated,
+                "should_progress": should_progress,
+                "progression_intensity": intensity,
+                "reasoning": reasoning
+            }
         }

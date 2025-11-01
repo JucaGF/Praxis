@@ -201,7 +201,8 @@ ESTRUTURA DE CADA DESAFIO:
     "language": "python|javascript|sql|markdown",
     "eval_criteria": ["critério1", "critério2", "critério3"],
     "target_skill": "Skill do perfil",
-    "hints": ["dica útil 1", "dica útil 2"]
+    "hints": ["dica útil 1", "dica útil 2"],
+    "enunciado": null  // NOVO: objeto estruturado (veja regras abaixo)
   },
   "difficulty": {"level": "easy|medium|hard", "time_limit": 20-90},
   "category": "bugfix|feature|api-design|ui-ux|performance|comunicacao|planejamento",
@@ -228,10 +229,25 @@ REGRAS OBRIGATÓRIAS:
    - fs.open: arquivo principal
    - fs.contents: TODOS os arquivos com código real (15-30 linhas)
    - Código deve ser bugado, incompleto ou precisar refatoração
-7. Para type="texto_livre" ou "planejamento": fs pode ser null
+   - enunciado: null
+   - template_code: null
+7. Para type="texto_livre":
+   - fs: null
+   - enunciado: OBRIGATÓRIO - simule um e-mail/ticket realista
+     Formato: {"type": "email", "de": "nome@empresa.com", "assunto": "assunto do email", "data": "2024-11-15", "corpo": "texto do email (3-5 linhas)"}
+   - template_code: null
+8. Para type="planejamento":
+   - fs: null
+   - enunciado: OBRIGATÓRIO - requisitos estruturados
+     Formato: {"type": "requisitos", "funcionais": ["req1", "req2", "req3"], "nao_funcionais": ["req1", "req2"]}
+   - template_code: OBRIGATÓRIO - array de abas/campos do formulário
+     Formato: [{"id": "aba1", "label": "Nome da Aba", "fields": [{"id": "campo1", "label": "Label do Campo", "type": "dropdown|textarea|checkbox", "options": ["op1", "op2"]}]}]
+     Crie 2-3 abas relevantes (ex: "Tecnologias", "Justificativa", "Trade-offs")
 
-EXEMPLO COMPLETO:
-[{
+EXEMPLOS COMPLETOS:
+
+// Exemplo 1: type="codigo"
+{
   "title": "Corrigir Validação no Login",
   "description": {
     "text": "E aí! O endpoint de login tá aceitando email sem @ e retornando 500. Os clientes tão reclamando. Pode corrigir pra retornar 400 com mensagem clara?",
@@ -239,7 +255,8 @@ EXEMPLO COMPLETO:
     "language": "python",
     "eval_criteria": ["Status HTTP 400", "Validação de email", "Mensagem clara"],
     "target_skill": "FastAPI",
-    "hints": ["Use EmailStr do pydantic", "HTTPException(status_code=400)", "Adicione try-except na rota"]
+    "hints": ["Use EmailStr do pydantic", "HTTPException(status_code=400)", "Adicione try-except na rota"],
+    "enunciado": null
   },
   "difficulty": {"level": "easy", "time_limit": 25},
   "category": "bugfix",
@@ -253,7 +270,90 @@ EXEMPLO COMPLETO:
     }
   },
   "template_code": null
-}]
+}
+
+// Exemplo 2: type="texto_livre"
+{
+  "title": "Responder Cliente sobre Atraso",
+  "description": {
+    "text": "Oi! Temos um cliente insatisfeito com atraso na entrega. Ele enviou um email meio áspero. Pode redigir uma resposta profissional explicando o ocorrido e oferecendo compensação?",
+    "type": "texto_livre",
+    "language": "markdown",
+    "eval_criteria": ["Tom profissional", "Empatia", "Solução proposta", "Clareza"],
+    "target_skill": "Comunicação",
+    "hints": ["Reconheça o problema primeiro", "Explique sem fazer desculpas", "Ofereça algo concreto"],
+    "enunciado": {
+      "type": "email",
+      "de": "carlos.souza@cliente.com.br",
+      "assunto": "Re: Pedido #12345 - ATRASO INACEITÁVEL",
+      "data": "2024-11-15",
+      "corpo": "Bom dia,\\n\\nComprei o produto há 3 semanas e AINDA não recebi. O prazo era 10 dias úteis. Já entrei em contato 2 vezes e só recebi respostas automáticas. Preciso de uma solução URGENTE ou vou cancelar e pedir reembolso.\\n\\nAguardo retorno HOJE."
+    }
+  },
+  "difficulty": {"level": "medium", "time_limit": 30},
+  "category": "comunicacao",
+  "fs": null,
+  "template_code": null
+}
+
+// Exemplo 3: type="planejamento"
+{
+  "title": "Planejar Sistema de Notificações em Tempo Real",
+  "description": {
+    "text": "Fala! Vamos implementar notificações em tempo real no app (likes, comentários, mensagens). Preciso que você planeje a arquitetura: quais tecnologias usar, como escalar, trade-offs, etc.",
+    "type": "planejamento",
+    "language": "markdown",
+    "eval_criteria": ["Escolha de tecnologias", "Escalabilidade", "Justificativa técnica", "Trade-offs"],
+    "target_skill": "Arquitetura",
+    "hints": ["Pense em WebSocket vs SSE vs Polling", "Como armazenar notificações não lidas?", "Redis pode ajudar na performance"],
+    "enunciado": {
+      "type": "requisitos",
+      "funcionais": [
+        "Notificar usuário sobre novos likes, comentários e mensagens",
+        "Usuário deve ver badge com número de notificações não lidas",
+        "Histórico de notificações dos últimos 30 dias",
+        "Marcar notificação como lida"
+      ],
+      "nao_funcionais": [
+        "Suportar 10 mil usuários simultâneos",
+        "Latência máxima de 2 segundos",
+        "Disponibilidade de 99.9%"
+      ]
+    }
+  },
+  "difficulty": {"level": "hard", "time_limit": 60},
+  "category": "planejamento",
+  "fs": null,
+  "template_code": [
+    {
+      "id": "tecnologias",
+      "label": "Tecnologias Principais",
+      "fields": [
+        {"id": "protocolo", "label": "Protocolo de Comunicação", "type": "dropdown", "options": ["WebSocket", "Server-Sent Events (SSE)", "Long Polling", "Firebase Cloud Messaging"]},
+        {"id": "message_broker", "label": "Message Broker", "type": "dropdown", "options": ["Redis Pub/Sub", "RabbitMQ", "Apache Kafka", "Não usar"]},
+        {"id": "armazenamento", "label": "Armazenamento de Notificações", "type": "dropdown", "options": ["PostgreSQL", "MongoDB", "Redis", "DynamoDB"]}
+      ]
+    },
+    {
+      "id": "justificativa",
+      "label": "Justificativa Técnica",
+      "fields": [
+        {"id": "porque_protocolo", "label": "Por que escolheu esse protocolo?", "type": "textarea"},
+        {"id": "porque_broker", "label": "Por que escolheu esse message broker?", "type": "textarea"},
+        {"id": "porque_storage", "label": "Por que escolheu esse armazenamento?", "type": "textarea"}
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "label": "Trade-offs e Desafios",
+      "fields": [
+        {"id": "limitacoes", "label": "Quais as principais limitações da sua solução?", "type": "textarea"},
+        {"id": "alternativas", "label": "Que alternativas você considerou?", "type": "textarea"},
+        {"id": "custos", "label": "Como seria o custo/complexidade?", "type": "dropdown", "options": ["Baixo", "Médio", "Alto"]}
+      ]
+    }
+  ]
+}
 """
         
         return base_prompt + track_prompt + json_schema
@@ -273,15 +373,75 @@ EXEMPLO COMPLETO:
         ch_desc = challenge.get("description", {})
         ch_diff = challenge.get("difficulty", {})
         
-        # Extrai dados da submissão
-        submitted_content = submission.get("text", "")
-        if not submitted_content and submission.get("files"):
-            # Se tiver arquivos, concatena o conteúdo
-            files_content = submission.get("files", {})
-            submitted_content = "\n\n".join([
-                f"// {filename}\n{content}" 
-                for filename, content in files_content.items()
-            ])
+        # Extrai dados da submissão de acordo com o tipo
+        submission_type = submission.get("type", "codigo")
+        submitted_content = ""
+        
+        if submission_type == "codigo":
+            # Para código: extrai arquivos
+            files = submission.get("files", {})
+            if files:
+                submitted_content = "\n\n".join([
+                    f"// {filename}\n{content}" 
+                    for filename, content in files.items()
+                ])
+            else:
+                submitted_content = submission.get("content", "")
+        
+        elif submission_type == "texto_livre":
+            # Para texto livre: extrai o conteúdo textual
+            submitted_content = submission.get("content", "")
+        
+        elif submission_type == "planejamento":
+            # Para planejamento: extrai form_data (respostas do formulário)
+            form_data = submission.get("form_data", {})
+            if form_data:
+                # Formata as respostas do formulário de forma legível
+                parts = []
+                for section_id, fields in form_data.items():
+                    parts.append(f"=== {section_id.upper()} ===")
+                    if isinstance(fields, dict):
+                        for field_id, value in fields.items():
+                            parts.append(f"{field_id}: {value}")
+                    parts.append("")
+                submitted_content = "\n".join(parts)
+            else:
+                # Fallback para content se form_data não existir
+                submitted_content = submission.get("content", "")
+        
+        # Adiciona contexto do enunciado se existir
+        enunciado_context = ""
+        enunciado = ch_desc.get('enunciado')
+        if enunciado:
+            enunciado_type = enunciado.get('type')
+            if enunciado_type == 'email':
+                # Para texto_livre: mostra o email/ticket original
+                enunciado_context = f"""
+CONTEXTO - EMAIL/TICKET ORIGINAL QUE O CANDIDATO DEVERIA RESPONDER:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+De: {enunciado.get('de', 'N/A')}
+Assunto: {enunciado.get('assunto', 'N/A')}
+Data: {enunciado.get('data', 'N/A')}
+
+{enunciado.get('corpo', '')}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+"""
+            elif enunciado_type == 'requisitos':
+                # Para planejamento: mostra os requisitos
+                funcionais = enunciado.get('funcionais', [])
+                nao_funcionais = enunciado.get('nao_funcionais', [])
+                enunciado_context = f"""
+CONTEXTO - REQUISITOS DO PROJETO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Requisitos Funcionais:
+{chr(10).join('  • ' + req for req in funcionais)}
+
+Requisitos Não-Funcionais:
+{chr(10).join('  • ' + req for req in nao_funcionais)}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+"""
         
         base_prompt = f"""Você é um avaliador técnico sênior especializado em {track.upper()}.
 
@@ -291,7 +451,7 @@ Descrição: {ch_desc.get('text')}
 Tipo: {ch_desc.get('type')}
 Dificuldade: {ch_diff.get('level', 'medium')}
 Critérios de avaliação: {', '.join(ch_desc.get('eval_criteria', []))}
-
+{enunciado_context}
 SUBMISSÃO DO CANDIDATO:
 ```{ch_desc.get('language', 'text')}
 {submitted_content}
