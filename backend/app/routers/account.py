@@ -44,13 +44,13 @@ async def delete_account(
     - 500: Erro ao deletar
     """
     user_id = current_user.id
-    service_role_key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY
+    service_role_key = settings.SUPABASE_SERVICE_ROLE_KEY
     
     if not service_role_key:
-        logger.error("SUPABASE_SERVICE_ROLE_KEY não configurada!")
+        logger.error("SUPABASE_SERVICE_ROLE_KEY não configurada! Esta chave é obrigatória para exclusão de conta.")
         raise HTTPException(
             status_code=500,
-            detail="Configuração do servidor incompleta"
+            detail="Configuração do servidor incompleta: SUPABASE_SERVICE_ROLE_KEY é obrigatória para deletar conta."
         )
     
     try:
