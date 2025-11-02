@@ -1,6 +1,5 @@
-// src/pages/Landing.jsx
+// src/App.jsx
 import { useEffect } from "react";
-import { Link } from "react-router-dom";
 
 export default function Landing() {
   useEffect(() => {
@@ -79,8 +78,8 @@ export default function Landing() {
               <span className="font-extrabold tracking-tight text-xl">Praxis<span className="text-primary-600">:</span></span>
             </a>
             <div className="flex items-center gap-3">
-              <Link to="/login" className="px-4 py-2 text-sm font-medium hover:text-zinc-700">Entrar</Link>
-              <Link to="/cadastro" className="px-4 py-2 text-sm font-semibold text-white bg-zinc-900 rounded-lg hover:bg-zinc-800">Criar conta</Link>
+              <a href="#login" className="px-4 py-2 text-sm font-medium hover:text-zinc-700">Entrar</a>
+              <a href="#signup" className="px-4 py-2 text-sm font-semibold text-white bg-zinc-900 rounded-lg hover:bg-zinc-800">Criar conta</a>
             </div>
           </div>
         </div>
@@ -108,7 +107,7 @@ export default function Landing() {
                   <span className="inline-block rounded-xl bg-white border border-zinc-200 px-5 py-2 shadow-chip">Feedback contínuo</span>
                 </div>
                 <div className="absolute top-[15%] left-[35%] floaty" data-delay="3">
-                  <span className="inline-block rounded-xl bg-white border border-zinc-200 px-5 py-2 shadow-chip">Portifólio</span>
+                  <span className="inline-block rounded-xl bg-white border border-zinc-200 px-5 py-2 shadow-chip">Portfólio</span>
                 </div>
                 <div className="absolute top-[10%] right-[12%] drifty" data-delay="4">
                   <span className="inline-block rounded-xl bg-white border border-zinc-200 px-5 py-2 shadow-chip">Soft skills</span>

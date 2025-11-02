@@ -10,10 +10,11 @@ Não precisa mais validar manualmente aqui.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
-from backend.app.deps import get_repo
+from backend.app.deps import get_repo, get_current_user
 from backend.app.domain.ports import IRepository
+from backend.app.domain.auth_service import AuthUser
 from backend.app.schemas.attributes import AttributesOut, AttributesPatchIn
-from backend.app.domain.exceptions import PraxisError, get_http_status_code
+from backend.app.domain.exceptions import PraxisError, get_http_status_code, AuthorizationError
 from backend.app.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -21,9 +22,19 @@ router = APIRouter(prefix="/attributes", tags=["attributes"])
 
 
 @router.get("/{profile_id}", response_model=AttributesOut)
-def get_attributes(profile_id: str, repo: IRepository = Depends(get_repo)):
+def get_attributes(
+    profile_id: str,
+    current_user: AuthUser = Depends(get_current_user),
+    repo: IRepository = Depends(get_repo)
+):
     """
     Busca atributos de um perfil (skills, career_goal).
+    
+    🔒 ENDPOINT PROTEGIDO - Requer autenticação
+    
+    ✅ Segurança:
+    - Usuário só pode acessar seus próprios atributos
+    - profile_id deve ser igual ao user_id do token
     
     Retorna:
     - career_goal: objetivo de carreira
@@ -31,9 +42,17 @@ def get_attributes(profile_id: str, repo: IRepository = Depends(get_repo)):
     - tech_skills: habilidades técnicas
     
     ✅ Erros específicos:
-    - AttributesNotFoundError → 404
+    - 401: Token inválido ou ausente
+    - 403: Tentando acessar atributos de outro usuário
+    - 404: Atributos não encontrados
     """
     try:
+        # Valida que usuário está acessando seus próprios dados
+        if profile_id != current_user.id:
+            raise AuthorizationError(
+                f"Você não tem permissão para acessar atributos de outro usuário"
+            )
+        
         return repo.get_attributes(profile_id)
     except PraxisError as e:
         status_code = get_http_status_code(e)
@@ -48,12 +67,19 @@ def get_attributes(profile_id: str, repo: IRepository = Depends(get_repo)):
 
 @router.patch("/{profile_id}", response_model=AttributesOut)
 def patch_attributes(
-    profile_id: str, 
-    body: AttributesPatchIn, 
+    profile_id: str,
+    body: AttributesPatchIn,
+    current_user: AuthUser = Depends(get_current_user),
     repo: IRepository = Depends(get_repo)
 ):
     """
     Atualiza atributos parcialmente (PATCH).
+    
+    🔒 ENDPOINT PROTEGIDO - Requer autenticação
+    
+    ✅ Segurança:
+    - Usuário só pode atualizar seus próprios atributos
+    - profile_id deve ser igual ao user_id do token
     
     Envie apenas os campos que deseja atualizar.
     
@@ -62,10 +88,18 @@ def patch_attributes(
     - Se enviar valor inválido → HTTP 422 automático
     
     ✅ Tratamento de erros específico:
-    - AttributesNotFoundError → 404
-    - ValidationError → 400
+    - 401: Token inválido ou ausente
+    - 403: Tentando alterar atributos de outro usuário
+    - 404: Atributos não encontrados
+    - 422: Dados inválidos
     """
     try:
+        # Valida que usuário está alterando seus próprios dados
+        if profile_id != current_user.id:
+            raise AuthorizationError(
+                f"Você não tem permissão para alterar atributos de outro usuário"
+            )
+        
         # Converte para dict apenas com campos preenchidos
         payload = body.model_dump(exclude_unset=True)
         
@@ -78,6 +112,6 @@ def patch_attributes(
     except Exception as e:
         logger.exception(
             "Erro inesperado ao atualizar atributos",
-            extra={"extra_data": {"profile_id": profile_id, "payload": payload}}
+            extra={"extra_data": {"profile_id": profile_id, "payload": body.model_dump(exclude_unset=True)}}
         )
         raise HTTPException(status_code=500, detail="Erro inesperado ao atualizar atributos")

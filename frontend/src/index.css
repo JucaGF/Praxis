@@ -1,5 +1,19 @@
 @import "tailwindcss";
 
+/* Cores customizadas */
+@theme {
+  --color-primary-50: #fefce8;
+  --color-primary-100: #fef9c3;
+  --color-primary-200: #fef08a;
+  --color-primary-300: #fde047;
+  --color-primary-400: #facc15;
+  --color-primary-500: #eab308;
+  --color-primary-600: #ca8a04;
+  --color-primary-700: #a16207;
+  --color-primary-800: #854d0e;
+  --color-primary-900: #713f12;
+}
+
 /* --- Texto de incentivo --- */
 @keyframes incentivo {
   0% {

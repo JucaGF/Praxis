@@ -1,41 +1,22 @@
 // src/pages/Home.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { fetchUser, fetchChallenges } from "../lib/api.js";
 import { Pill, Difficulty, Skill, Meta, Card, PrimaryButton } from "../components/ui.jsx";
-import { supabase } from "../lib/supabaseClient";
 
 /* ----- Home personalizável ----- */
 export default function Home() {
-  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [catalog, setCatalog] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/");
-  };
-
   // carrega usuário + catálogo
   useEffect(() => {
     (async () => {
-      try {
-        const [u, c] = await Promise.all([fetchUser(), fetchChallenges()]);
-        setUser(u);
-        setCatalog(c);
-      } catch (error) {
-        console.error("Erro ao carregar dados:", error);
-        // Define dados mock caso a API falhe
-        setUser({ 
-          name: "Usuário", 
-          skills: ["React", "JavaScript"], 
-          interests: ["Frontend", "Backend"] 
-        });
-        setCatalog([]);
-      } finally {
-        setLoading(false);
-      }
+      const [u, c] = await Promise.all([fetchUser(), fetchChallenges()]);
+      setUser(u);
+      setCatalog(c);
+      setLoading(false);
     })();
   }, []);
   useEffect(() => {
@@ -55,7 +36,7 @@ export default function Home() {
     setExpandedId(prev => (prev === id ? null : id));
   };
 
-  // "score" simples para ordenar por relevância
+  // “score” simples para ordenar por relevância
   function score(ch, u) {
     if (!u) return 0;
     let s = 0;
@@ -72,25 +53,7 @@ export default function Home() {
   }, [catalog, user]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
-          <p className="text-zinc-600">Carregando…</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-zinc-600 mb-4">Backend não está respondendo</p>
-          <Link to="/" className="text-primary-600 hover:text-primary-700">Voltar para Home</Link>
-        </div>
-      </div>
-    );
+    return <div className="max-w-6xl mx-auto px-4 py-10 text-zinc-600">Carregando…</div>;
   }
 
   return (
@@ -105,12 +68,6 @@ export default function Home() {
           <nav className="flex items-center gap-2">
             <Link to="/home" className="px-3 py-1.5 rounded-md bg-primary-100 text-primary-800 border border-primary-200 text-sm">Home</Link>
             <Link to="/perfil" className="px-3 py-1.5 rounded-md hover:bg-zinc-50 border border-zinc-200 text-sm">Perfil</Link>
-            <button
-              onClick={handleLogout}
-              className="px-3 py-1.5 rounded-md hover:bg-red-50 border border-red-200 text-red-600 text-sm font-medium transition cursor-pointer"
-            >
-              Sair
-            </button>
           </nav>
         </div>
       </header>
@@ -293,3 +250,4 @@ export default function Home() {
     </div>
   );
 }
+

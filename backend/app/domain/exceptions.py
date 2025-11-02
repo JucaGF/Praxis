@@ -141,6 +141,22 @@ class DatasetGenerationError(ProcessingError):
         )
 
 
+# ==================== ERROS DE AUTORIZAÇÃO ====================
+
+class AuthorizationError(PraxisError):
+    """
+    Erro de autorização - usuário não tem permissão.
+    
+    Uso: Usuário autenticado, mas sem permissão para a operação
+    HTTP Status: 403 (Forbidden)
+    
+    Exemplo:
+    - Tentar acessar atributos de outro usuário
+    - Tentar editar desafio de outro usuário
+    """
+    pass
+
+
 # ==================== ERROS DE ESTADO ====================
 
 class InvalidStateError(PraxisError):
@@ -185,6 +201,8 @@ def get_http_status_code(error: PraxisError) -> int:
     
     if isinstance(error, AuthenticationError):
         return 401  # Unauthorized (autenticação falhou)
+    elif isinstance(error, AuthorizationError):
+        return 403  # Forbidden (sem permissão)
     elif isinstance(error, ResourceNotFoundError):
         return 404  # Not Found
     elif isinstance(error, ValidationError):

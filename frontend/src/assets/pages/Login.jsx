@@ -1,8 +1,6 @@
-import React, { useState, useEffect } from "react";
-// Importar useAuth e useNavigate para redirecionamento
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
-import { useAuth } from "../hooks/useAuth";
 
 const LinkedInIcon = () => (
   // ... (SVG Code) ...
@@ -17,21 +15,12 @@ const LinkedInIcon = () => (
 );
 
 export default function Login() {
-  // Substituímos o estado local isLoggedIn pelo useAuth
-  const { user, isLoggedIn, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  // Redireciona se o usuário já estiver logado
-  useEffect(() => {
-    if (isLoggedIn) {
-      navigate("/home"); // ← MUDAR DE "/" PARA "/home"
-    }
-  }, [isLoggedIn, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -50,22 +39,24 @@ export default function Login() {
         `Erro ao entrar: ${authError.message}. Verifique seu e-mail e senha.`
       );
     }
-    // Se o login for bem-sucedido, o 'useAuth' detectará a mudança e o useEffect acima fará o redirecionamento.
+    // Redireciona para home após login bem-sucedido
+    if (!authError) {
+      navigate("/home");
+    }
   };
 
-  // Se o hook de auth estiver carregando o estado inicial, mostre um loading.
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gray-100 font-sans">
-        <p className="text-xl font-medium text-gray-700">Carregando...</p>
-      </div>
-    );
-  }
-
-  // O restante do seu componente de Login (HTML)
   return (
     <div className="min-h-screen flex items-center justify-center bg-white font-sans relative overflow-hidden">
-      {/* ... (Seu código de estilos, formas geométricas e CONTEÚDO PRINCIPAL) ... */}
+      {/* Botão Voltar */}
+      <Link 
+        to="/" 
+        className="absolute top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 transition"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        </svg>
+        Voltar
+      </Link>
 
       <style>{`
           @keyframes floatY { 
@@ -281,7 +272,7 @@ export default function Login() {
                   className={`w-full py-3 rounded-lg text-sm font-semibold transition duration-150 ${
                     loading
                       ? "bg-gray-400 text-gray-100 cursor-not-allowed"
-                      : "bg-yellow-500 hover:bg-yellow-600 shadow-sm text-white"
+                      : "bg-yellow-500 hover:bg-yellow-600 shadow-sm text-white cursor-pointer"
                   } `}
                 >
                   {loading ? "Entrando..." : "Entrar"}
