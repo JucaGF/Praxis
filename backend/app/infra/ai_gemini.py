@@ -142,11 +142,16 @@ class GeminiAI(IAIService):
         Returns:
             Prompt formatado
         """
-        tech_skills = attributes.get("tech_skills", {})
+        tech_skills = attributes.get("tech_skills", [])
         career_goal = attributes.get("career_goal", "Desenvolver habilidades técnicas")
         
         # Skills formatadas
-        skills_text = "\n".join([f"  - {skill}: {level}/100" for skill, level in tech_skills.items()])
+        # tech_skills agora é uma lista de objetos com 'name' e 'percentage'
+        if isinstance(tech_skills, list):
+            skills_text = "\n".join([f"  - {skill['name']}: {skill['percentage']}/100" for skill in tech_skills])
+        else:
+            # Fallback para formato antigo (dict)
+            skills_text = "\n".join([f"  - {skill}: {level}/100" for skill, level in tech_skills.items()])
         
         # Prompt base simplificado
         base_prompt = f"""Você é um AI Career Coach. Gere 3 desafios personalizados.
@@ -667,7 +672,7 @@ REGRAS:
     
     def _parse_json_response(self, response_text: str, fallback: Optional[dict] = None) -> dict:
         """
-        Parseia resposta JSON da API com tratamento de erros.
+        Parseia resposta JSON da API com tratamento de erros e tentativas de recuperação.
         
         Args:
             response_text: Texto da resposta
@@ -689,6 +694,62 @@ REGRAS:
             
             return json.loads(cleaned)
         except json.JSONDecodeError as e:
+            logger.warning(f"JSON inválido, tentando recuperar: {e}")
+            
+            # Tenta recuperar extraindo apenas os objetos completos
+            try:
+                # Se for uma lista, tenta extrair objetos válidos
+                if cleaned.startswith("["):
+                    # Encontra todos os objetos completos (começam com { e terminam com })
+                    import re
+                    objects = []
+                    depth = 0
+                    current_obj = ""
+                    in_string = False
+                    escape_next = False
+                    
+                    for char in cleaned:
+                        if escape_next:
+                            current_obj += char
+                            escape_next = False
+                            continue
+                        
+                        if char == '\\':
+                            escape_next = True
+                            current_obj += char
+                            continue
+                        
+                        if char == '"':
+                            in_string = not in_string
+                        
+                        if not in_string:
+                            if char == '{':
+                                if depth == 0:
+                                    current_obj = "{"
+                                else:
+                                    current_obj += char
+                                depth += 1
+                            elif char == '}':
+                                depth -= 1
+                                current_obj += char
+                                if depth == 0 and current_obj:
+                                    try:
+                                        obj = json.loads(current_obj)
+                                        objects.append(obj)
+                                        current_obj = ""
+                                    except:
+                                        current_obj = ""
+                            elif depth > 0:
+                                current_obj += char
+                        else:
+                            current_obj += char
+                    
+                    if objects:
+                        logger.info(f"Recuperados {len(objects)} objetos válidos de JSON malformado")
+                        return objects
+            except Exception as recovery_error:
+                logger.error(f"Falha ao recuperar JSON: {recovery_error}")
+            
             logger.error(f"Erro ao parsear JSON: {e}\nResposta: {response_text[:200]}")
             if fallback:
                 return fallback
@@ -696,9 +757,53 @@ REGRAS:
     
     # ==================== MÉTODOS DA INTERFACE ====================
     
+    def _validate_challenge(self, challenge: dict) -> bool:
+        """
+        Valida se um desafio tem todos os campos obrigatórios.
+        
+        Args:
+            challenge: Desafio a validar
+            
+        Returns:
+            True se válido, False caso contrário
+        """
+        required_fields = ["title", "description", "difficulty", "category"]
+        
+        # Valida campos de primeiro nível
+        for field in required_fields:
+            if field not in challenge or not challenge[field]:
+                logger.warning(f"Campo '{field}' faltando ou vazio no desafio")
+                return False
+        
+        # Valida description
+        description = challenge["description"]
+        if not isinstance(description, dict):
+            logger.warning(f"'description' não é um dict: {type(description)}")
+            return False
+        
+        if "text" not in description or not description["text"]:
+            logger.warning("'description.text' faltando ou vazio")
+            return False
+        
+        # Valida difficulty
+        difficulty = challenge["difficulty"]
+        if not isinstance(difficulty, dict):
+            logger.warning(f"'difficulty' não é um dict: {type(difficulty)}")
+            return False
+        
+        if "level" not in difficulty or not difficulty["level"]:
+            logger.warning("'difficulty.level' faltando ou vazio")
+            return False
+        
+        if "time_limit" not in difficulty or not difficulty["time_limit"]:
+            logger.warning("'difficulty.time_limit' faltando ou vazio")
+            return False
+        
+        return True
+    
     def generate_challenges(self, profile: dict, attributes: dict) -> List[dict]:
         """
-        Gera desafios personalizados usando Gemini.
+        Gera desafios personalizados usando Gemini com retry automático.
         
         Args:
             profile: Dados do perfil
@@ -712,28 +817,59 @@ REGRAS:
         
         prompt = self._build_challenge_prompt(profile, attributes, track)
         
-        try:
-            response_text = self._call_gemini(prompt, response_mime_type="application/json")
-            challenges = self._parse_json_response(response_text)
-            
-            # Valida que é uma lista
-            if not isinstance(challenges, list):
-                logger.warning("Resposta não é uma lista, tentando extrair...")
-                if isinstance(challenges, dict) and "challenges" in challenges:
-                    challenges = challenges["challenges"]
+        # Tenta até 2 vezes em caso de JSON inválido
+        max_attempts = 2
+        for attempt in range(max_attempts):
+            try:
+                response_text = self._call_gemini(prompt, response_mime_type="application/json")
+                challenges = self._parse_json_response(response_text)
+                
+                # Valida que é uma lista
+                if not isinstance(challenges, list):
+                    logger.warning("Resposta não é uma lista, tentando extrair...")
+                    if isinstance(challenges, dict) and "challenges" in challenges:
+                        challenges = challenges["challenges"]
+                    else:
+                        raise ValueError("Formato de resposta inválido")
+                
+                # Valida cada desafio
+                valid_challenges = []
+                for i, challenge in enumerate(challenges):
+                    if self._validate_challenge(challenge):
+                        valid_challenges.append(challenge)
+                    else:
+                        logger.warning(f"Desafio {i} inválido, descartando")
+                
+                # Verifica se temos pelo menos 1 desafio válido
+                if not valid_challenges:
+                    if attempt < max_attempts - 1:
+                        logger.warning(f"Nenhum desafio válido na tentativa {attempt + 1}, tentando novamente...")
+                        continue
+                    else:
+                        raise ValueError("Nenhum desafio válido retornado pelo Gemini após todas as tentativas")
+                
+                # Limita a 3 desafios
+                valid_challenges = valid_challenges[:3]
+                
+                logger.info(f"Gerados {len(valid_challenges)} desafios válidos (de {len(challenges)} retornados) na tentativa {attempt + 1}")
+                return valid_challenges
+                
+            except json.JSONDecodeError as e:
+                if attempt < max_attempts - 1:
+                    logger.warning(f"JSON inválido na tentativa {attempt + 1}, tentando novamente...")
+                    time.sleep(1)  # Pequeno delay antes do retry
+                    continue
                 else:
-                    raise ValueError("Formato de resposta inválido")
-            
-            # Limita a 3 desafios
-            challenges = challenges[:3]
-            
-            logger.info(f"Gerados {len(challenges)} desafios com sucesso")
-            return challenges
-            
-        except Exception as e:
-            logger.error(f"Erro ao gerar desafios: {e}")
-            # Fallback: retorna lista vazia ou poderia retornar desafios do FakeAI
-            raise
+                    logger.error(f"Erro ao parsear JSON após {max_attempts} tentativas: {e}")
+                    raise
+            except Exception as e:
+                logger.error(f"Erro ao gerar desafios na tentativa {attempt + 1}: {e}")
+                if attempt < max_attempts - 1:
+                    logger.warning("Tentando novamente...")
+                    time.sleep(1)
+                    continue
+                else:
+                    raise
     
     def evaluate_submission(self, challenge: dict, submission: dict) -> dict:
         """

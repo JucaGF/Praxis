@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Any
 from datetime import datetime
 
 # ==================== EXPLICAÇÃO: Validadores Pydantic ====================
@@ -19,15 +19,35 @@ from datetime import datetime
 # ===========================================================================
 
 
+class TechSkill(BaseModel):
+    """Uma habilidade técnica com porcentagem e última atualização."""
+    name: str
+    percentage: int
+    last_updated: str
+
+
+class SoftSkill(BaseModel):
+    """Uma habilidade interpessoal com nível."""
+    name: str
+    level: str
+
+
 class AttributesOut(BaseModel):
     """
     Resposta completa dos atributos do perfil.
+    
+    IMPORTANTE: tech_skills e soft_skills são LISTAS DE OBJETOS agora,
+    não dicionários, para corresponder ao formato no banco.
     """
     profile_id: str
     career_goal: Optional[str] = None
-    soft_skills: Dict[str, int] = Field(default_factory=dict)  # ex: {"comunicacao": 60}
-    tech_skills: Dict[str, int] = Field(default_factory=dict)  # ex: {"React": 62}
+    soft_skills: List[SoftSkill] = Field(default_factory=list)
+    tech_skills: List[TechSkill] = Field(default_factory=list)
     updated_at: datetime
+    
+    class Config:
+        # Permite que o Pydantic receba campos JSONB do SQLAlchemy
+        from_attributes = True
 
 
 class AttributesPatchIn(BaseModel):

@@ -36,11 +36,23 @@ def _profile_out(p: Profile) -> dict:
     return {"id": str(p.id), "full_name": p.full_name or "", "email": p.email}
 
 def _attributes_out(profile_id: uuid.UUID, a: Attributes) -> dict:
+    import json
+    
+    # Parse JSONB fields se eles vierem como string
+    soft_skills = a.soft_skills or []
+    tech_skills = a.tech_skills or []
+    
+    # Se vier como string, parseia
+    if isinstance(soft_skills, str):
+        soft_skills = json.loads(soft_skills)
+    if isinstance(tech_skills, str):
+        tech_skills = json.loads(tech_skills)
+    
     return {
         "profile_id": str(profile_id),
         "career_goal": a.career_goal,
-        "soft_skills": a.soft_skills or {},
-        "tech_skills": a.tech_skills or {},
+        "soft_skills": soft_skills if isinstance(soft_skills, list) else [],
+        "tech_skills": tech_skills if isinstance(tech_skills, list) else [],
         "updated_at": a.updated_at,
     }
 

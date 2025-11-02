@@ -11,6 +11,7 @@ from backend.app.routers.challenges import router as challenges_router
 from backend.app.routers.submissions import router as submissions_router
 from backend.app.routers.dev import router as dev_router
 from backend.app.routers.account import router as account_router
+from backend.app.routers.profile import router as profile_router
 from backend.app.config import get_settings
 from backend.app.logging_config import setup_logging, get_logger
 from backend.app.domain.exceptions import PraxisError, get_http_status_code
@@ -98,6 +99,7 @@ app.add_middleware(
 # registra as rotas
 app.include_router(health_router)
 app.include_router(session_router)
+app.include_router(profile_router)  # Perfil do usuário
 app.include_router(attributes_router)
 app.include_router(challenges_router)
 app.include_router(submissions_router)
