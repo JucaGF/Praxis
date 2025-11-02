@@ -167,30 +167,30 @@ PERFIL:
         if track == "data_engineer":
             track_prompt = """
 Gere 3 desafios de DATA ENGINEER:
-- Tipos: SQL/Python (código), Pipeline (planejamento), Comunicação
-- Categorias: data-exploration, data-pipeline, data-modeling, performance-tuning, comunicacao
+- Tipos: SQL/Python (code), Pipeline (organization), Comunicação (daily-task)
+- Categorias válidas: code, daily-task, organization
 - Skills alvo: SQL, Python, Airflow, Spark
 """
         elif track == "frontend":
             track_prompt = """
 Gere 3 desafios de FRONTEND:
-- Tipos: Bugfix (código), Feature (código), UI/UX ou Comunicação
-- Categorias: bugfix, feature, ui-ux, comunicacao, planejamento
+- Tipos: Bugfix/Feature (code), Comunicação (daily-task), Planejamento (organization)
+- Categorias válidas: code, daily-task, organization
 - Skills alvo: React, Vue, JavaScript, TypeScript, CSS
 """
         elif track == "fullstack":
             track_prompt = """
 Gere 3 desafios de FULLSTACK:
 - OBRIGATÓRIO: 1 FRONTEND + 1 BACKEND + 1 qualquer
-- Tipos: Código (front/back), Planejamento, Comunicação
-- Categorias: bugfix, feature, api-design, ui-ux, performance, comunicacao
+- Tipos: Código (code), Planejamento (organization), Comunicação (daily-task)
+- Categorias válidas: code, daily-task, organization
 - Skills alvo: React, Python, JavaScript, FastAPI, SQL
 """
         else:  # backend
             track_prompt = """
 Gere 3 desafios de BACKEND:
-- Tipos: API/Bugfix (código), Performance (planejamento), Comunicação
-- Categorias: bugfix, api-design, performance, comunicacao, planejamento
+- Tipos: API/Bugfix (code), Performance (organization), Comunicação (daily-task)
+- Categorias válidas: code, daily-task, organization
 - Skills alvo: Python, Node.js, FastAPI, SQL
 """
         
@@ -210,7 +210,7 @@ ESTRUTURA DE CADA DESAFIO:
     "enunciado": null  // NOVO: objeto estruturado (veja regras abaixo)
   },
   "difficulty": {"level": "easy|medium|hard", "time_limit": 20-90},
-  "category": "bugfix|feature|api-design|ui-ux|performance|comunicacao|planejamento",
+  "category": "code|daily-task|organization",  // ⚠️ DIFERENTE de description.type!
   "fs": {
     "files": ["caminho/arquivo1.ext", "caminho/arquivo2.ext"],
     "open": "caminho/arquivo1.ext",
@@ -222,13 +222,17 @@ ESTRUTURA DE CADA DESAFIO:
   "template_code": null
 }
 
+⚠️ IMPORTANTE: NÃO confunda "description.type" com "category"!
+- description.type: tipo de ENUNCIADO (codigo|texto_livre|planejamento) - campo interno
+- category: tipo de DESAFIO (code|daily-task|organization) - campo que define a tela do frontend
+
 REGRAS OBRIGATÓRIAS:
 1. Retorne array com exatamente 3 desafios
 2. target_skill DEVE existir nas skills do usuário
 3. Varie dificuldade: 1 easy, 1 medium, 1 hard
 4. description.text: Tom conversacional (chefe falando)
 5. SEMPRE adicione 2-4 hints úteis e práticas
-6. Para type="codigo":
+6. Para type="codigo" → category="code":
    - fs é OBRIGATÓRIO (não null!)
    - fs.files: 2-4 caminhos realistas
    - fs.open: arquivo principal
@@ -236,12 +240,12 @@ REGRAS OBRIGATÓRIAS:
    - Código deve ser bugado, incompleto ou precisar refatoração
    - enunciado: null
    - template_code: null
-7. Para type="texto_livre":
+7. Para type="texto_livre" → category="daily-task":
    - fs: null
    - enunciado: OBRIGATÓRIO - simule um e-mail/ticket realista
      Formato: {"type": "email", "de": "nome@empresa.com", "assunto": "assunto do email", "data": "2024-11-15", "corpo": "texto do email (3-5 linhas)"}
    - template_code: null
-8. Para type="planejamento":
+8. Para type="planejamento" → category="organization":
    - fs: null
    - enunciado: OBRIGATÓRIO - requisitos estruturados
      Formato: {"type": "requisitos", "funcionais": ["req1", "req2", "req3"], "nao_funcionais": ["req1", "req2"]}
@@ -264,7 +268,7 @@ EXEMPLOS COMPLETOS:
     "enunciado": null
   },
   "difficulty": {"level": "easy", "time_limit": 25},
-  "category": "bugfix",
+  "category": "code",
   "fs": {
     "files": ["app/auth.py", "app/models.py", "app/main.py"],
     "open": "app/auth.py",
@@ -296,12 +300,12 @@ EXEMPLOS COMPLETOS:
     }
   },
   "difficulty": {"level": "medium", "time_limit": 30},
-  "category": "comunicacao",
+  "category": "daily-task",
   "fs": null,
   "template_code": null
 }
 
-// Exemplo 3: type="planejamento"
+// Exemplo 3: type="planejamento" (mas category="organization")
 {
   "title": "Planejar Sistema de Notificações em Tempo Real",
   "description": {
@@ -327,7 +331,7 @@ EXEMPLOS COMPLETOS:
     }
   },
   "difficulty": {"level": "hard", "time_limit": 60},
-  "category": "planejamento",
+  "category": "organization",
   "fs": null,
   "template_code": [
     {
@@ -397,8 +401,8 @@ EXEMPLOS COMPLETOS:
             # Para texto livre: extrai o conteúdo textual
             submitted_content = submission.get("content", "")
         
-        elif submission_type == "planejamento":
-            # Para planejamento: extrai form_data (respostas do formulário)
+        elif submission_type == "organization":
+            # Para organization: extrai form_data (respostas do formulário)
             form_data = submission.get("form_data", {})
             if form_data:
                 # Formata as respostas do formulário de forma legível
@@ -433,7 +437,7 @@ Data: {enunciado.get('data', 'N/A')}
 
 """
             elif enunciado_type == 'requisitos':
-                # Para planejamento: mostra os requisitos
+                # Para organization: mostra os requisitos
                 funcionais = enunciado.get('funcionais', [])
                 nao_funcionais = enunciado.get('nao_funcionais', [])
                 enunciado_context = f"""
@@ -800,6 +804,209 @@ REGRAS:
             return False
         
         return True
+    
+    def _extract_complete_challenges(self, json_buffer: str) -> List[dict]:
+        """
+        Extrai desafios completos de um JSON parcialmente recebido (streaming).
+        
+        Args:
+            json_buffer: String JSON parcial ou completa
+            
+        Returns:
+            Lista de desafios completos encontrados
+        """
+        try:
+            # Limpar buffer (remover markdown se existir)
+            cleaned = json_buffer.strip()
+            if cleaned.startswith("```json"):
+                cleaned = cleaned[7:]
+            if cleaned.startswith("```"):
+                cleaned = cleaned[3:]
+            if cleaned.endswith("```"):
+                cleaned = cleaned[:-3]
+            cleaned = cleaned.strip()
+            
+            # Tenta parsear como array completo
+            parsed = json.loads(cleaned)
+            if isinstance(parsed, list):
+                logger.info(f"✅ JSON completo parseado: {len(parsed)} desafios")
+                return parsed
+            elif isinstance(parsed, dict) and "challenges" in parsed:
+                logger.info(f"✅ JSON completo parseado (dict): {len(parsed['challenges'])} desafios")
+                return parsed["challenges"]
+            return []
+        except json.JSONDecodeError as e:
+            # JSON incompleto, tentar extrair objetos completos
+            logger.debug(f"⚠️ JSON incompleto, tentando extração incremental: {str(e)[:100]}")
+            challenges = []
+            
+            # Estratégia mais robusta: procurar por arrays parciais
+            # Tenta encontrar: [ {...}, {...}, ...
+            import re
+            
+            # Primeiro, tenta encontrar o início do array
+            array_start = json_buffer.find('[')
+            if array_start == -1:
+                return []
+            
+            # Pega tudo a partir do [
+            partial_array = json_buffer[array_start:]
+            
+            # Tenta adicionar ] no final e parsear
+            try:
+                test_json = partial_array.rstrip() + ']'
+                parsed = json.loads(test_json)
+                if isinstance(parsed, list) and len(parsed) > 0:
+                    logger.info(f"✅ Extração incremental: {len(parsed)} desafios parciais")
+                    return parsed
+            except:
+                pass
+            
+            return challenges
+    
+    async def generate_challenges_streaming(self, profile: dict, attributes: dict):
+        """
+        Gera desafios usando Gemini streaming e yielda eventos SSE progressivamente.
+        
+        Args:
+            profile: Dados do perfil
+            attributes: Skills e career_goal
+            
+        Yields:
+            Dicionários com eventos SSE:
+            - {"type": "start", "message": "..."}
+            - {"type": "progress", "percent": 0-100, "message": "..."}
+            - {"type": "challenge", "data": {...}, "number": 1-3}
+            - {"type": "complete", "total": 3}
+            - {"type": "error", "message": "..."}
+        """
+        try:
+            track = self._detect_track(attributes)
+            logger.info(f"🎬 Iniciando geração streaming para track: {track}")
+            
+            yield {
+                "type": "start",
+                "message": f"🧠 Analisando perfil {track}..."
+            }
+            
+            prompt = self._build_challenge_prompt(profile, attributes, track)
+            
+            # Configurar modelo com streaming
+            # IMPORTANTE: NÃO usar response_mime_type="application/json" aqui
+            # pois isso força o Gemini a esperar até ter um JSON completo,
+            # anulando o benefício do streaming!
+            generation_config = self.generation_config.copy()
+            generation_config["max_output_tokens"] = 8192
+            # Removido: generation_config["response_mime_type"] = "application/json"
+            
+            model = genai.GenerativeModel(
+                model_name=self.model_name,
+                generation_config=generation_config,
+                safety_settings=self.safety_settings
+            )
+            
+            # Progresso inicial simulado (5% -> 35%) bem devagar
+            import asyncio
+            for i in range(5, 36, 1):
+                yield {
+                    "type": "progress",
+                    "percent": i,
+                    "message": "⏳ Processando..."
+                }
+                await asyncio.sleep(1.5)  # 1.5 segundos entre updates
+            
+            # Streaming do Gemini
+            response = model.generate_content(prompt, stream=True)
+            
+            buffer = ""
+            challenges_sent = 0
+            last_progress = 35
+            chunk_count = 0
+            
+            logger.info("📡 Aguardando chunks do Gemini...")
+            
+            import time
+            start_time = time.time()
+            
+            for chunk in response:
+                chunk_count += 1
+                elapsed = time.time() - start_time
+                if chunk.text:
+                    buffer += chunk.text
+                    logger.info(f"📦 Chunk {chunk_count} (+{elapsed:.2f}s): +{len(chunk.text)} chars (total: {len(buffer)})")
+                
+                # Atualizar progresso baseado no tamanho do buffer
+                # Estimativa: ~10k chars = 3 desafios completos
+                estimated_progress = min(85, 35 + (len(buffer) / 10000) * 50)
+                
+                # Só envia progresso se mudou significativamente (evita spam)
+                if estimated_progress - last_progress >= 5:
+                    yield {
+                        "type": "progress",
+                        "percent": int(estimated_progress),
+                        "message": f"🤖 Gerando desafios... ({len(buffer)} caracteres)"
+                    }
+                    last_progress = estimated_progress
+                
+                # Tentar extrair desafios completos
+                current_challenges = self._extract_complete_challenges(buffer)
+                
+                # Enviar apenas novos desafios (que ainda não foram enviados)
+                for challenge in current_challenges[challenges_sent:]:
+                    if self._validate_challenge(challenge):
+                        challenges_sent += 1
+                        
+                        yield {
+                            "type": "challenge",
+                            "data": challenge,
+                            "number": challenges_sent,
+                            "total": 3
+                        }
+                        
+                        progress_percent = 10 + (challenges_sent / 3) * 80
+                        yield {
+                            "type": "progress",
+                            "percent": int(progress_percent),
+                            "message": f"✅ Desafio {challenges_sent}/3 gerado!"
+                        }
+                        
+                        logger.info(f"✅ Desafio {challenges_sent}/3 enviado: {challenge.get('title', 'sem título')}")
+            
+            # Final: garantir que temos todos os desafios
+            final_challenges = self._extract_complete_challenges(buffer)
+            
+            # Enviar desafios que podem ter ficado faltando
+            for challenge in final_challenges[challenges_sent:]:
+                if self._validate_challenge(challenge):
+                    challenges_sent += 1
+                    
+                    yield {
+                        "type": "challenge",
+                        "data": challenge,
+                        "number": challenges_sent,
+                        "total": 3
+                    }
+                    
+                    logger.info(f"✅ Desafio final {challenges_sent}/3 enviado: {challenge.get('title', 'sem título')}")
+            
+            # Verificar se temos pelo menos 1 desafio
+            if challenges_sent == 0:
+                raise ValueError("Nenhum desafio válido foi gerado")
+            
+            yield {
+                "type": "complete",
+                "total": challenges_sent,
+                "message": f"🎉 {challenges_sent} desafio(s) gerado(s) com sucesso!"
+            }
+            
+            logger.info(f"🎉 Geração streaming concluída: {challenges_sent} desafios")
+            
+        except Exception as e:
+            logger.exception("❌ Erro na geração streaming de desafios")
+            yield {
+                "type": "error",
+                "message": f"Erro ao gerar desafios: {str(e)}"
+            }
     
     def generate_challenges(self, profile: dict, attributes: dict) -> List[dict]:
         """

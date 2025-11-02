@@ -10,8 +10,10 @@ Responsabilidades:
 Delega toda lógica para ChallengeService.
 """
 
+import json
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from backend.app.deps import get_challenge_service, get_current_user
 from backend.app.domain.services import ChallengeService
 from backend.app.domain.auth_service import AuthUser
@@ -67,6 +69,97 @@ def generate_challenges(
             extra={"extra_data": {"profile_id": current_user.id}}
         )
         raise HTTPException(status_code=500, detail="Erro inesperado ao gerar desafios. Por favor, tente novamente.")
+
+
+@router.get("/generate/stream")
+async def generate_challenges_stream(
+    current_user: AuthUser = Depends(get_current_user),
+    service: ChallengeService = Depends(get_challenge_service)
+):
+    """
+    Gera desafios personalizados com SSE (Server-Sent Events) streaming.
+    
+    🔒 ENDPOINT PROTEGIDO - Requer autenticação
+    🚀 STREAMING: Retorna eventos progressivamente em tempo real
+    
+    Eventos SSE:
+    - event: start
+      data: {"message": "🧠 Analisando perfil..."}
+      
+    - event: progress  
+      data: {"percent": 0-100, "message": "🤖 Gemini gerando..."}
+      
+    - event: challenge
+      data: {id: 42, title: "...", category: "code", ...}
+      
+    - event: complete
+      data: {"total": 3, "message": "🎉 Concluído!"}
+      
+    - event: error
+      data: {"message": "Erro ao gerar desafios"}
+    
+    Frontend usage:
+    ```javascript
+    const eventSource = new EventSource('/challenges/generate/stream', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    eventSource.addEventListener('progress', (e) => {
+      const data = JSON.parse(e.data);
+      updateProgressBar(data.percent);
+    });
+    
+    eventSource.addEventListener('challenge', (e) => {
+      const challenge = JSON.parse(e.data);
+      addChallengeToUI(challenge);
+    });
+    ```
+    """
+    
+    async def event_generator():
+        """Generator que formata eventos SSE corretamente"""
+        try:
+            async for event in service.generate_challenges_for_profile_streaming(current_user.id):
+                event_type = event.get("type", "message")
+                event_data = {k: v for k, v in event.items() if k != "type"}
+                
+                logger.info(f"📤 Enviando evento SSE: {event_type}")
+                
+                # Formato SSE correto:
+                # event: <tipo>\n
+                # data: <json>\n\n
+                yield f"event: {event_type}\n"
+                yield f"data: {json.dumps(event_data, default=str)}\n\n"
+                
+                # Pequeno delay para forçar flush e evitar buffering
+                import asyncio
+                await asyncio.sleep(0.01)  # 10ms
+                
+        except PraxisError as e:
+            # Erro de domínio (ProfileNotFound, etc)
+            logger.error(f"Erro de domínio no streaming: {str(e)}")
+            yield f"event: error\n"
+            yield f"data: {json.dumps({'message': str(e)}, default=str)}\n\n"
+            
+        except Exception as e:
+            # Erro inesperado
+            import traceback
+            error_trace = traceback.format_exc()
+            logger.error(f"Erro inesperado no streaming de desafios:\n{error_trace}")
+            yield f"event: error\n"
+            yield f"data: {json.dumps({'message': 'Erro inesperado ao gerar desafios'}, default=str)}\n\n"
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "X-Accel-Buffering": "no",  # Desabilita buffering do nginx
+            "Connection": "keep-alive",
+            "Transfer-Encoding": "chunked",
+            "Access-Control-Allow-Origin": "*",
+        }
+    )
 
 
 @router.get("/active", response_model=List[ChallengeOut])

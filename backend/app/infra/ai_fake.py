@@ -26,7 +26,7 @@ def _front():
               "README.md": "# Dica\nAtive o handler onClick."
             }
           },
-          "category": "bugfix",
+          "category": "code",
           "template_code": None
         },
         {
@@ -48,7 +48,7 @@ def _front():
           },
           "difficulty": {"level": "easy", "time_limit": 20},
           "fs": None,
-          "category": "comunicacao",
+          "category": "daily-task",
           "template_code": None
         },
         {
@@ -77,7 +77,7 @@ def _front():
           },
           "difficulty": {"level": "hard", "time_limit": 45},
           "fs": None,
-          "category": "planejamento",
+          "category": "organization",
           "template_code": [
             {
               "id": "tecnologias",
@@ -128,7 +128,7 @@ def _back():
               "README.md": "# Contexto\nValide campos e retorne 400/401."
             }
           },
-          "category": "bugfix",
+          "category": "code",
           "template_code": None
         },
         {
@@ -150,7 +150,7 @@ def _back():
           },
           "difficulty": {"level": "easy", "time_limit": 20},
           "fs": None,
-          "category": "comunicacao",
+          "category": "daily-task",
           "template_code": None
         },
         {
@@ -179,7 +179,7 @@ def _back():
           },
           "difficulty": {"level": "hard", "time_limit": 45},
           "fs": None,
-          "category": "planejamento",
+          "category": "organization",
           "template_code": [
             {
               "id": "estrategia",
@@ -230,7 +230,7 @@ def _de():
           },
           "difficulty": {"level": "medium", "time_limit": 40},
           "fs": None,
-          "category": "data-exploration",
+          "category": "organization",
           "template_code": None
         },
         {
@@ -259,7 +259,7 @@ def _de():
           },
           "difficulty": {"level": "easy", "time_limit": 30},
           "fs": None,
-          "category": "data-pipeline",
+          "category": "organization",
           "template_code": [
             {
               "id": "orquestracao",
@@ -306,7 +306,7 @@ def _de():
           },
           "difficulty": {"level": "hard", "time_limit": 25},
           "fs": None,
-          "category": "comunicacao",
+          "category": "daily-task",
           "template_code": None
         }
     ]
