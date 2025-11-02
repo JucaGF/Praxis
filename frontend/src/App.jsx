@@ -51,13 +51,14 @@ function PrivateRoute({ children }) {
 function PublicRoute({ children }) {
   const { user, loading } = useAuth();
 
-  if (loading) {
-    return <LoadingSpinner />;
-  }
-
-  // Se já está logado, redireciona para home
+  // Se já está logado, redireciona IMEDIATAMENTE sem mostrar a página
   if (user) {
     return <Navigate to="/home" replace />;
+  }
+
+  // Mostra loading enquanto verifica autenticação
+  if (loading) {
+    return <LoadingSpinner />;
   }
 
   return children;

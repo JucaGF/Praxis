@@ -1,42 +1,67 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
+/* Animações para Landing Page */
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
-
-@keyframes logo-spin {
+/* Rotação de palavras */
+@keyframes word-in {
   from {
-    transform: rotate(0deg);
+    opacity: 0;
+    transform: translateY(10px);
   }
   to {
-    transform: rotate(360deg);
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
+@keyframes word-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
   }
 }
 
-.card {
-  padding: 2em;
+.word-in {
+  animation: word-in 0.3s ease-out forwards;
 }
 
-.read-the-docs {
-  color: #888;
+.word-out {
+  animation: word-out 0.2s ease-in forwards;
+}
+
+/* Animações dos chips */
+@keyframes floaty {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
+
+@keyframes drifty {
+  0%, 100% {
+    transform: translateX(0px) rotate(0deg);
+  }
+  33% {
+    transform: translateX(10px) rotate(2deg);
+  }
+  66% {
+    transform: translateX(-10px) rotate(-2deg);
+  }
+}
+
+.floaty {
+  animation: floaty 3s ease-in-out infinite;
+}
+
+.drifty {
+  animation: drifty 4s ease-in-out infinite;
+}
+
+.shadow-chip {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }

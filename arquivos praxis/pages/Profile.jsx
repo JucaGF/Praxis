@@ -1,9 +1,7 @@
 // src/pages/Profile.jsx
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Line } from "react-chartjs-2";
-import { supabase } from "../lib/supabaseClient";
-import { deleteAccount } from "../lib/api";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -128,54 +126,40 @@ const evolutionOptions = {
 
 
 export default function Profile() {
-  const navigate = useNavigate();
-  // Dados mockados já inicializados para evitar loading desnecessário
-  const [user] = useState({
-    name: "João Silva",
-    tech_skills: [
-      { name: "React", percentage: 74, last_updated: "14/10/2025" },
-      { name: "JavaScript", percentage: 74, last_updated: "14/10/2025" },
-      { name: "TypeScript", percentage: 55, last_updated: "30/09/2025" },
-      { name: "Problem Solving", percentage: 69, last_updated: "14/10/2025" },
-    ]
-  });
-  const [submissions] = useState([
-    { id: 1, title: "Correção de Bug: Button Component", score: 90, points: 22, date: "14/10/2025", tags: "React, JavaScript, Problem Solving" }
-  ]);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
+  const [user, setUser] = useState(null);
+  const [submissions, setSubmissions] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/");
-  };
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // Simulação de chamadas de API
+        const userData = {
+            name: "João Silva",
+            tech_skills: [
+                { name: "React", percentage: 74, last_updated: "14/10/2025" },
+                { name: "JavaScript", percentage: 74, last_updated: "14/10/2025" },
+                { name: "TypeScript", percentage: 55, last_updated: "30/09/2025" },
+                { name: "Problem Solving", percentage: 69, last_updated: "14/10/2025" },
+            ]
+        };
+        const submissionsData = [
+            { id: 1, title: "Correção de Bug: Button Component", score: 90, points: 22, date: "14/10/2025", tags: "React, JavaScript, Problem Solving" }
+        ];
+        setUser(userData);
+        setSubmissions(submissionsData);
+      } catch (error) {
+        console.error("Erro ao carregar dados do perfil:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
 
-  const handleDeleteAccount = async () => {
-    setDeleteLoading(true);
-    setDeleteError("");
-
-    try {
-      // Chama o backend que:
-      // 1. Deleta o perfil (trigger limpa dados relacionados)
-      // 2. Deleta o usuário de auth.users via Admin API
-      await deleteAccount();
-      
-      console.log("Conta deletada com sucesso");
-      
-      // Faz logout local
-      await supabase.auth.signOut();
-      
-      // Redireciona para a landing page
-      navigate("/");
-    } catch (error) {
-      console.error("Erro ao excluir conta:", error);
-      setDeleteError(
-        error.message || "Não foi possível excluir sua conta. Por favor, tente novamente ou entre em contato com o suporte."
-      );
-      setDeleteLoading(false);
-    }
-  };
+  if (loading) {
+    return <div className="min-h-screen bg-zinc-950 text-center py-10 text-zinc-400">Carregando perfil...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-white text-zinc-900">
@@ -189,12 +173,6 @@ export default function Profile() {
           <nav className="flex items-center gap-2">
             <Link to="/home" className="px-3 py-1.5 rounded-md hover:bg-zinc-50 border border-zinc-200 text-sm">Home</Link>
             <Link to="/perfil" className="px-3 py-1.5 rounded-md bg-primary-100 text-primary-800 border border-primary-200 text-sm">Perfil</Link>
-            <button
-              onClick={handleLogout}
-              className="px-3 py-1.5 rounded-md hover:bg-red-50 border border-red-200 text-red-600 text-sm font-medium transition cursor-pointer"
-            >
-              Sair
-            </button>
           </nav>
         </div>
       </header>
@@ -225,22 +203,6 @@ export default function Profile() {
                 <StatCard value={user?.tech_skills.length} label="Habilidades Rastreadas" />
                 <StatCard value="90" label="Score Médio" />
             </div>
-
-            {/* Seção de Exclusão de Conta */}
-            <Section title="Zona de Perigo" subtitle="Ações irreversíveis">
-              <div className="p-4 border border-red-200 rounded-lg bg-red-50">
-                <h4 className="font-semibold text-red-900 mb-2">Excluir Conta</h4>
-                <p className="text-sm text-red-700 mb-4">
-                  Uma vez excluída, sua conta não poderá ser recuperada. Todos os seus dados, desafios e progresso serão perdidos permanentemente.
-                </p>
-                <button
-                  onClick={() => setShowDeleteModal(true)}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium text-sm cursor-pointer"
-                >
-                  Excluir Minha Conta
-                </button>
-              </div>
-            </Section>
           </div>
 
           {/* Coluna Lateral (1/3) */}
@@ -257,54 +219,6 @@ export default function Profile() {
           </div>
         </div>
       </main>
-
-      {/* Modal de Confirmação de Exclusão */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
-            <h3 className="text-2xl font-bold text-zinc-900 mb-3">
-              Tem certeza absoluta?
-            </h3>
-            <p className="text-zinc-600 mb-6">
-              Esta ação <strong className="text-red-600">não pode ser desfeita</strong>. 
-              Você perderá permanentemente:
-            </p>
-            
-            <ul className="list-disc list-inside text-sm text-zinc-700 mb-6 space-y-1">
-              <li>Todo o seu progresso e pontuação</li>
-              <li>Histórico de desafios completados</li>
-              <li>Habilidades rastreadas</li>
-              <li>Dados de perfil</li>
-            </ul>
-
-            {deleteError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-700">{deleteError}</p>
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowDeleteModal(false);
-                  setDeleteError("");
-                }}
-                disabled={deleteLoading}
-                className="flex-1 px-4 py-3 bg-zinc-100 text-zinc-900 rounded-lg hover:bg-zinc-200 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleDeleteAccount}
-                disabled={deleteLoading}
-                className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              >
-                {deleteLoading ? "Excluindo..." : "Sim, Excluir Permanentemente"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

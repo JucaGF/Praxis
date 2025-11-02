@@ -176,6 +176,23 @@ class Settings(BaseSettings):
     Se vazio, valida online via API do Supabase (mais lento).
     """
     
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
+    """
+    Service Role Key do Supabase (para operações admin).
+    
+    Onde encontrar:
+    - Dashboard Supabase → Project Settings → API → service_role key
+    
+    ⚠️ ATENÇÃO: Esta chave tem privilégios totais!
+    - NUNCA exponha no frontend
+    - NUNCA commite no git
+    - Use apenas no backend
+    
+    Usada para:
+    - Deletar usuários
+    - Operações administrativas
+    """
+    
     AUTH_ENABLED: bool = True
     """
     Habilita/desabilita autenticação.

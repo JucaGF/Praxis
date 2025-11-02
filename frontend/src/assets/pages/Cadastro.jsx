@@ -12,7 +12,7 @@ export default function Cadastro() {
     nome: "",
     email: "",
     senha: "",
-    profissao: "", // Mantemos para o questionário
+    career_goal: "", // Trilha de carreira
   });
 
   const [etapa, setEtapa] = useState("cadastro"); // "cadastro" | "questionario" | "finalizado"
@@ -24,8 +24,8 @@ export default function Cadastro() {
     e.preventDefault();
     setMensagem("");
 
-    // Se não houver profissão, abre o questionário
-    if (!formData.profissao) {
+    // Se não houver trilha de carreira, abre o questionário
+    if (!formData.career_goal) {
       setEtapa("questionario");
       return;
     }
@@ -38,8 +38,9 @@ export default function Cadastro() {
       password: formData.senha,
       options: {
         data: {
-          nome: formData.nome, // Metadado: nome
-          profissao: formData.profissao, // Metadado: profissao
+          full_name: formData.nome,           // ✅ Campo padrão do Supabase
+          nome: formData.nome,                // Metadado customizado (compatibilidade)
+          career_goal: formData.career_goal,  // ✅ Trilha de carreira (para o trigger)
         },
       },
     });
@@ -61,13 +62,13 @@ export default function Cadastro() {
     setEtapa("finalizado");
   };
 
-  // Escolha da profissão no questionário
-  const selecionarProfissao = (profissaoEscolhida) => {
-    // 1. Atualiza o formData com a profissão escolhida
-    const novosDados = { ...formData, profissao: profissaoEscolhida };
+  // Escolha da trilha de carreira no questionário
+  const selecionarCarreira = (trilhaEscolhida) => {
+    // 1. Atualiza o formData com a trilha escolhida
+    const novosDados = { ...formData, career_goal: trilhaEscolhida };
     setFormData(novosDados);
 
-    // 2. Chama a função de submissão com a profissão preenchida
+    // 2. Chama a função de submissão com a trilha preenchida
     // Criamos um mock de evento para re-utilizar o handleSubmit
     handleSubmit({ preventDefault: () => {} });
   };
@@ -75,6 +76,16 @@ export default function Cadastro() {
   // Seu código de renderização do componente...
   return (
     <div className="flex min-h-screen">
+      {/* Botão Voltar */}
+      <Link 
+        to="/" 
+        className="absolute top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 transition bg-white/80 backdrop-blur rounded-lg"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        </svg>
+        Voltar
+      </Link>
       {/* ... (LADO ESQUERDO permanece o mesmo) ... */}
       <div className="hidden md:flex w-[35%] bg-yellow-400 text-black flex-col relative overflow-hidden">
         <div className="flex flex-col h-full items-center">
@@ -213,14 +224,14 @@ export default function Cadastro() {
             </>
           )}
 
-          {/* === ETAPA 2: QUESTIONÁRIO DE PROFISSÃO === */}
+          {/* === ETAPA 2: QUESTIONÁRIO DE TRILHA DE CARREIRA === */}
           {etapa === "questionario" && (
             <div className="text-center">
               <h2 className="text-2xl font-semibold mb-6 text-gray-800">
-                Qual área você quer seguir?
+                Qual trilha de carreira você quer seguir?
               </h2>
               <p className="text-gray-600 mb-8">
-                Escolha a profissão que melhor representa seu perfil.
+                Escolha a área que melhor representa seu objetivo profissional.
               </p>
 
               {loading && (
@@ -231,23 +242,30 @@ export default function Cadastro() {
 
               <div className="flex flex-col gap-4">
                 <button
-                  onClick={() => selecionarProfissao("Desenvolvedor Frontend")}
+                  onClick={() => selecionarCarreira("Desenvolvedor Frontend")}
                   disabled={loading}
-                  className="border border-yellow-400 hover:bg-yellow-400 hover:text-black text-yellow-500 font-medium py-3 rounded-lg transition disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-300"
+                  className="border border-yellow-400 hover:bg-yellow-400 hover:text-black text-yellow-500 font-medium py-3 rounded-lg transition disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-300 cursor-pointer"
                 >
                   Desenvolvedor Frontend
                 </button>
                 <button
-                  onClick={() => selecionarProfissao("Desenvolvedor Backend")}
+                  onClick={() => selecionarCarreira("Desenvolvedor Backend")}
                   disabled={loading}
-                  className="border border-yellow-400 hover:bg-yellow-400 hover:text-black text-yellow-500 font-medium py-3 rounded-lg transition disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-300"
+                  className="border border-yellow-400 hover:bg-yellow-400 hover:text-black text-yellow-500 font-medium py-3 rounded-lg transition disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-300 cursor-pointer"
                 >
                   Desenvolvedor Backend
                 </button>
                 <button
-                  onClick={() => selecionarProfissao("Engenheiro de Dados")}
+                  onClick={() => selecionarCarreira("Desenvolvedor Full Stack")}
                   disabled={loading}
-                  className="border border-yellow-400 hover:bg-yellow-400 hover:text-black text-yellow-500 font-medium py-3 rounded-lg transition disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-300"
+                  className="border border-yellow-400 hover:bg-yellow-400 hover:text-black text-yellow-500 font-medium py-3 rounded-lg transition disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-300 cursor-pointer"
+                >
+                  Desenvolvedor Full Stack
+                </button>
+                <button
+                  onClick={() => selecionarCarreira("Engenheiro de Dados")}
+                  disabled={loading}
+                  className="border border-yellow-400 hover:bg-yellow-400 hover:text-black text-yellow-500 font-medium py-3 rounded-lg transition disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-300 cursor-pointer"
                 >
                   Engenheiro de Dados
                 </button>
