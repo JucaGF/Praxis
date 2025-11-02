@@ -1,7 +1,7 @@
 // src/pages/Home.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { fetchUser, fetchChallenges, generateChallenges } from "../lib/api.js";
+import { fetchUser, fetchChallenges, generateChallengesStreaming } from "../lib/api.js";
 import { Pill, Difficulty, Skill, Meta, Card, PrimaryButton } from "../components/ui.jsx";
 import { supabase } from "../lib/supabaseClient";
 
@@ -39,9 +39,30 @@ function transformChallenges(apiChallenges) {
       time: timeStr,
       skills: skills.slice(0, 3), // Limita a 3 skills
       tags: challenge.category ? [challenge.category] : [],
-      status: "available"
+      status: "available",
+      category: challenge.category // Adiciona category para os ícones
     };
   });
+}
+
+/* ----- Função para ícones minimalistas por categoria ----- */
+function getChallengeIcon(category) {
+  const icons = {
+    'code': '{ }',           // Código: chaves
+    'daily-task': '✉',       // Comunicação: envelope
+    'organization': '◇'      // Planejamento: losango (arquitetura)
+  };
+  return icons[category] || '●';
+}
+
+/* ----- Função para nome amigável da categoria ----- */
+function getChallengeCategoryName(category) {
+  const names = {
+    'code': 'Código',
+    'daily-task': 'Comunicação',
+    'organization': 'Planejamento'
+  };
+  return names[category] || 'Desafio';
 }
 
 /* ----- Home personalizável ----- */
@@ -51,6 +72,9 @@ export default function Home() {
   const [catalog, setCatalog] = useState([]);
   const [loading, setLoading] = useState(true);
   const [generatingChallenges, setGeneratingChallenges] = useState(false);
+  const [streamProgress, setStreamProgress] = useState(0);
+  const [streamMessage, setStreamMessage] = useState("");
+  const [cancelStream, setCancelStream] = useState(null);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -59,22 +83,72 @@ export default function Home() {
 
   const handleGenerateChallenges = async () => {
     setGeneratingChallenges(true);
+    setStreamProgress(0);
+    setStreamMessage("");
+    setCatalog([]); // Limpa desafios antigos
+    
     try {
-      console.log("🎯 Gerando novos desafios...");
-      const newChallenges = await generateChallenges();
-      console.log("✅ Desafios gerados:", newChallenges);
+      console.log("🎯 Iniciando geração com streaming...");
       
-      // Transforma os dados da API para o formato esperado
-      const transformedChallenges = transformChallenges(newChallenges);
-      console.log("🔄 Desafios transformados:", transformedChallenges);
+      const cancel = await generateChallengesStreaming({
+        onStart: (data) => {
+          console.log("🎬 Stream iniciado:", data);
+          setStreamMessage(data.message || "Iniciando...");
+        },
+        
+        onProgress: (data) => {
+          console.log("📊 Progresso:", data);
+          setStreamProgress(data.percent || 0);
+          setStreamMessage(data.message || "Gerando...");
+        },
+        
+        onChallenge: (data) => {
+          console.log("✅ Desafio recebido:", data);
+          // Transformar e adicionar ao catálogo imediatamente
+          const transformed = transformChallenges([data.data]);
+          setCatalog(prev => [...prev, ...transformed]);
+          setStreamMessage(`✅ Desafio ${data.number}/${data.total} gerado!`);
+        },
+        
+        onComplete: (data) => {
+          console.log("🎉 Geração concluída:", data);
+          setStreamMessage(data.message || "🎉 Concluído!");
+          setStreamProgress(100);
+          setTimeout(() => {
+            setGeneratingChallenges(false);
+            setStreamProgress(0);
+            setStreamMessage("");
+          }, 1500);
+        },
+        
+        onError: (data) => {
+          console.error("❌ Erro no stream:", data);
+          alert("Erro ao gerar desafios: " + (data.message || "Erro desconhecido"));
+          setGeneratingChallenges(false);
+          setStreamProgress(0);
+          setStreamMessage("");
+        }
+      });
       
-      // Atualiza o catálogo com os novos desafios
-      setCatalog(transformedChallenges);
+      // Guardar função de cancelamento
+      setCancelStream(() => cancel);
+      
     } catch (error) {
-      console.error("❌ Erro ao gerar desafios:", error);
+      console.error("❌ Erro ao iniciar streaming:", error);
       alert("Erro ao gerar desafios: " + error.message);
-    } finally {
       setGeneratingChallenges(false);
+      setStreamProgress(0);
+      setStreamMessage("");
+    }
+  };
+  
+  const handleCancelGeneration = () => {
+    if (cancelStream) {
+      cancelStream();
+      setGeneratingChallenges(false);
+      setStreamProgress(0);
+      setStreamMessage("");
+      setCancelStream(null);
     }
   };
 
@@ -298,17 +372,43 @@ export default function Home() {
             <h2 className="text-xl md:text-2xl font-extrabold tracking-tight">Recomendados para você</h2>
             <p className="text-zinc-600 text-sm">Baseado nas suas habilidades e interesses</p>
           </div>
-          <button
-            onClick={handleGenerateChallenges}
-            disabled={generatingChallenges}
-            className="px-4 py-2 bg-primary-500 text-black font-semibold rounded-lg hover:bg-primary-600 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-          >
-            {generatingChallenges ? "Gerando..." : "Gerar Desafios"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleGenerateChallenges}
+              disabled={generatingChallenges}
+              className="px-4 py-2 bg-primary-500 text-black font-semibold rounded-lg hover:bg-primary-600 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              {generatingChallenges ? "Gerando..." : "Gerar Desafios"}
+            </button>
+            {generatingChallenges && (
+              <button
+                onClick={handleCancelGeneration}
+                className="px-4 py-2 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600 transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+            )}
+          </div>
         </div>
 
+        {/* Barra de progresso e mensagem (durante geração) */}
+        {generatingChallenges && (
+          <div className="mb-6 bg-white rounded-lg shadow-md p-4 border border-primary-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-zinc-700">{streamMessage}</span>
+              <span className="text-sm font-semibold text-primary-600">{Math.round(streamProgress)}%</span>
+            </div>
+            <div className="w-full bg-zinc-200 rounded-full h-2.5 overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-primary-400 to-primary-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${streamProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Mensagem quando não há desafios */}
-        {recommended.length === 0 && (
+        {recommended.length === 0 && !generatingChallenges && (
           <div className="text-center py-12 px-4">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-zinc-100 mb-4">
               <span className="text-3xl">🎯</span>
@@ -320,23 +420,51 @@ export default function Home() {
           </div>
         )}
 
-        <div className="grid md:grid-cols-3 gap-5">
-        {recommended.slice(0, 3).map((c) => {
+        <div className="grid md:grid-cols-6 gap-5">
+        {/* Reordena para colocar o expandido primeiro */}
+        {recommended.slice(0, 3)
+          .sort((a, b) => {
+            if (a.id === expandedId) return -1;
+            if (b.id === expandedId) return 1;
+            return 0;
+          })
+          .map((c, index) => {
             const expanded = expandedId === c.id;
+            const isFirstCollapsed = !expanded && expandedId && index === 1;
+            const isSecondCollapsed = !expanded && expandedId && index === 2;
+            
             return (
             <Card
                 key={c.id}
                 role="button"
                 aria-expanded={expanded}
                 onClick={() => toggleExpand(c.id)}
+                style={{
+                  gridColumn: expanded 
+                    ? 'span 6' 
+                    : isFirstCollapsed 
+                      ? '2 / span 2' 
+                      : isSecondCollapsed 
+                        ? '4 / span 2' 
+                        : 'span 2'
+                }}
                 className={
-                "p-5 cursor-pointer transition-transform duration-200 " +
-                (expanded ? "ring-2 ring-primary-300 scale-[1.02]" : "hover:scale-[1.01]")
+                "p-5 cursor-pointer transition-all duration-300 ease-in-out animate-fade-in " +
+                (expanded 
+                  ? "ring-2 ring-primary-300" 
+                  : expandedId
+                    ? "hover:scale-[1.02] scale-95 opacity-90"
+                    : "hover:scale-[1.02]")
                 }
             >
                 <div className="flex items-start justify-between">
-                <div className="h-9 w-9 rounded-md bg-primary-100 text-primary-800 grid place-content-center border border-primary-200">
-                    ⚙️
+                <div className="flex items-center gap-2">
+                  <div className="h-9 w-9 rounded-md bg-primary-100 text-primary-800 grid place-content-center border border-primary-200 text-sm font-semibold">
+                      {getChallengeIcon(c.category)}
+                  </div>
+                  <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                    {getChallengeCategoryName(c.category)}
+                  </span>
                 </div>
                 <Difficulty level={c.difficulty} />
                 </div>
@@ -351,50 +479,45 @@ export default function Home() {
                 </div>
 
                 {/* Área extra que aparece quando expandido */}
-                <div
-                className={
-                    "overflow-hidden transition-[max-height,opacity] duration-300 ease-out " +
-                    (expanded ? "max-h-[360px] opacity-100" : "max-h-0 opacity-0")
-                }
-                >
-                <div className="pt-4 mt-4 border-t border-zinc-200">
+                {expanded && (
+                  <div className="pt-4 mt-4 border-t border-zinc-200">
                     <p className="text-sm text-zinc-700">
-                    <span className="font-medium">Objetivo:</span> resolver o desafio aplicando as skills acima e
-                    registrando suas decisões técnicas.
+                      <span className="font-medium">Objetivo:</span> resolver o desafio aplicando as skills acima e
+                      registrando suas decisões técnicas.
                     </p>
 
                     <div className="mt-3 grid gap-2 text-sm text-zinc-700">
-                    <div>
+                      <div>
                         <span className="font-medium">Pré-requisitos:</span>{" "}
                         {c.skills.join(", ")}
-                    </div>
-                    <div>
+                      </div>
+                      <div>
                         <span className="font-medium">O que será avaliado:</span> clareza do código, testes básicos,
                         comunicação (README) e performance quando aplicável.
-                    </div>
-                    <div>
+                      </div>
+                      <div>
                         <span className="font-medium">Passos sugeridos:</span> entender o bug/feature, planejar,
                         implementar, testar e documentar.
-                    </div>
+                      </div>
                     </div>
 
                     {/* Ações extras quando expandido */}
                     <div className="mt-5 flex flex-wrap gap-3">
-                    <Link to={`/desafio/${c.id}`} onClick={(e) => e.stopPropagation()}>
-                      <PrimaryButton>
-                        Começar desafio
-                      </PrimaryButton>
-                    </Link>
+                      <Link to={`/desafio/${c.id}`} onClick={(e) => e.stopPropagation()}>
+                        <PrimaryButton>
+                          Começar desafio
+                        </PrimaryButton>
+                      </Link>
 
-                    <button
+                      <button
                         onClick={(e) => { e.stopPropagation(); setExpandedId(null); }}
                         className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50"
-                    >
+                      >
                         Fechar
-                    </button>
+                      </button>
                     </div>
-                </div>
-                </div>
+                  </div>
+                )}
             </Card>
             );
         })}

@@ -212,6 +212,61 @@ class ChallengeService:
         
         return created
     
+    async def generate_challenges_for_profile_streaming(self, profile_id: str):
+        """
+        Gera desafios personalizados com streaming SSE.
+        
+        Fluxo:
+        1. Busca dados do perfil
+        2. Busca atributos (skills, career_goal)
+        3. **DELETA desafios antigos do usuário**
+        4. Chama IA streaming para gerar desafios progressivamente
+        5. Salva cada desafio no banco assim que é gerado
+        6. Yielda eventos SSE (start, progress, challenge, complete, error)
+        
+        Args:
+            profile_id: ID do perfil
+            
+        Yields:
+            Dicionários com eventos SSE
+            
+        Raises:
+            ProfileNotFoundError: Se perfil não existe
+        """
+        # 1. Busca perfil
+        profile = self.repo.get_profile(profile_id)
+        if not profile:
+            raise ProfileNotFoundError(profile_id)
+        
+        # 2. Busca atributos
+        attributes = self.repo.get_attributes(profile_id)
+        
+        # 3. Deleta desafios antigos
+        deleted_count = self.repo.delete_challenges_for_profile(profile_id)
+        if deleted_count > 0:
+            logger.info(f"🗑️ Deletados {deleted_count} desafios antigos do perfil {profile_id}")
+        
+        # 4. Streaming da IA
+        async for event in self.ai.generate_challenges_streaming(profile, attributes):
+            
+            # Se é um desafio completo, salvar no banco
+            if event.get("type") == "challenge":
+                challenge_data = event.get("data")
+                if challenge_data:
+                    # Salvar no banco
+                    saved_challenges = self.repo.create_challenges_for_profile(
+                        profile_id, 
+                        [challenge_data]
+                    )
+                    
+                    if saved_challenges:
+                        # Atualizar evento com dados do banco (incluindo ID)
+                        event["data"] = saved_challenges[0]
+                        logger.info(f"💾 Desafio salvo com ID {saved_challenges[0]['id']}")
+            
+            # Propagar evento para o cliente
+            yield event
+    
     def get_active_challenges(self, profile_id: str, limit: int = 3) -> List[dict]:
         """
         Lista desafios ativos de um perfil.

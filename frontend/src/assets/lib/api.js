@@ -136,3 +136,132 @@ export async function deleteAccount() {
     method: "DELETE",
   });
 }
+
+/**
+ * Conecta ao endpoint SSE de geração de desafios com streaming
+ * 
+ * @param {Object} callbacks - Callbacks para diferentes eventos
+ * @param {Function} callbacks.onStart - Chamado quando inicia
+ * @param {Function} callbacks.onProgress - Chamado com progresso (percent, message)
+ * @param {Function} callbacks.onChallenge - Chamado quando um desafio é recebido
+ * @param {Function} callbacks.onComplete - Chamado quando termina
+ * @param {Function} callbacks.onError - Chamado em caso de erro
+ * @returns {Function} Função para cancelar/fechar a conexão
+ */
+export async function generateChallengesStreaming(callbacks) {
+  const token = await getAuthToken();
+  
+  if (!token) {
+    callbacks.onError?.({ message: "Não autenticado" });
+    return () => {};
+  }
+
+  // Usar fetch com streaming (mais flexível que EventSource)
+  const controller = new AbortController();
+  
+  try {
+    const response = await fetch(`${API_URL}/challenges/generate/stream`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Accept": "text/event-stream",
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    
+    // Estado do evento SSE (mantido entre leituras)
+    let currentEvent = null;
+    let currentData = "";
+
+    // Ler stream
+    const readStream = async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) {
+            console.log("✅ Stream finalizado");
+            break;
+          }
+
+          // Decodificar chunk
+          const chunk = decoder.decode(value, { stream: true });
+          console.log(`📦 Chunk recebido: ${chunk.length} bytes`);
+          
+          buffer += chunk;
+          
+          // Processar eventos SSE do buffer
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || ""; // Guarda linha incompleta
+
+          for (const line of lines) {
+            if (line.startsWith("event:")) {
+              currentEvent = line.substring(6).trim();
+            } else if (line.startsWith("data:")) {
+              currentData = line.substring(5).trim();
+            } else if (line === "" && currentEvent && currentData) {
+              // Evento completo, processar IMEDIATAMENTE
+              console.log(`⚡ Processando evento: ${currentEvent}`);
+              
+              try {
+                const data = JSON.parse(currentData);
+                
+                // Chamar callback apropriado
+                switch (currentEvent) {
+                  case "start":
+                    callbacks.onStart?.(data);
+                    break;
+                  case "progress":
+                    callbacks.onProgress?.(data);
+                    break;
+                  case "challenge":
+                    callbacks.onChallenge?.(data);
+                    break;
+                  case "complete":
+                    callbacks.onComplete?.(data);
+                    break;
+                  case "error":
+                    callbacks.onError?.(data);
+                    break;
+                }
+              } catch (e) {
+                console.error("❌ Erro ao parsear evento SSE:", e, currentData);
+              }
+              
+              // Resetar estado
+              currentEvent = null;
+              currentData = "";
+            }
+          }
+        }
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          console.error("❌ Erro no stream:", error);
+          callbacks.onError?.({ message: error.message });
+        }
+      }
+    };
+
+    readStream();
+    
+    // Retorna função para cancelar
+    return () => {
+      console.log("🛑 Cancelando stream...");
+      controller.abort();
+      reader.cancel();
+    };
+    
+  } catch (error) {
+    console.error("❌ Erro ao conectar SSE:", error);
+    callbacks.onError?.({ message: error.message });
+    return () => {};
+  }
+}

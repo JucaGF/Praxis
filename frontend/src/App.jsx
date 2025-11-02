@@ -13,6 +13,7 @@ import Login from "./assets/pages/Login";
 import Cadastro from "./assets/pages/Cadastro";
 import Home from "./assets/pages/Home";
 import Profile from "./assets/pages/Profile";
+import Challenge from "./assets/pages/Challenge";
 
 // --- Hook de autenticação ---
 import { useAuth } from "./assets/hooks/useAuth";
@@ -89,26 +90,34 @@ export default function App() {
           }
         />
 
-        {/* --- Rotas protegidas (só para logados) --- */}
-        <Route
-          path="/home"
-          element={
-            <PrivateRoute>
-              <Home />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/perfil"
-          element={
-            <PrivateRoute>
-              <Profile />
-            </PrivateRoute>
-          }
-        />
+              {/* --- Rotas protegidas (só para logados) --- */}
+              <Route
+                path="/home"
+                element={
+                  <PrivateRoute>
+                    <Home />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/perfil"
+                element={
+                  <PrivateRoute>
+                    <Profile />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/desafio/:id"
+                element={
+                  <PrivateRoute>
+                    <Challenge />
+                  </PrivateRoute>
+                }
+              />
 
-        {/* --- Rota fallback (404) --- */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+              {/* --- Rota fallback (404) --- */}
+              <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );
