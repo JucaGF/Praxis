@@ -1,9 +1,48 @@
 // src/pages/Home.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { fetchUser, fetchChallenges } from "../lib/api.js";
+import { fetchUser, fetchChallenges, generateChallenges } from "../lib/api.js";
 import { Pill, Difficulty, Skill, Meta, Card, PrimaryButton } from "../components/ui.jsx";
 import { supabase } from "../lib/supabaseClient";
+
+/* ----- Função para transformar dados da API no formato esperado ----- */
+function transformChallenges(apiChallenges) {
+  return apiChallenges.map(challenge => {
+    // Mapeia level de inglês para português
+    const levelMap = {
+      'easy': 'Fácil',
+      'medium': 'Médio',
+      'hard': 'Difícil'
+    };
+    
+    // Extrai skills do target_skill ou eval_criteria
+    const skills = [];
+    if (challenge.description?.target_skill) {
+      skills.push(challenge.description.target_skill);
+    }
+    if (challenge.description?.eval_criteria) {
+      skills.push(...challenge.description.eval_criteria.slice(0, 2)); // Limita a 3 skills total
+    }
+    
+    // Formata tempo
+    const timeLimit = challenge.difficulty?.time_limit || 120;
+    const hours = Math.floor(timeLimit / 60);
+    const minutes = timeLimit % 60;
+    const timeStr = hours > 0 ? `${hours}h${minutes > 0 ? ` ${minutes}min` : ''}` : `${minutes}min`;
+    
+    return {
+      id: challenge.id,
+      title: challenge.title,
+      desc: challenge.description?.text || "Sem descrição",
+      long_desc: challenge.description?.text || "Sem descrição",
+      difficulty: levelMap[challenge.difficulty?.level] || 'Médio',
+      time: timeStr,
+      skills: skills.slice(0, 3), // Limita a 3 skills
+      tags: challenge.category ? [challenge.category] : [],
+      status: "available"
+    };
+  });
+}
 
 /* ----- Home personalizável ----- */
 export default function Home() {
@@ -11,27 +50,103 @@ export default function Home() {
   const [user, setUser] = useState(null);
   const [catalog, setCatalog] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [generatingChallenges, setGeneratingChallenges] = useState(false);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/");
   };
 
+  const handleGenerateChallenges = async () => {
+    setGeneratingChallenges(true);
+    try {
+      console.log("🎯 Gerando novos desafios...");
+      const newChallenges = await generateChallenges();
+      console.log("✅ Desafios gerados:", newChallenges);
+      
+      // Transforma os dados da API para o formato esperado
+      const transformedChallenges = transformChallenges(newChallenges);
+      console.log("🔄 Desafios transformados:", transformedChallenges);
+      
+      // Atualiza o catálogo com os novos desafios
+      setCatalog(transformedChallenges);
+    } catch (error) {
+      console.error("❌ Erro ao gerar desafios:", error);
+      alert("Erro ao gerar desafios: " + error.message);
+    } finally {
+      setGeneratingChallenges(false);
+    }
+  };
+
   // carrega usuário + catálogo
   useEffect(() => {
     (async () => {
       try {
-        const [u, c] = await Promise.all([fetchUser(), fetchChallenges()]);
-        setUser(u);
-        setCatalog(c);
+        // Busca apenas atributos e desafios (profile vem do Supabase)
+        const [attributes, challenges] = await Promise.all([
+          fetchUser(),
+          fetchChallenges()
+        ]);
+        
+        // Pega o nome do Supabase
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        const fullName = authUser?.user_metadata?.full_name || authUser?.user_metadata?.nome || "Usuário";
+        
+        console.log("📊 Dados recebidos da API:", { authUser, attributes, challenges });
+        
+        // Verifica se os atributos existem
+        if (!attributes || !attributes.tech_skills || attributes.tech_skills.length === 0) {
+          console.warn("⚠️ Atributos não encontrados ou vazios. Usuário precisa criar dados mockados.");
+          throw new Error("Atributos não encontrados. Clique no botão para criar dados mockados.");
+        }
+        
+        // Mapeia career_goal para interesses relevantes
+        const getInterests = (careerGoal) => {
+          if (!careerGoal) return ["Desenvolvimento", "Tecnologia"];
+          
+          const goal = careerGoal.toLowerCase();
+          
+          if (goal.includes("full stack")) {
+            return ["Frontend", "Backend"];
+          } else if (goal.includes("frontend")) {
+            return ["Frontend", "UI/UX"];
+          } else if (goal.includes("backend")) {
+            return ["Backend", "Banco de Dados"];
+          } else if (goal.includes("dados") || goal.includes("data")) {
+            return ["Banco de Dados", "Engenharia de Dados"];
+          }
+          
+          // Fallback: pega as duas primeiras palavras
+          return ["Desenvolvimento", "Tecnologia"];
+        };
+        
+        // Transforma os dados da API no formato esperado pelo componente
+        const userData = {
+          name: fullName,
+          // Extrai nomes das tech_skills para usar como skills
+          skills: attributes.tech_skills.map(skill => skill.name),
+          // Mapeia career_goal para interesses
+          interests: getInterests(attributes.career_goal)
+        };
+        
+               console.log("✅ Dados transformados para o componente:", userData);
+               
+               // Transforma os desafios da API para o formato esperado
+               const transformedChallenges = transformChallenges(challenges || []);
+               console.log("🔄 Desafios carregados e transformados:", transformedChallenges);
+               
+               setUser(userData);
+               setCatalog(transformedChallenges);
       } catch (error) {
-        console.error("Erro ao carregar dados:", error);
-        // Define dados mock caso a API falhe
-        setUser({ 
-          name: "Usuário", 
-          skills: ["React", "JavaScript"], 
-          interests: ["Frontend", "Backend"] 
-        });
+        console.error("❌ Erro detalhado ao carregar dados:", error);
+        console.error("❌ Mensagem de erro:", error.message);
+        console.error("❌ Stack:", error.stack);
+        
+        // NÃO cria dados automaticamente para evitar loop
+        // O usuário precisará clicar no botão "Criar Dados Mockados"
+        
+        // Seta user como null para mostrar a tela com o botão
+        setUser(null);
         setCatalog([]);
       } finally {
         setLoading(false);
@@ -83,11 +198,53 @@ export default function Home() {
   }
 
   if (!user) {
+    const setupMockData = async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+        const { data } = await supabase.auth.getSession();
+        const token = data?.session?.access_token;
+        
+        console.log("🔧 Criando dados mockados...");
+        
+        const response = await fetch(`${API_URL}/dev/setup-mock-data`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
+        
+        if (response.ok) {
+          console.log("✅ Dados criados! Recarregando...");
+          window.location.reload();
+        } else {
+          const error = await response.text();
+          console.error("❌ Erro:", error);
+          alert("Erro ao criar dados: " + error);
+        }
+      } catch (error) {
+        console.error("❌ Erro:", error);
+        alert("Erro ao criar dados: " + error.message);
+      }
+    };
+    
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-zinc-600 mb-4">Backend não está respondendo</p>
-          <Link to="/" className="text-primary-600 hover:text-primary-700">Voltar para Home</Link>
+        <div className="text-center max-w-md">
+          <h2 className="text-2xl font-bold text-zinc-900 mb-4">Dados não encontrados</h2>
+          <p className="text-zinc-600 mb-6">
+            Parece que você não tem dados de perfil ainda. Clique no botão abaixo para criar dados mockados automaticamente.
+          </p>
+          <button
+            onClick={setupMockData}
+            className="px-6 py-3 bg-primary-500 text-black font-semibold rounded-lg hover:bg-primary-600 transition cursor-pointer mb-4"
+          >
+            Criar Dados Mockados
+          </button>
+          <br />
+          <Link to="/" className="text-primary-600 hover:text-primary-700 text-sm">
+            Voltar para Landing Page
+          </Link>
         </div>
       </div>
     );
@@ -136,10 +293,32 @@ export default function Home() {
         </Card>
 
         {/* Lista ordenada por relevância */}
-        <div className="mb-4">
-          <h2 className="text-xl md:text-2xl font-extrabold tracking-tight">Recomendados para você</h2>
-          <p className="text-zinc-600 text-sm">Baseado nas suas habilidades e interesses</p>
+        <div className="mb-4 flex items-end justify-between">
+          <div>
+            <h2 className="text-xl md:text-2xl font-extrabold tracking-tight">Recomendados para você</h2>
+            <p className="text-zinc-600 text-sm">Baseado nas suas habilidades e interesses</p>
+          </div>
+          <button
+            onClick={handleGenerateChallenges}
+            disabled={generatingChallenges}
+            className="px-4 py-2 bg-primary-500 text-black font-semibold rounded-lg hover:bg-primary-600 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          >
+            {generatingChallenges ? "Gerando..." : "Gerar Desafios"}
+          </button>
         </div>
+
+        {/* Mensagem quando não há desafios */}
+        {recommended.length === 0 && (
+          <div className="text-center py-12 px-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-zinc-100 mb-4">
+              <span className="text-3xl">🎯</span>
+            </div>
+            <h3 className="text-xl font-semibold text-zinc-900 mb-2">Nenhum desafio disponível</h3>
+            <p className="text-zinc-600 mb-6">
+              Clique no botão acima para gerar desafios personalizados com base no seu perfil.
+            </p>
+          </div>
+        )}
 
         <div className="grid md:grid-cols-3 gap-5">
         {recommended.slice(0, 3).map((c) => {

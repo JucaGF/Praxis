@@ -95,6 +95,14 @@ export async function fetchUser() {
   return await fetchWithAuth(`${API_URL}/attributes`);
 }
 
+export async function fetchProfile() {
+  return await fetchWithAuth(`${API_URL}/profile`);
+}
+
+export async function fetchSubmissions() {
+  return await fetchWithAuth(`${API_URL}/submissions`);
+}
+
 export async function fetchChallenges(limit = 3) {
   return await fetchWithAuth(`${API_URL}/challenges/active?limit=${limit}`);
 }

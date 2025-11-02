@@ -25,6 +25,64 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/submissions", tags=["submissions"])
 
 
+@router.get("")
+def get_my_submissions(
+    current_user: AuthUser = Depends(get_current_user),
+    service: SubmissionService = Depends(get_submission_service)
+):
+    """
+    Busca todas as submissões do usuário autenticado.
+    
+    🔒 ENDPOINT PROTEGIDO - Requer autenticação
+    
+    Retorna lista com todas as submissões do usuário logado,
+    incluindo feedbacks e pontuações.
+    
+    ✅ Erros específicos:
+    - 401: Token inválido ou ausente
+    """
+    try:
+        # Busca submissões do usuário logado
+        try:
+            submissions = service.repo.get_submissions_by_profile(current_user.id)
+        except Exception:
+            # Se não houver submissões, retorna lista vazia
+            return []
+        
+        # Formata resposta
+        result = []
+        for sub in submissions:
+            try:
+                feedback = service.repo.get_feedback_by_submission(sub.id)
+            except:
+                feedback = None
+            
+            try:
+                challenge = service.repo.get_challenge(sub.challenge_id)
+            except:
+                challenge = None
+            
+            result.append({
+                "id": sub.id,
+                "title": challenge.title if challenge else "Desafio Desconhecido",
+                "score": feedback.score if feedback else 0,
+                "points": feedback.score if feedback else 0,
+                "date": sub.submitted_at.strftime("%d/%m/%Y") if sub.submitted_at else "Data desconhecida",
+                "tags": challenge.category if challenge else "",
+                "status": sub.status
+            })
+        
+        return result
+        
+    except Exception as e:
+        logger.exception(
+            "Erro ao buscar submissões",
+            extra={"extra_data": {"user_id": current_user.id}}
+        )
+        # Retorna lista vazia em vez de erro
+        return []
+
+
 @router.post("", response_model=SubmissionResultOut)
 def create_and_score_submission(
     body: SubmissionCreateIn,

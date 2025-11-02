@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Line } from "react-chartjs-2";
 import { supabase } from "../lib/supabaseClient";
-import { deleteAccount } from "../lib/api";
+import { deleteAccount, fetchUser, fetchSubmissions } from "../lib/api";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -41,6 +41,18 @@ function Section({ title, subtitle, children }) {
 }
 
 function SkillBar({ skill, percentage, date }) {
+  // Formata a data para formato brasileiro
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "Data desconhecida";
+    
+    try {
+      const dateObj = new Date(dateStr);
+      return dateObj.toLocaleDateString("pt-BR");
+    } catch {
+      return "Data desconhecida";
+    }
+  };
+  
   return (
     <div>
       <div className="flex justify-between items-end mb-1">
@@ -50,7 +62,7 @@ function SkillBar({ skill, percentage, date }) {
       <div className="w-full bg-zinc-100 rounded-full h-2.5">
         <div className="bg-primary-500 h-2.5 rounded-full" style={{ width: `${percentage}%` }}></div>
       </div>
-      <p className="text-right text-xs text-zinc-500 mt-1">Atualizado em {date}</p>
+      <p className="text-right text-xs text-zinc-500 mt-1">Atualizado em {formatDate(date)}</p>
     </div>
   );
 }
@@ -129,22 +141,57 @@ const evolutionOptions = {
 
 export default function Profile() {
   const navigate = useNavigate();
-  // Dados mockados já inicializados para evitar loading desnecessário
-  const [user] = useState({
-    name: "João Silva",
-    tech_skills: [
-      { name: "React", percentage: 74, last_updated: "14/10/2025" },
-      { name: "JavaScript", percentage: 74, last_updated: "14/10/2025" },
-      { name: "TypeScript", percentage: 55, last_updated: "30/09/2025" },
-      { name: "Problem Solving", percentage: 69, last_updated: "14/10/2025" },
-    ]
-  });
-  const [submissions] = useState([
-    { id: 1, title: "Correção de Bug: Button Component", score: 90, points: 22, date: "14/10/2025", tags: "React, JavaScript, Problem Solving" }
-  ]);
+  // Estados para dados reais
+  const [user, setUser] = useState(null);
+  const [attributes, setAttributes] = useState(null);
+  const [submissions, setSubmissions] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+
+  // Busca dados reais do usuário
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // Pega o nome do Supabase Auth primeiro
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        const fullName = authUser?.user_metadata?.full_name || authUser?.user_metadata?.nome || "Usuário";
+        
+        // Formata o usuário com o nome real
+        setUser({ full_name: fullName });
+        
+        // Busca dados da API (com fallback se falhar)
+        try {
+          const attributesData = await fetchUser();
+          setAttributes(attributesData);
+        } catch (error) {
+          console.error("Erro ao buscar atributos:", error);
+          setAttributes({ tech_skills: [], soft_skills: [], career_goal: "" });
+        }
+        
+        try {
+          const submissionsData = await fetchSubmissions();
+          setSubmissions(submissionsData || []);
+        } catch (error) {
+          console.error("Erro ao buscar submissões:", error);
+          setSubmissions([]);
+        }
+        
+        console.log("📊 Dados do perfil carregados:", { fullName });
+      } catch (error) {
+        console.error("Erro ao carregar dados do perfil:", error);
+        // Seta valores padrão se tudo falhar
+        setUser({ full_name: "Usuário" });
+        setAttributes({ tech_skills: [], soft_skills: [], career_goal: "" });
+        setSubmissions([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -201,30 +248,47 @@ export default function Profile() {
 
       {/* Conteúdo da Página de Perfil */}
       <main className="max-w-6xl mx-auto px-4 py-8 md:py-10">
-        <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Olá, {user?.name}</h1>
-          <p className="text-zinc-600 text-lg">Acompanhe seu progresso e desenvolvimento profissional.</p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Coluna Principal (2/3) */}
-          <div className="lg:col-span-2 space-y-8">
-
-            <Section title="Habilidades Técnicas" subtitle="Suas competências atualizadas com base nos desafios completados">
-                <div className="space-y-6">
-                    {user?.tech_skills.map(skill => <SkillBar key={skill.name} skill={skill.name} percentage={skill.percentage} date={skill.last_updated} />)}
-                </div>
-            </Section>
-
-            <Section title="Histórico de Desafios" subtitle={`${submissions.length} desafios completados`}>
-                {submissions.map(sub => <ChallengeHistoryItem key={sub.id} {...sub} />)}
-            </Section>
-
-            <div className="grid grid-cols-3 gap-4">
-                <StatCard value={submissions.length} label="Desafios Completados" />
-                <StatCard value={user?.tech_skills.length} label="Habilidades Rastreadas" />
-                <StatCard value="90" label="Score Médio" />
+        {loading ? (
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
+              <p className="text-zinc-600">Carregando perfil...</p>
             </div>
+          </div>
+        ) : (
+          <>
+            <div className="mb-8">
+              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Olá, {user?.full_name || 'Usuário'}</h1>
+              <p className="text-zinc-600 text-lg">Acompanhe seu progresso e desenvolvimento profissional.</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Coluna Principal (2/3) */}
+              <div className="lg:col-span-2 space-y-8">
+
+                <Section title="Habilidades Técnicas" subtitle="Suas competências atualizadas com base nos desafios completados">
+                    <div className="space-y-6">
+                        {attributes?.tech_skills && attributes.tech_skills.length > 0 ? (
+                          attributes.tech_skills.map(skill => <SkillBar key={skill.name} skill={skill.name} percentage={skill.percentage} date={skill.last_updated} />)
+                        ) : (
+                          <p className="text-zinc-500 text-center py-4">Nenhuma habilidade registrada ainda.</p>
+                        )}
+                    </div>
+                </Section>
+
+                <Section title="Histórico de Desafios" subtitle={`${submissions.length} desafios completados`}>
+                    {submissions && submissions.length > 0 ? (
+                      submissions.map(sub => <ChallengeHistoryItem key={sub.id} {...sub} />)
+                    ) : (
+                      <p className="text-zinc-500 text-center py-4">Nenhum desafio completado ainda.</p>
+                    )}
+                </Section>
+
+                <div className="grid grid-cols-3 gap-4">
+                    <StatCard value={submissions?.length || 0} label="Desafios Completados" />
+                    <StatCard value={attributes?.tech_skills?.length || 0} label="Habilidades Rastreadas" />
+                    <StatCard value="90" label="Score Médio" />
+                </div>
 
             {/* Seção de Exclusão de Conta */}
             <Section title="Zona de Perigo" subtitle="Ações irreversíveis">
@@ -256,6 +320,8 @@ export default function Profile() {
             </Section>
           </div>
         </div>
+          </>
+        )}
       </main>
 
       {/* Modal de Confirmação de Exclusão */}

@@ -21,6 +21,41 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/attributes", tags=["attributes"])
 
 
+@router.get("", response_model=AttributesOut)
+def get_my_attributes(
+    current_user: AuthUser = Depends(get_current_user),
+    repo: IRepository = Depends(get_repo)
+):
+    """
+    Busca atributos do usuário autenticado atual.
+    
+    🔒 ENDPOINT PROTEGIDO - Requer autenticação
+    
+    Este endpoint retorna automaticamente os atributos do usuário logado.
+    Não precisa passar profile_id - usa o ID do token JWT.
+    
+    Retorna:
+    - career_goal: objetivo de carreira
+    - soft_skills: habilidades interpessoais
+    - tech_skills: habilidades técnicas
+    
+    ✅ Erros específicos:
+    - 401: Token inválido ou ausente
+    - 404: Atributos não encontrados
+    """
+    try:
+        return repo.get_attributes(current_user.id)
+    except PraxisError as e:
+        status_code = get_http_status_code(e)
+        raise HTTPException(status_code=status_code, detail=str(e))
+    except Exception as e:
+        logger.exception(
+            "Erro inesperado ao buscar atributos",
+            extra={"extra_data": {"user_id": current_user.id}}
+        )
+        raise HTTPException(status_code=500, detail="Erro inesperado ao buscar atributos")
+
+
 @router.get("/{profile_id}", response_model=AttributesOut)
 def get_attributes(
     profile_id: str,
