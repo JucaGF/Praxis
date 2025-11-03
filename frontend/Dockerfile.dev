@@ -1,0 +1,23 @@
+# Dockerfile para desenvolvimento com hot-reload
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copiar package.json e package-lock.json
+COPY package*.json ./
+
+# Instalar dependências
+RUN npm install
+
+# Copiar configurações (código fonte virá por volume)
+COPY vite.config.js ./
+COPY index.html ./
+
+# Dar permissões para UID 1000 poder escrever no diretório
+RUN chmod -R 777 /app
+
+# Expor porta do Vite
+EXPOSE 5173
+
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+

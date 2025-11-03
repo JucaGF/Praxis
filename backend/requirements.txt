@@ -10,6 +10,7 @@ pydantic-settings==2.7.0
 annotated-types==0.7.0
 typing-extensions==4.15.0
 typing-inspection==0.4.2
+email-validator==2.2.0
 
 # Database
 sqlmodel==0.0.27

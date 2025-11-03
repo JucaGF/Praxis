@@ -65,7 +65,7 @@ Para rodar este projeto localmente, siga os passos abaixo.
 
 3.  **Instale as dependências com `uv`:**
     ```bash
-    uv pip install -r requirements.txt
+    uv pip install -r backend/requirements.txt
     ```
 
 4.  **Configure as variáveis de ambiente:**

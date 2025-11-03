@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # Backend FastAPI
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: praxis-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Configurações do ambiente
+      - ENVIRONMENT=production
+      - DEBUG=False
+      
+      # Supabase (substitua pelos seus valores reais)
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
+      
+      # Google Gemini AI
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - AI_PROVIDER=${AI_PROVIDER:-gemini}
+      
+      # Database (Supabase PostgreSQL)
+      - DATABASE_URL=${DATABASE_URL}
+      
+    volumes:
+      # Para desenvolvimento com hot-reload (comentar em produção)
+      - ./backend:/app
+    restart: unless-stopped
+    networks:
+      - praxis-network
+
+  # Frontend React + Vite
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: praxis-frontend
+    ports:
+      - "80:80"
+    environment:
+      # Variáveis de ambiente do frontend (se houver)
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - praxis-network
+
+networks:
+  praxis-network:
+    driver: bridge
+
+# Volumes (opcional, para persistir dados se necessário)
+volumes:
+  backend-data:
+
