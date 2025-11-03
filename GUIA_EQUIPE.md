@@ -246,9 +246,22 @@ git push
 
 **Algo não funcionou?**
 
-1. Veja os logs: `docker-compose -f docker-compose.dev.yml logs -f`
-2. Pergunte no chat da equipe
-3. Rebuild do zero: `docker-compose -f docker-compose.dev.yml down -v && docker-compose -f docker-compose.dev.yml up --build`
+1. **Windows:** Se teve erro ao buildar, veja `TROUBLESHOOTING_WINDOWS.md` 📘
+2. Veja os logs: `docker-compose -f docker-compose.dev.yml logs -f`
+3. Pergunte no chat da equipe
+4. Rebuild do zero: `docker-compose -f docker-compose.dev.yml down -v && docker-compose -f docker-compose.dev.yml up --build`
+
+### 🪟 Problemas no Windows?
+
+Execute no PowerShell como Administrador:
+```powershell
+docker system prune -af
+docker-compose -f docker-compose.dev.yml down -v
+docker-compose -f docker-compose.dev.yml build --no-cache
+docker-compose -f docker-compose.dev.yml up
+```
+
+Se persistir, reinicie o Docker Desktop e tente novamente.
 
 ---
 
