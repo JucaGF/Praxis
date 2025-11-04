@@ -48,12 +48,22 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-white font-sans relative overflow-hidden">
       {/* Botão Voltar */}
-      <Link 
-        to="/" 
+      <Link
+        to="/"
         className="absolute top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 transition"
       >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M10 19l-7-7m0 0l7-7m-7 7h18"
+          />
         </svg>
         Voltar
       </Link>
@@ -185,10 +195,11 @@ export default function Login() {
         <div className="flex items-center">
           <div className="w-full max-w-md mx-auto p-8 rounded-2xl bg-white/95 backdrop-blur-sm shadow-2xl border border-gray-100">
             <div className="mb-8 text-center">
-              <h2 className="text-4xl font-bold text-gray-900 mb-2">Praxis</h2>
-              <p className="text-sm text-gray-500 font-medium">
-                Seu trabalho na sua frente.
-              </p>
+              <img
+                src="/logo.png"
+                alt="Logo Praxis"
+                className="mx-auto w-44 h-auto mb-2"
+              />
             </div>
 
             <div className="mb-6">
@@ -294,7 +305,7 @@ export default function Login() {
 
             <div className="pt-6 border-t border-gray-100 mt-8 text-center">
               <h1 className="text-xs text-gray-400 font-semibold tracking-widest uppercase">
-                SIMULE | PRATIQUE | EVOLUA
+                SIMULE | EVOLUA | PRATIQUE
               </h1>
             </div>
           </div>
