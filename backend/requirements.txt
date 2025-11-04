@@ -10,7 +10,6 @@ pydantic-settings==2.7.0
 annotated-types==0.7.0
 typing-extensions==4.15.0
 typing-inspection==0.4.2
-email-validator==2.2.0
 
 # Database
 sqlmodel==0.0.27
@@ -33,7 +32,6 @@ pyyaml==6.0.3
 click==8.3.0
 
 # Server Optimization
-uvloop==0.22.1
 httptools==0.7.1
 watchfiles==1.1.1
 websockets==15.0.1
