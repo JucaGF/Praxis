@@ -1,6 +1,7 @@
 // src/pages/Landing.jsx
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
+import PraxisLogo from "../components/PraxisLogo";
 
 export default function Landing() {
   useEffect(() => {
@@ -75,8 +76,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="h-16 flex items-center justify-between">
             <a href="#" className="flex items-center gap-2 group" aria-label="Início">
-              <div className="w-8 h-8 rounded-md bg-primary-500 text-zinc-900 grid place-content-center font-black group-hover:bg-primary-600 transition">P</div>
-              <span className="font-extrabold tracking-tight text-xl">Praxis<span className="text-primary-600">:</span></span>
+              <PraxisLogo className="h-12" />
             </a>
             <div className="flex items-center gap-3">
               <Link to="/login" className="px-4 py-2 text-sm font-medium hover:text-zinc-700">Entrar</Link>

@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { fetchUser, fetchChallenges, generateChallengesStreaming } from "../lib/api.js";
 import { Pill, Difficulty, Skill, Meta, Card, PrimaryButton } from "../components/ui.jsx";
 import { supabase } from "../lib/supabaseClient";
+import PraxisLogo from "../components/PraxisLogo";
 
 /* ----- Função para transformar dados da API no formato esperado ----- */
 function transformChallenges(apiChallenges) {
@@ -330,8 +331,7 @@ export default function Home() {
       <header className="sticky top-0 z-40 bg-white/70 backdrop-blur border-b border-zinc-100">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 group" aria-label="Início">
-            <div className="w-8 h-8 rounded-md bg-primary-500 text-zinc-900 grid place-content-center font-black group-hover:bg-primary-600 transition">P</div>
-            <span className="font-extrabold tracking-tight text-xl">Praxis<span className="text-primary-600">:</span></span>
+            <PraxisLogo className="h-12" />
           </Link>
           <nav className="flex items-center gap-2">
             <Link to="/home" className="px-3 py-1.5 rounded-md bg-primary-100 text-primary-800 border border-primary-200 text-sm">Home</Link>

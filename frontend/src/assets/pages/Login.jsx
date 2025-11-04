@@ -1,6 +1,8 @@
+// src/pages/Login.jsx
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
+import PraxisLogo from "../components/PraxisLogo";
 
 const LinkedInIcon = () => (
   // ... (SVG Code) ...
@@ -185,7 +187,9 @@ export default function Login() {
         <div className="flex items-center">
           <div className="w-full max-w-md mx-auto p-8 rounded-2xl bg-white/95 backdrop-blur-sm shadow-2xl border border-gray-100">
             <div className="mb-8 text-center">
-              <h2 className="text-4xl font-bold text-gray-900 mb-2">Praxis</h2>
+              <div className="flex justify-center mb-4">
+                <PraxisLogo className="h-16" />
+              </div>
               <p className="text-sm text-gray-500 font-medium">
                 Seu trabalho na sua frente.
               </p>
