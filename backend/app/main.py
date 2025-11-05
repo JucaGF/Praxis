@@ -44,26 +44,26 @@ app = FastAPI(
 async def praxis_exception_handler(request: Request, exc: PraxisError):
     """
     Handler global para TODAS as exceções PraxisError.
-    
+
     Por que isso é importante?
     - Exceções lançadas em dependencies são capturadas automaticamente
     - Converte exceção customizada em HTTPException apropriada
     - Loga o erro automaticamente
     - Retorna JSON estruturado
-    
+
     Antes:
     - Exceção em dependency → crash não tratado
-    
+
     Depois:
     - Exceção em dependency → capturada aqui → HTTP correto
-    
+
     Exemplo:
     - TokenInvalidError → HTTP 401
     - ChallengeNotFoundError → HTTP 404
     - AIEvaluationError → HTTP 503
     """
     status_code = get_http_status_code(exc)
-    
+
     # Log do erro
     logger.warning(
         f"Exceção capturada: {exc.__class__.__name__}",
@@ -75,7 +75,7 @@ async def praxis_exception_handler(request: Request, exc: PraxisError):
             "details": getattr(exc, 'details', {})
         }}
     )
-    
+
     return JSONResponse(
         status_code=status_code,
         content={"detail": str(exc)}
@@ -105,6 +105,7 @@ app.include_router(challenges_router)
 app.include_router(submissions_router)
 app.include_router(account_router)  # Gerenciamento de conta
 app.include_router(dev_router)  # Endpoints de desenvolvimento/mock
+
 
 @app.get("/")
 def read_root():

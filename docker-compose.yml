@@ -1,49 +1,51 @@
-version: '3.8'
-
 services:
-  # Backend FastAPI
+  # Backend FastAPI (Desenvolvimento com hot-reload)
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: praxis-backend
+      context: .
+      dockerfile: backend/Dockerfile.dev
+    container_name: praxis-backend-dev
     ports:
       - "8000:8000"
     environment:
-      # Configurações do ambiente
-      - ENVIRONMENT=production
-      - DEBUG=False
-      
-      # Supabase (substitua pelos seus valores reais)
+      - ENVIRONMENT=development
+      - DEBUG=True
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
       - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
-      
-      # Google Gemini AI
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - AI_PROVIDER=${AI_PROVIDER:-gemini}
-      
-      # Database (Supabase PostgreSQL)
       - DATABASE_URL=${DATABASE_URL}
-      
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/workspace
     volumes:
-      # Para desenvolvimento com hot-reload (comentar em produção)
-      - ./backend:/app
+      # Monta projeto inteiro para importações corretas (Z para SELinux)
+      - .:/workspace:Z
+    working_dir: /workspace
+    command: uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
     restart: unless-stopped
     networks:
       - praxis-network
 
-  # Frontend React + Vite
+  # Frontend React + Vite (Desenvolvimento)
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
-    container_name: praxis-frontend
+      dockerfile: Dockerfile.dev
+    container_name: praxis-frontend-dev
     ports:
-      - "80:80"
+      - "5173:5173"
     environment:
-      # Variáveis de ambiente do frontend (se houver)
       - VITE_API_URL=http://localhost:8000
+      - VITE_SUPABASE_URL=${SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${SUPABASE_KEY}
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    volumes:
+      # Monta apenas código fonte (node_modules e configs ficam no container)
+      - ./frontend/src:/app/src:cached
+      - ./frontend/public:/app/public:cached
+      - ./frontend/vite.config.js:/app/vite.config.js:cached
     depends_on:
       - backend
     restart: unless-stopped
@@ -53,8 +55,4 @@ services:
 networks:
   praxis-network:
     driver: bridge
-
-# Volumes (opcional, para persistir dados se necessário)
-volumes:
-  backend-data:
 

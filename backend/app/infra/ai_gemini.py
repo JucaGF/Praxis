@@ -23,23 +23,24 @@ try:
     import google.generativeai as genai
     from google.generativeai.types import HarmCategory, HarmBlockThreshold
 except ImportError:
-    logger.warning("google-generativeai não instalado. Instale com: pip install google-generativeai")
+    logger.warning(
+        "google-generativeai não instalado. Instale com: pip install google-generativeai")
     genai = None
 
 
 class GeminiAI(IAIService):
     """
     Implementação real da IA usando Google Gemini.
-    
+
     Attributes:
         api_key: Chave da API do Gemini
         model_name: Nome do modelo (default: gemini-1.5-flash)
         max_retries: Número máximo de tentativas em caso de erro
         timeout: Timeout em segundos para cada chamada
     """
-    
+
     def __init__(
-        self, 
+        self,
         api_key: str,
         model_name: str = "models/gemini-2.5-flash",
         max_retries: int = 3,
@@ -47,13 +48,13 @@ class GeminiAI(IAIService):
     ):
         """
         Inicializa o cliente Gemini.
-        
+
         Args:
             api_key: API key do Google Gemini
             model_name: Modelo a usar (gemini-1.5-flash ou gemini-1.5-pro)
             max_retries: Quantas vezes retentar em caso de erro
             timeout: Timeout por request em segundos
-            
+
         Raises:
             ValueError: Se API key não fornecida ou SDK não instalado
         """
@@ -62,18 +63,18 @@ class GeminiAI(IAIService):
                 "SDK do Google Gemini não instalado. "
                 "Execute: pip install google-generativeai"
             )
-        
+
         if not api_key:
             raise ValueError("GEMINI_API_KEY é obrigatória!")
-        
+
         self.api_key = api_key
         self.model_name = model_name
         self.max_retries = max_retries
         self.timeout = timeout
-        
+
         # Configura o SDK
         genai.configure(api_key=api_key)
-        
+
         # Configurações de segurança (permite conteúdo técnico)
         self.safety_settings = {
             HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
@@ -81,7 +82,7 @@ class GeminiAI(IAIService):
             HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
             HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
         }
-        
+
         # Configuração de geração
         self.generation_config = {
             "temperature": 0.7,  # Criatividade moderada
@@ -89,70 +90,73 @@ class GeminiAI(IAIService):
             "top_k": 40,
             "max_output_tokens": 8192,  # Aumentado para permitir respostas maiores
         }
-        
+
         logger.info(f"GeminiAI inicializado com modelo {model_name}")
-    
+
     def _detect_track(self, attributes: dict) -> str:
         """
         Detecta o track de carreira baseado no career_goal.
-        
+
         Args:
             attributes: Atributos do perfil com career_goal
-            
+
         Returns:
             "frontend", "backend", "data_engineer" ou "fullstack"
         """
         goal = (attributes.get("career_goal") or "").lower()
-        
+
         # Keywords para Data Engineer
-        de_keywords = ["data engineer", "data", "pipeline", "etl", "elt", 
+        de_keywords = ["data engineer", "data", "pipeline", "etl", "elt",
                        "airflow", "spark", "dbt", "analytics engineer"]
         if any(k in goal for k in de_keywords):
             return "data_engineer"
-        
+
         # Keywords para Fullstack (explícito)
         fs_keywords = ["fullstack", "full-stack", "full stack"]
         if any(k in goal for k in fs_keywords):
             return "fullstack"
-        
+
         # Keywords para Frontend
-        fe_keywords = ["frontend", "front-end", "front", "react", "vue", 
+        fe_keywords = ["frontend", "front-end", "front", "react", "vue",
                        "angular", "ui", "ux"]
         if any(k in goal for k in fe_keywords):
             return "frontend"
-        
+
         # Keywords para Backend
-        be_keywords = ["backend", "back-end", "back", "api", "server", 
+        be_keywords = ["backend", "back-end", "back", "api", "server",
                        "node", "python", "java", "microservice"]
         if any(k in goal for k in be_keywords):
             return "backend"
-        
+
         # Default: fullstack (quando não identifica especificamente)
         return "fullstack"
-    
+
     def _build_challenge_prompt(self, profile: dict, attributes: dict, track: str) -> str:
         """
         Constrói o prompt para geração de desafios baseado no track.
-        
+
         Args:
             profile: Dados do perfil
             attributes: Skills e career_goal
             track: Track detectado
-            
+
         Returns:
             Prompt formatado
         """
         tech_skills = attributes.get("tech_skills", [])
-        career_goal = attributes.get("career_goal", "Desenvolver habilidades técnicas")
-        
+        career_goal = attributes.get(
+            "career_goal", "Desenvolver habilidades técnicas")
+
         # Skills formatadas
         # tech_skills agora é uma lista de objetos com 'name' e 'percentage'
         if isinstance(tech_skills, list):
-            skills_text = "\n".join([f"  - {skill['name']}: {skill['percentage']}/100" for skill in tech_skills])
+            skills_text = "\n".join(
+                [f"  - {skill['name']}: {skill['percentage']}/100" for skill in tech_skills])
         else:
             # Fallback para formato antigo (dict)
-            skills_text = "\n".join([f"  - {skill}: {level}/100" for skill, level in tech_skills.items()])
-        
+            skills_text = "\n".join(
+                [f"  - {skill}: {level}/100" for skill, level in tech_skills.items()])
+
         # Prompt base simplificado
         base_prompt = f"""Você é um AI Career Coach. Gere 3 desafios personalizados.
 
@@ -162,7 +166,7 @@ PERFIL:
 - Skills: {skills_text or "Iniciante"}
 
 """
-        
+
         # Prompts específicos por track (simplificados)
         if track == "data_engineer":
             track_prompt = """
@@ -193,7 +197,7 @@ Gere 3 desafios de BACKEND:
 - Categorias válidas: code, daily-task, organization
 - Skills alvo: Python, Node.js, FastAPI, SQL
 """
-        
+
         json_schema = """
 FORMATO JSON (retorne APENAS o JSON, sem texto extra):
 
@@ -364,43 +368,43 @@ EXEMPLOS COMPLETOS:
   ]
 }
 """
-        
+
         return base_prompt + track_prompt + json_schema
-    
+
     def _build_evaluation_prompt(self, challenge: dict, submission: dict, track: str) -> str:
         """
         Constrói o prompt para avaliação de submissão.
-        
+
         Args:
             challenge: Dados do desafio
             submission: Código/texto submetido
             track: Track do usuário
-            
+
         Returns:
             Prompt formatado
         """
         ch_desc = challenge.get("description", {})
         ch_diff = challenge.get("difficulty", {})
-        
+
         # Extrai dados da submissão de acordo com o tipo
         submission_type = submission.get("type", "codigo")
         submitted_content = ""
-        
+
         if submission_type == "codigo":
             # Para código: extrai arquivos
             files = submission.get("files", {})
             if files:
                 submitted_content = "\n\n".join([
-                    f"// {filename}\n{content}" 
+                    f"// {filename}\n{content}"
                     for filename, content in files.items()
                 ])
             else:
                 submitted_content = submission.get("content", "")
-        
+
         elif submission_type == "texto_livre":
             # Para texto livre: extrai o conteúdo textual
             submitted_content = submission.get("content", "")
-        
+
         elif submission_type == "organization":
             # Para organization: extrai form_data (respostas do formulário)
             form_data = submission.get("form_data", {})
@@ -417,7 +421,7 @@ EXEMPLOS COMPLETOS:
             else:
                 # Fallback para content se form_data não existir
                 submitted_content = submission.get("content", "")
-        
+
         # Adiciona contexto do enunciado se existir
         enunciado_context = ""
         enunciado = ch_desc.get('enunciado')
@@ -451,7 +455,7 @@ Requisitos Não-Funcionais:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 """
-        
+
         base_prompt = f"""Você é um avaliador técnico sênior especializado em {track.upper()}.
 
 DESAFIO PROPOSTO:
@@ -467,7 +471,7 @@ SUBMISSÃO DO CANDIDATO:
 ```
 
 """
-        
+
         # Critérios específicos por track
         if track == "data_engineer":
             criteria = """
@@ -534,7 +538,7 @@ Para COMUNICAÇÃO:
 - Clareza técnica: explica problemas bem?
 - Contexto: entende impacto em sistema?
 """
-        
+
         assessment_instructions = """
 TAREFA DE AVALIAÇÃO:
 
@@ -607,20 +611,20 @@ REGRAS:
 - Penalize más práticas mesmo que funcione
 - skill_level_demonstrated deve ser calculado holisticamente
 """
-        
+
         return base_prompt + criteria + assessment_instructions
-    
+
     def _call_gemini(self, prompt: str, response_mime_type: str = "application/json") -> str:
         """
         Chama a API do Gemini com retry logic.
-        
+
         Args:
             prompt: Prompt a enviar
             response_mime_type: Tipo de resposta esperada
-            
+
         Returns:
             Resposta da API como string
-            
+
         Raises:
             Exception: Se falhar após todas as tentativas
         """
@@ -632,17 +636,18 @@ REGRAS:
                 "response_mime_type": response_mime_type
             }
         )
-        
+
         last_error = None
         for attempt in range(1, self.max_retries + 1):
             try:
-                logger.info(f"Chamando Gemini (tentativa {attempt}/{self.max_retries})")
-                
+                logger.info(
+                    f"Chamando Gemini (tentativa {attempt}/{self.max_retries})")
+
                 response = model.generate_content(
                     prompt,
                     request_options={"timeout": self.timeout}
                 )
-                
+
                 # Log de uso (para monitorar custos)
                 if hasattr(response, 'usage_metadata'):
                     logger.info(
@@ -653,35 +658,36 @@ REGRAS:
                             "attempt": attempt
                         }}
                     )
-                
+
                 return response.text
-                
+
             except Exception as e:
                 last_error = e
                 logger.warning(
                     f"Gemini API error (tentativa {attempt}/{self.max_retries}): {e}",
                     extra={"extra_data": {"error": str(e), "attempt": attempt}}
                 )
-                
+
                 # Backoff exponencial
                 if attempt < self.max_retries:
                     wait_time = 2 ** attempt  # 2s, 4s, 8s
-                    logger.info(f"Aguardando {wait_time}s antes de retentar...")
+                    logger.info(
+                        f"Aguardando {wait_time}s antes de retentar...")
                     time.sleep(wait_time)
-        
+
         # Se chegou aqui, falhou todas as tentativas
         error_msg = f"Falha ao chamar Gemini após {self.max_retries} tentativas: {last_error}"
         logger.error(error_msg)
         raise Exception(error_msg)
-    
+
     def _parse_json_response(self, response_text: str, fallback: Optional[dict] = None) -> dict:
         """
         Parseia resposta JSON da API com tratamento de erros e tentativas de recuperação.
-        
+
         Args:
             response_text: Texto da resposta
             fallback: Valor padrão se parsing falhar
-            
+
         Returns:
             Dict parseado ou fallback
         """
@@ -695,11 +701,11 @@ REGRAS:
             if cleaned.endswith("```"):
                 cleaned = cleaned[:-3]
             cleaned = cleaned.strip()
-            
+
             return json.loads(cleaned)
         except json.JSONDecodeError as e:
             logger.warning(f"JSON inválido, tentando recuperar: {e}")
-            
+
             # Tenta recuperar extraindo apenas os objetos completos
             try:
                 # Se for uma lista, tenta extrair objetos válidos
@@ -711,21 +717,21 @@ REGRAS:
                     current_obj = ""
                     in_string = False
                     escape_next = False
-                    
+
                     for char in cleaned:
                         if escape_next:
                             current_obj += char
                             escape_next = False
                             continue
-                        
+
                         if char == '\\':
                             escape_next = True
                             current_obj += char
                             continue
-                        
+
                         if char == '"':
                             in_string = not in_string
-                        
+
                         if not in_string:
                             if char == '{':
                                 if depth == 0:
@@ -747,71 +753,73 @@ REGRAS:
                                 current_obj += char
                         else:
                             current_obj += char
-                    
+
                     if objects:
-                        logger.info(f"Recuperados {len(objects)} objetos válidos de JSON malformado")
+                        logger.info(
+                            f"Recuperados {len(objects)} objetos válidos de JSON malformado")
                         return objects
             except Exception as recovery_error:
                 logger.error(f"Falha ao recuperar JSON: {recovery_error}")
-            
-            logger.error(f"Erro ao parsear JSON: {e}\nResposta: {response_text[:200]}")
+
+            logger.error(
+                f"Erro ao parsear JSON: {e}\nResposta: {response_text[:200]}")
             if fallback:
                 return fallback
             raise
-    
+
     # ==================== MÉTODOS DA INTERFACE ====================
-    
+
     def _validate_challenge(self, challenge: dict) -> bool:
         """
         Valida se um desafio tem todos os campos obrigatórios.
-        
+
         Args:
             challenge: Desafio a validar
-            
+
         Returns:
             True se válido, False caso contrário
         """
         required_fields = ["title", "description", "difficulty", "category"]
-        
+
         # Valida campos de primeiro nível
         for field in required_fields:
             if field not in challenge or not challenge[field]:
                 logger.warning(f"Campo '{field}' faltando ou vazio no desafio")
                 return False
-        
+
         # Valida description
         description = challenge["description"]
         if not isinstance(description, dict):
             logger.warning(f"'description' não é um dict: {type(description)}")
             return False
-        
+
         if "text" not in description or not description["text"]:
             logger.warning("'description.text' faltando ou vazio")
             return False
-        
+
         # Valida difficulty
         difficulty = challenge["difficulty"]
         if not isinstance(difficulty, dict):
             logger.warning(f"'difficulty' não é um dict: {type(difficulty)}")
             return False
-        
+
         if "level" not in difficulty or not difficulty["level"]:
             logger.warning("'difficulty.level' faltando ou vazio")
             return False
-        
+
         if "time_limit" not in difficulty or not difficulty["time_limit"]:
             logger.warning("'difficulty.time_limit' faltando ou vazio")
             return False
-        
+
         return True
-    
+
     def _extract_complete_challenges(self, json_buffer: str) -> List[dict]:
         """
         Extrai desafios completos de um JSON parcialmente recebido (streaming).
-        
+
         Args:
             json_buffer: String JSON parcial ou completa
-            
+
         Returns:
             Lista de desafios completos encontrados
         """
@@ -825,53 +833,57 @@ REGRAS:
             if cleaned.endswith("```"):
                 cleaned = cleaned[:-3]
             cleaned = cleaned.strip()
-            
+
             # Tenta parsear como array completo
             parsed = json.loads(cleaned)
             if isinstance(parsed, list):
-                logger.info(f"✅ JSON completo parseado: {len(parsed)} desafios")
+                logger.info(
+                    f"✅ JSON completo parseado: {len(parsed)} desafios")
                 return parsed
             elif isinstance(parsed, dict) and "challenges" in parsed:
-                logger.info(f"✅ JSON completo parseado (dict): {len(parsed['challenges'])} desafios")
+                logger.info(
+                    f"✅ JSON completo parseado (dict): {len(parsed['challenges'])} desafios")
                 return parsed["challenges"]
             return []
         except json.JSONDecodeError as e:
             # JSON incompleto, tentar extrair objetos completos
-            logger.debug(f"⚠️ JSON incompleto, tentando extração incremental: {str(e)[:100]}")
+            logger.debug(
+                f"⚠️ JSON incompleto, tentando extração incremental: {str(e)[:100]}")
             challenges = []
-            
+
             # Estratégia mais robusta: procurar por arrays parciais
             # Tenta encontrar: [ {...}, {...}, ...
             import re
-            
+
             # Primeiro, tenta encontrar o início do array
             array_start = json_buffer.find('[')
             if array_start == -1:
                 return []
-            
+
             # Pega tudo a partir do [
             partial_array = json_buffer[array_start:]
-            
+
             # Tenta adicionar ] no final e parsear
             try:
                 test_json = partial_array.rstrip() + ']'
                 parsed = json.loads(test_json)
                 if isinstance(parsed, list) and len(parsed) > 0:
-                    logger.info(f"✅ Extração incremental: {len(parsed)} desafios parciais")
+                    logger.info(
+                        f"✅ Extração incremental: {len(parsed)} desafios parciais")
                     return parsed
             except:
                 pass
-            
+
             return challenges
-    
+
     async def generate_challenges_streaming(self, profile: dict, attributes: dict):
         """
         Gera desafios usando Gemini streaming e yielda eventos SSE progressivamente.
-        
+
         Args:
             profile: Dados do perfil
             attributes: Skills e career_goal
-            
+
         Yields:
             Dicionários com eventos SSE:
             - {"type": "start", "message": "..."}
@@ -883,14 +895,14 @@ REGRAS:
         try:
             track = self._detect_track(attributes)
             logger.info(f"🎬 Iniciando geração streaming para track: {track}")
-            
+
             yield {
                 "type": "start",
                 "message": f"🧠 Analisando perfil {track}..."
             }
-            
+
             prompt = self._build_challenge_prompt(profile, attributes, track)
-            
+
             # Configurar modelo com streaming
             # IMPORTANTE: NÃO usar response_mime_type="application/json" aqui
             # pois isso força o Gemini a esperar até ter um JSON completo,
@@ -898,13 +910,13 @@ REGRAS:
             generation_config = self.generation_config.copy()
             generation_config["max_output_tokens"] = 8192
             # Removido: generation_config["response_mime_type"] = "application/json"
-            
+
             model = genai.GenerativeModel(
                 model_name=self.model_name,
                 generation_config=generation_config,
                 safety_settings=self.safety_settings
             )
-            
+
             # Progresso inicial simulado (5% -> 35%) bem devagar
             import asyncio
             for i in range(5, 36, 1):
@@ -914,31 +926,32 @@ REGRAS:
                     "message": "⏳ Processando..."
                 }
                 await asyncio.sleep(1.5)  # 1.5 segundos entre updates
-            
+
             # Streaming do Gemini
             response = model.generate_content(prompt, stream=True)
-            
+
             buffer = ""
             challenges_sent = 0
             last_progress = 35
             chunk_count = 0
-            
+
             logger.info("📡 Aguardando chunks do Gemini...")
-            
+
             import time
             start_time = time.time()
-            
+
             for chunk in response:
                 chunk_count += 1
                 elapsed = time.time() - start_time
                 if chunk.text:
                     buffer += chunk.text
-                    logger.info(f"📦 Chunk {chunk_count} (+{elapsed:.2f}s): +{len(chunk.text)} chars (total: {len(buffer)})")
-                
+                    logger.info(
+                        f"📦 Chunk {chunk_count} (+{elapsed:.2f}s): +{len(chunk.text)} chars (total: {len(buffer)})")
+
                 # Atualizar progresso baseado no tamanho do buffer
                 # Estimativa: ~10k chars = 3 desafios completos
                 estimated_progress = min(85, 35 + (len(buffer) / 10000) * 50)
-                
+
                 # Só envia progresso se mudou significativamente (evita spam)
                 if estimated_progress - last_progress >= 5:
                     yield {
@@ -947,98 +960,103 @@ REGRAS:
                         "message": f"🤖 Gerando desafios... ({len(buffer)} caracteres)"
                     }
                     last_progress = estimated_progress
-                
+
                 # Tentar extrair desafios completos
                 current_challenges = self._extract_complete_challenges(buffer)
-                
+
                 # Enviar apenas novos desafios (que ainda não foram enviados)
                 for challenge in current_challenges[challenges_sent:]:
                     if self._validate_challenge(challenge):
                         challenges_sent += 1
-                        
+
                         yield {
                             "type": "challenge",
                             "data": challenge,
                             "number": challenges_sent,
                             "total": 3
                         }
-                        
+
                         progress_percent = 10 + (challenges_sent / 3) * 80
                         yield {
                             "type": "progress",
                             "percent": int(progress_percent),
                             "message": f"✅ Desafio {challenges_sent}/3 gerado!"
                         }
-                        
-                        logger.info(f"✅ Desafio {challenges_sent}/3 enviado: {challenge.get('title', 'sem título')}")
-            
+
+                        logger.info(
+                            f"✅ Desafio {challenges_sent}/3 enviado: {challenge.get('title', 'sem título')}")
+
             # Final: garantir que temos todos os desafios
             final_challenges = self._extract_complete_challenges(buffer)
-            
+
             # Enviar desafios que podem ter ficado faltando
             for challenge in final_challenges[challenges_sent:]:
                 if self._validate_challenge(challenge):
                     challenges_sent += 1
-                    
+
                     yield {
                         "type": "challenge",
                         "data": challenge,
                         "number": challenges_sent,
                         "total": 3
                     }
-                    
-                    logger.info(f"✅ Desafio final {challenges_sent}/3 enviado: {challenge.get('title', 'sem título')}")
-            
+
+                    logger.info(
+                        f"✅ Desafio final {challenges_sent}/3 enviado: {challenge.get('title', 'sem título')}")
+
             # Verificar se temos pelo menos 1 desafio
             if challenges_sent == 0:
                 raise ValueError("Nenhum desafio válido foi gerado")
-            
+
             yield {
                 "type": "complete",
                 "total": challenges_sent,
                 "message": f"🎉 {challenges_sent} desafio(s) gerado(s) com sucesso!"
             }
-            
-            logger.info(f"🎉 Geração streaming concluída: {challenges_sent} desafios")
-            
+
+            logger.info(
+                f"🎉 Geração streaming concluída: {challenges_sent} desafios")
+
         except Exception as e:
             logger.exception("❌ Erro na geração streaming de desafios")
             yield {
                 "type": "error",
                 "message": f"Erro ao gerar desafios: {str(e)}"
             }
-    
+
     def generate_challenges(self, profile: dict, attributes: dict) -> List[dict]:
         """
         Gera desafios personalizados usando Gemini com retry automático.
-        
+
         Args:
             profile: Dados do perfil
             attributes: Skills e career_goal
-            
+
         Returns:
             Lista de 3 desafios personalizados
         """
         track = self._detect_track(attributes)
         logger.info(f"Gerando desafios para track: {track}")
-        
+
         prompt = self._build_challenge_prompt(profile, attributes, track)
-        
+
         # Tenta até 2 vezes em caso de JSON inválido
         max_attempts = 2
         for attempt in range(max_attempts):
             try:
-                response_text = self._call_gemini(prompt, response_mime_type="application/json")
+                response_text = self._call_gemini(
+                    prompt, response_mime_type="application/json")
                 challenges = self._parse_json_response(response_text)
-                
+
                 # Valida que é uma lista
                 if not isinstance(challenges, list):
-                    logger.warning("Resposta não é uma lista, tentando extrair...")
+                    logger.warning(
+                        "Resposta não é uma lista, tentando extrair...")
                     if isinstance(challenges, dict) and "challenges" in challenges:
                         challenges = challenges["challenges"]
                     else:
                         raise ValueError("Formato de resposta inválido")
-                
+
                 # Valida cada desafio
                 valid_challenges = []
                 for i, challenge in enumerate(challenges):
@@ -1046,51 +1064,58 @@ REGRAS:
                         valid_challenges.append(challenge)
                     else:
                         logger.warning(f"Desafio {i} inválido, descartando")
-                
+
                 # Verifica se temos pelo menos 1 desafio válido
                 if not valid_challenges:
                     if attempt < max_attempts - 1:
-                        logger.warning(f"Nenhum desafio válido na tentativa {attempt + 1}, tentando novamente...")
+                        logger.warning(
+                            f"Nenhum desafio válido na tentativa {attempt + 1}, tentando novamente...")
                         continue
                     else:
-                        raise ValueError("Nenhum desafio válido retornado pelo Gemini após todas as tentativas")
-                
+                        raise ValueError(
+                            "Nenhum desafio válido retornado pelo Gemini após todas as tentativas")
+
                 # Limita a 3 desafios
                 valid_challenges = valid_challenges[:3]
-                
-                logger.info(f"Gerados {len(valid_challenges)} desafios válidos (de {len(challenges)} retornados) na tentativa {attempt + 1}")
+
+                logger.info(
+                    f"Gerados {len(valid_challenges)} desafios válidos (de {len(challenges)} retornados) na tentativa {attempt + 1}")
                 return valid_challenges
-                
+
             except json.JSONDecodeError as e:
                 if attempt < max_attempts - 1:
-                    logger.warning(f"JSON inválido na tentativa {attempt + 1}, tentando novamente...")
+                    logger.warning(
+                        f"JSON inválido na tentativa {attempt + 1}, tentando novamente...")
                     time.sleep(1)  # Pequeno delay antes do retry
                     continue
                 else:
-                    logger.error(f"Erro ao parsear JSON após {max_attempts} tentativas: {e}")
+                    logger.error(
+                        f"Erro ao parsear JSON após {max_attempts} tentativas: {e}")
                     raise
             except Exception as e:
-                logger.error(f"Erro ao gerar desafios na tentativa {attempt + 1}: {e}")
+                logger.error(
+                    f"Erro ao gerar desafios na tentativa {attempt + 1}: {e}")
                 if attempt < max_attempts - 1:
                     logger.warning("Tentando novamente...")
                     time.sleep(1)
                     continue
                 else:
                     raise
-    
+
     def evaluate_submission(self, challenge: dict, submission: dict) -> dict:
         """
         Avalia submissão usando Gemini com skill assessment inteligente.
-        
+
         Args:
             challenge: Dados do desafio
             submission: Código/texto submetido
-            
+
         Returns:
             Dict com nota, métricas, feedback e skill_assessment
         """
         # Detecta track baseado na skill target (ou usa genérico)
-        target_skill = (challenge.get("description") or {}).get("target_skill", "")
+        target_skill = (challenge.get("description")
+                        or {}).get("target_skill", "")
         track = "fullstack"  # Default
         if any(s in target_skill.lower() for s in ["sql", "airflow", "spark", "dbt"]):
             track = "data_engineer"
@@ -1098,20 +1123,22 @@ REGRAS:
             track = "frontend"
         elif any(s in target_skill.lower() for s in ["python", "node", "fastapi", "api"]):
             track = "backend"
-        
+
         logger.info(f"Avaliando submissão (track: {track})")
-        
+
         prompt = self._build_evaluation_prompt(challenge, submission, track)
-        
+
         try:
-            response_text = self._call_gemini(prompt, response_mime_type="application/json")
+            response_text = self._call_gemini(
+                prompt, response_mime_type="application/json")
             evaluation = self._parse_json_response(response_text)
-            
+
             # Valida campos obrigatórios
             required_fields = ["nota_geral", "metricas", "skill_assessment"]
             for field in required_fields:
                 if field not in evaluation:
-                    logger.warning(f"Campo obrigatório '{field}' ausente, adicionando default")
+                    logger.warning(
+                        f"Campo obrigatório '{field}' ausente, adicionando default")
                     if field == "nota_geral":
                         evaluation[field] = 70
                     elif field == "metricas":
@@ -1123,11 +1150,11 @@ REGRAS:
                             "progression_intensity": 0.3,
                             "reasoning": "Avaliação automática"
                         }
-            
-            logger.info(f"Avaliação completa: nota={evaluation.get('nota_geral')}")
+
+            logger.info(
+                f"Avaliação completa: nota={evaluation.get('nota_geral')}")
             return evaluation
-            
+
         except Exception as e:
             logger.error(f"Erro ao avaliar submissão: {e}")
             raise
-        

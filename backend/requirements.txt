@@ -7,6 +7,7 @@ starlette==0.48.0
 pydantic==2.12.3
 pydantic-core==2.41.4
 pydantic-settings==2.7.0
+email-validator==2.1.0
 annotated-types==0.7.0
 typing-extensions==4.15.0
 typing-inspection==0.4.2

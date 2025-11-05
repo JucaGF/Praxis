@@ -40,25 +40,35 @@ export default function Cadastro() {
 
     setLoading(true);
 
-    const { error: authError } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.senha,
-      options: {
-        data: {
-          full_name: formData.nome,
-          nome: formData.nome,
-          career_goal: formData.career_goal,
+    try {
+      // Cria a conta no Supabase
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.senha,
+        options: {
+          data: {
+            full_name: formData.nome,
+            nome: formData.nome,
+            career_goal: formData.career_goal,
+          },
         },
-      },
-    });
+      });
 
-    setLoading(false);
+      if (authError) {
+        setError(`Erro ao criar conta: ${authError.message}`);
+        setLoading(false);
+        setEtapa("cadastro");
+        return;
+      }
 
-    if (authError) {
-      setError(`Erro ao criar conta: ${authError.message}`);
-      setEtapa("cadastro");
-    } else {
       setEtapa("finalizado");
+      
+    } catch (err) {
+      console.error("Erro no processo de cadastro:", err);
+      setError(`Erro inesperado: ${err.message}`);
+      setEtapa("cadastro");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -88,6 +98,23 @@ export default function Cadastro() {
           <p className="text-gray-600 mb-6">
             Verifique seu e-mail ({formData.email}) para confirmar sua conta e fazer login.
           </p>
+          {resumeText && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-start gap-3">
+                <svg className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-green-800 mb-1">
+                    ✨ Currículo analisado com sucesso!
+                  </p>
+                  <p className="text-xs text-green-700">
+                    Suas habilidades foram extraídas e adicionadas ao seu perfil. Você verá os resultados na home page!
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           <Link
             to="/login"
             className="inline-block px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold transition"

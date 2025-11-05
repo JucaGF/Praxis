@@ -26,135 +26,135 @@ from typing import List, Dict, Optional, Any
 class IRepository(ABC):
     """
     Interface (contrato) para operações de banco de dados.
-    
+
     ABC = Abstract Base Class (Classe Base Abstrata)
     - Não pode ser instanciada diretamente
     - Serve apenas como "molde" para outras classes
-    
+
     Qualquer classe que implemente essa interface DEVE ter todos esses métodos.
     """
-    
+
     # -------------- PERFIL / SESSÃO --------------
     @abstractmethod
     def upsert_mock_profile(self, email: str, full_name: str) -> dict:
         """
         Cria ou atualiza um perfil mock (para desenvolvimento/testes).
-        
+
         Args:
             email: Email do perfil
             full_name: Nome completo
-            
+
         Returns:
             dict com {id, full_name, email}
         """
         pass  # "pass" = "não tem implementação aqui, quem herdar deve implementar"
-    
+
     @abstractmethod
     def get_profile(self, profile_id: str) -> Optional[dict]:
         """
         Busca um perfil por ID.
-        
+
         Returns:
             dict com dados do perfil ou None se não encontrar
         """
         pass
-    
+
     @abstractmethod
     def create_profile(self, profile_id: str, profile_data: dict) -> dict:
         """
         Cria um novo perfil com ID específico.
-        
+
         Args:
             profile_id: ID do perfil (pode ser UUID ou string para dev)
             profile_data: dict com {name, track, email, linkedin?, github?, portfolio?}
-            
+
         Returns:
             dict com dados do perfil criado
         """
         pass
-    
+
     # -------------- ATRIBUTOS --------------
     @abstractmethod
     def get_attributes(self, profile_id: str) -> dict:
         """
         Busca atributos (skills, career_goal) de um perfil.
-        
+
         Returns:
             dict com {profile_id, career_goal, soft_skills, tech_skills, updated_at}
         """
         pass
-    
+
     @abstractmethod
     def update_attributes(self, profile_id: str, patch: dict) -> dict:
         """
         Atualiza atributos parcialmente.
-        
+
         Args:
             patch: dicionário com campos a atualizar
-            
+
         Returns:
             dict com atributos atualizados
         """
         pass
-    
+
     @abstractmethod
     def get_tech_skills(self, profile_id: str) -> Dict[str, int]:
         """
         Retorna apenas as tech_skills de um perfil.
-        
+
         Returns:
             dict tipo {"React": 70, "Python": 85}
         """
         pass
-    
+
     @abstractmethod
     def update_tech_skills(self, profile_id: str, tech_skills: Dict[str, int]) -> None:
         """
         Atualiza as tech_skills de um perfil.
         """
         pass
-    
+
     # -------------- CHALLENGES --------------
     @abstractmethod
     def create_challenges_for_profile(self, profile_id: str, challenges: List[dict]) -> List[dict]:
         """
         Cria múltiplos desafios para um perfil.
-        
+
         Args:
             challenges: lista de dicts com dados dos desafios
-            
+
         Returns:
             lista de desafios criados (com IDs)
         """
         pass
-    
+
     @abstractmethod
     def delete_challenges_for_profile(self, profile_id: str) -> int:
         """
         Deleta todos os desafios de um perfil.
-        
+
         Args:
             profile_id: ID do perfil
-            
+
         Returns:
             Número de desafios deletados
         """
         pass
-    
+
     @abstractmethod
     def list_active_challenges(self, profile_id: str, limit: int = 3) -> List[dict]:
         """
         Lista desafios ativos de um perfil (mais recentes).
         """
         pass
-    
+
     @abstractmethod
     def get_challenge(self, challenge_id: int) -> Optional[dict]:
         """
         Busca um desafio específico por ID.
         """
         pass
-    
+
     # -------------- SUBMISSIONS --------------
     @abstractmethod
     def count_attempts(self, profile_id: str, challenge_id: int) -> int:
@@ -162,30 +162,30 @@ class IRepository(ABC):
         Conta quantas tentativas um usuário já fez em um desafio.
         """
         pass
-    
+
     @abstractmethod
     def create_submission(self, payload: dict) -> dict:
         """
         Cria uma nova submissão.
-        
+
         Returns:
             dict com dados da submissão criada (incluindo ID)
         """
         pass
-    
+
     @abstractmethod
     def update_submission(self, submission_id: int, patch: dict) -> None:
         """
         Atualiza campos de uma submissão (ex: status).
         """
         pass
-    
+
     # -------------- FEEDBACK --------------
     @abstractmethod
     def create_submission_feedback(self, payload: dict) -> dict:
         """
         Cria feedback para uma submissão.
-        
+
         Returns:
             dict com dados do feedback criado
         """
@@ -196,36 +196,36 @@ class IRepository(ABC):
 class IAIService(ABC):
     """
     Interface (contrato) para serviços de IA.
-    
+
     Por que separar isso?
     - Agora você pode trocar facilmente de FakeAI para IA real (Gemini, GPT, etc)
     - Pode criar mocks para testes
     - O resto do código não precisa saber qual IA está sendo usada
     """
-    
+
     @abstractmethod
     def generate_challenges(self, profile: dict, attributes: dict) -> List[dict]:
         """
         Gera desafios personalizados com base no perfil e atributos do usuário.
-        
+
         Args:
             profile: dados do perfil {id, email, full_name}
             attributes: {career_goal, tech_skills, soft_skills}
-            
+
         Returns:
             lista de desafios gerados (máximo 3 no MVP)
         """
         pass
-    
+
     @abstractmethod
     def evaluate_submission(self, challenge: dict, submission: dict) -> dict:
         """
         Avalia uma submissão e retorna feedback estruturado.
-        
+
         Args:
             challenge: dados do desafio
             submission: código/texto submetido
-            
+
         Returns:
             dict com {
                 "nota_geral": int (0-100),
@@ -243,4 +243,3 @@ class IAIService(ABC):
             }
         """
         pass
-

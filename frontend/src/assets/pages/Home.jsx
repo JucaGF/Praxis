@@ -16,7 +16,7 @@ function transformChallenges(apiChallenges) {
       'hard': 'Difícil'
     };
     
-    // Extrai skills do target_skill ou eval_criteria
+    // Extrai skills do target_skill ou eval_criteria 
     const skills = [];
     if (challenge.description?.target_skill) {
       skills.push(challenge.description.target_skill);
