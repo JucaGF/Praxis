@@ -43,9 +43,10 @@ services:
       - WATCHPACK_POLLING=true
     volumes:
       # Monta apenas código fonte (node_modules e configs ficam no container)
-      - ./frontend/src:/app/src:cached
-      - ./frontend/public:/app/public:cached
-      - ./frontend/vite.config.js:/app/vite.config.js:cached
+      # Flag :z necessária para SELinux (Fedora/RHEL) - ignorada no Windows/Mac
+      - ./frontend/src:/app/src:z
+      - ./frontend/public:/app/public:z
+      - ./frontend/vite.config.js:/app/vite.config.js:z
     depends_on:
       - backend
     restart: unless-stopped

@@ -1,5 +1,19 @@
 # 🔧 Troubleshooting Docker no Windows
 
+## ℹ️ Nota sobre Compatibilidade
+
+**Flag `:z` nos volumes**: Se você ver a flag `:z` nos volumes do `docker-compose.yml`, não se preocupe! 
+Esta flag é específica para sistemas Linux com SELinux (como Fedora) e é **completamente ignorada no Windows e macOS**. 
+Não causará erros nem afetará o funcionamento da aplicação no Windows.
+
+Exemplo:
+```yaml
+volumes:
+  - ./frontend/src:/app/src:z  # Esta flag é ignorada no Windows
+```
+
+---
+
 ## Erro: "unable to get image" ou "500 Internal Server Error"
 
 Se você recebeu esse erro ao tentar rodar `docker-compose up --build`:

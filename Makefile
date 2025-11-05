@@ -16,22 +16,22 @@ help: ## Mostra esta ajuda
 
 dev: ## Inicia ambiente de DESENVOLVIMENTO (hot-reload)
 	@echo "$(GREEN)🛠️  Iniciando ambiente de DESENVOLVIMENTO...$(NC)"
-	docker-compose -f docker-compose.dev.yml up
+	docker-compose -f docker-compose.yml up
 
 build-dev: ## Build containers de desenvolvimento
 	@echo "$(GREEN)🔨 Building containers de desenvolvimento...$(NC)"
-	docker-compose -f docker-compose.dev.yml build --no-cache
+	docker-compose -f docker-compose.yml build --no-cache
 
 up-dev: ## Inicia desenvolvimento em background
 	@echo "$(GREEN)🚀 Subindo containers de desenvolvimento...$(NC)"
-	docker-compose -f docker-compose.dev.yml up -d
+	docker-compose -f docker-compose.yml up -d
 
 down-dev: ## Para ambiente de desenvolvimento
 	@echo "$(YELLOW)🛑 Parando containers de desenvolvimento...$(NC)"
-	docker-compose -f docker-compose.dev.yml down
+	docker-compose -f docker-compose.yml down
 
 logs-dev: ## Ver logs do desenvolvimento
-	docker-compose -f docker-compose.dev.yml logs -f
+	docker-compose -f docker-compose.yml logs -f
 
 # ============================================
 # PRODUÇÃO
