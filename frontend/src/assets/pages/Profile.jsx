@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Line } from "react-chartjs-2";
 import { supabase } from "../lib/supabaseClient";
 import { deleteAccount, fetchUser, fetchSubmissions } from "../lib/api";
+import PraxisLogo from "../components/PraxisLogo";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -13,7 +14,7 @@ import {
   Title,
   Tooltip,
   Legend,
-} from "chart.js";
+} from 'chart.js';
 
 import { Card } from "../components/ui.jsx";
 // Importes de API removidos: a página usa dados simulados por enquanto.
@@ -44,7 +45,7 @@ function SkillBar({ skill, percentage, date }) {
   // Formata a data para formato brasileiro
   const formatDate = (dateStr) => {
     if (!dateStr) return "Data desconhecida";
-
+    
     try {
       const dateObj = new Date(dateStr);
       return dateObj.toLocaleDateString("pt-BR");
@@ -52,24 +53,17 @@ function SkillBar({ skill, percentage, date }) {
       return "Data desconhecida";
     }
   };
-
+  
   return (
     <div>
       <div className="flex justify-between items-end mb-1">
         <h3 className="font-medium text-zinc-900">{skill}</h3>
-        <span className="text-lg font-bold text-primary-600">
-          {percentage}%
-        </span>
+        <span className="text-lg font-bold text-primary-600">{percentage}%</span>
       </div>
       <div className="w-full bg-zinc-100 rounded-full h-2.5">
-        <div
-          className="bg-primary-500 h-2.5 rounded-full"
-          style={{ width: `${percentage}%` }}
-        ></div>
+        <div className="bg-primary-500 h-2.5 rounded-full" style={{ width: `${percentage}%` }}></div>
       </div>
-      <p className="text-right text-xs text-zinc-500 mt-1">
-        Atualizado em {formatDate(date)}
-      </p>
+      <p className="text-right text-xs text-zinc-500 mt-1">Atualizado em {formatDate(date)}</p>
     </div>
   );
 }
@@ -102,20 +96,20 @@ function StatCard({ value, label }) {
 }
 
 const evolutionData = {
-  labels: ["Jun", "Jul", "Ago", "Set", "Out"],
+  labels: ['Jun', 'Jul', 'Ago', 'Set', 'Out'],
   datasets: [
     {
-      label: "Pontuação",
+      label: 'Pontuação',
       data: [50, 58, 65, 68, 72],
-      borderColor: "#eab308", // primary-500
-      backgroundColor: "#eab308",
+      borderColor: '#eab308', // primary-500
+      backgroundColor: '#eab308',
       tension: 0.1,
     },
     {
-      label: "Atividades",
+      label: 'Atividades',
       data: [10, 15, 18, 20, 25],
-      borderColor: "#10b981", // emerald-500
-      backgroundColor: "#10b981",
+      borderColor: '#10b981', // emerald-500
+      backgroundColor: '#10b981',
       tension: 0.1,
     },
   ],
@@ -126,24 +120,25 @@ const evolutionOptions = {
   maintainAspectRatio: false,
   plugins: {
     legend: {
-      position: "bottom",
+      position: 'bottom',
       labels: {
-        color: "#3f3f46", // zinc-700
-      },
+        color: '#3f3f46' // zinc-700
+      }
     },
     title: { display: false },
   },
   scales: {
     x: {
-      ticks: { color: "#52525b" }, // zinc-600
-      grid: { color: "#e4e4e7" }, // zinc-200
+      ticks: { color: '#52525b' }, // zinc-600
+      grid: { color: '#e4e4e7' }   // zinc-200
     },
     y: {
-      ticks: { color: "#52525b" },
-      grid: { color: "#e4e4e7" },
-    },
-  },
+      ticks: { color: '#52525b' },
+      grid: { color: '#e4e4e7' }
+    }
+  }
 };
+
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -161,17 +156,12 @@ export default function Profile() {
     const loadData = async () => {
       try {
         // Pega o nome do Supabase Auth primeiro
-        const {
-          data: { user: authUser },
-        } = await supabase.auth.getUser();
-        const fullName =
-          authUser?.user_metadata?.full_name ||
-          authUser?.user_metadata?.nome ||
-          "Usuário";
-
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        const fullName = authUser?.user_metadata?.full_name || authUser?.user_metadata?.nome || "Usuário";
+        
         // Formata o usuário com o nome real
         setUser({ full_name: fullName });
-
+        
         // Busca dados da API (com fallback se falhar)
         try {
           const attributesData = await fetchUser();
@@ -180,7 +170,7 @@ export default function Profile() {
           console.error("Erro ao buscar atributos:", error);
           setAttributes({ tech_skills: [], soft_skills: [], career_goal: "" });
         }
-
+        
         try {
           const submissionsData = await fetchSubmissions();
           setSubmissions(submissionsData || []);
@@ -188,7 +178,7 @@ export default function Profile() {
           console.error("Erro ao buscar submissões:", error);
           setSubmissions([]);
         }
-
+        
         console.log("📊 Dados do perfil carregados:", { fullName });
       } catch (error) {
         console.error("Erro ao carregar dados do perfil:", error);
@@ -218,19 +208,18 @@ export default function Profile() {
       // 1. Deleta o perfil (trigger limpa dados relacionados)
       // 2. Deleta o usuário de auth.users via Admin API
       await deleteAccount();
-
+      
       console.log("Conta deletada com sucesso");
-
+      
       // Faz logout local
       await supabase.auth.signOut();
-
+      
       // Redireciona para a landing page
       navigate("/");
     } catch (error) {
       console.error("Erro ao excluir conta:", error);
       setDeleteError(
-        error.message ||
-          "Não foi possível excluir sua conta. Por favor, tente novamente ou entre em contato com o suporte."
+        error.message || "Não foi possível excluir sua conta. Por favor, tente novamente ou entre em contato com o suporte."
       );
       setDeleteLoading(false);
     }
@@ -241,28 +230,12 @@ export default function Profile() {
       {/* Header no mesmo estilo da Home */}
       <header className="sticky top-0 z-40 bg-white/70 backdrop-blur border-b border-zinc-100">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center group" aria-label="Início">
-            <img
-              src="/logo.png"
-              alt="Logo Praxis"
-              className="h-24 w-auto object-contain"
-              style={{ display: "block" }}
-            />
+          <Link to="/" className="flex items-center gap-2 group" aria-label="Início">
+            <PraxisLogo className="h-12" />
           </Link>
-
           <nav className="flex items-center gap-2">
-            <Link
-              to="/home"
-              className="px-3 py-1.5 rounded-md hover:bg-zinc-50 border border-zinc-200 text-sm"
-            >
-              Home
-            </Link>
-            <Link
-              to="/perfil"
-              className="px-3 py-1.5 rounded-md bg-primary-100 text-primary-800 border border-primary-200 text-sm"
-            >
-              Perfil
-            </Link>
+            <Link to="/home" className="px-3 py-1.5 rounded-md hover:bg-zinc-50 border border-zinc-200 text-sm">Home</Link>
+            <Link to="/perfil" className="px-3 py-1.5 rounded-md bg-primary-100 text-primary-800 border border-primary-200 text-sm">Perfil</Link>
             <button
               onClick={handleLogout}
               className="px-3 py-1.5 rounded-md hover:bg-red-50 border border-red-200 text-red-600 text-sm font-medium transition cursor-pointer"
@@ -285,109 +258,68 @@ export default function Profile() {
         ) : (
           <>
             <div className="mb-8">
-              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">
-                Olá, {user?.full_name || "Usuário"}
-              </h1>
-              <p className="text-zinc-600 text-lg">
-                Acompanhe seu progresso e desenvolvimento profissional.
-              </p>
+              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Olá, {user?.full_name || 'Usuário'}</h1>
+              <p className="text-zinc-600 text-lg">Acompanhe seu progresso e desenvolvimento profissional.</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Coluna Principal (2/3) */}
               <div className="lg:col-span-2 space-y-8">
-                <Section
-                  title="Habilidades Técnicas"
-                  subtitle="Suas competências atualizadas com base nos desafios completados"
-                >
-                  <div className="space-y-6">
-                    {attributes?.tech_skills &&
-                    attributes.tech_skills.length > 0 ? (
-                      attributes.tech_skills.map((skill) => (
-                        <SkillBar
-                          key={skill.name}
-                          skill={skill.name}
-                          percentage={skill.percentage}
-                          date={skill.last_updated}
-                        />
-                      ))
-                    ) : (
-                      <p className="text-zinc-500 text-center py-4">
-                        Nenhuma habilidade registrada ainda.
-                      </p>
-                    )}
-                  </div>
+
+                <Section title="Habilidades Técnicas" subtitle="Suas competências atualizadas com base nos desafios completados">
+                    <div className="space-y-6">
+                        {attributes?.tech_skills && attributes.tech_skills.length > 0 ? (
+                          attributes.tech_skills.map(skill => <SkillBar key={skill.name} skill={skill.name} percentage={skill.percentage} date={skill.last_updated} />)
+                        ) : (
+                          <p className="text-zinc-500 text-center py-4">Nenhuma habilidade registrada ainda.</p>
+                        )}
+                    </div>
                 </Section>
 
-                <Section
-                  title="Histórico de Desafios"
-                  subtitle={`${submissions.length} desafios completados`}
-                >
-                  {submissions && submissions.length > 0 ? (
-                    submissions.map((sub) => (
-                      <ChallengeHistoryItem key={sub.id} {...sub} />
-                    ))
-                  ) : (
-                    <p className="text-zinc-500 text-center py-4">
-                      Nenhum desafio completado ainda.
-                    </p>
-                  )}
+                <Section title="Histórico de Desafios" subtitle={`${submissions.length} desafios completados`}>
+                    {submissions && submissions.length > 0 ? (
+                      submissions.map(sub => <ChallengeHistoryItem key={sub.id} {...sub} />)
+                    ) : (
+                      <p className="text-zinc-500 text-center py-4">Nenhum desafio completado ainda.</p>
+                    )}
                 </Section>
 
                 <div className="grid grid-cols-3 gap-4">
-                  <StatCard
-                    value={submissions?.length || 0}
-                    label="Desafios Completados"
-                  />
-                  <StatCard
-                    value={attributes?.tech_skills?.length || 0}
-                    label="Habilidades Rastreadas"
-                  />
-                  <StatCard value="90" label="Score Médio" />
+                    <StatCard value={submissions?.length || 0} label="Desafios Completados" />
+                    <StatCard value={attributes?.tech_skills?.length || 0} label="Habilidades Rastreadas" />
+                    <StatCard value="90" label="Score Médio" />
                 </div>
 
-                {/* Seção de Exclusão de Conta */}
-                <Section title="Zona de Perigo" subtitle="Ações irreversíveis">
-                  <div className="p-4 border border-red-200 rounded-lg bg-red-50">
-                    <h4 className="font-semibold text-red-900 mb-2">
-                      Excluir Conta
-                    </h4>
-                    <p className="text-sm text-red-700 mb-4">
-                      Uma vez excluída, sua conta não poderá ser recuperada.
-                      Todos os seus dados, desafios e progresso serão perdidos
-                      permanentemente.
-                    </p>
-                    <button
-                      onClick={() => setShowDeleteModal(true)}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium text-sm cursor-pointer"
-                    >
-                      Excluir Minha Conta
-                    </button>
-                  </div>
-                </Section>
-              </div>
-
-              {/* Coluna Lateral (1/3) */}
-              <div className="space-y-8">
-                <Section
-                  title="Evolução da Pontuação"
-                  subtitle="Seu progresso nos últimos 5 meses"
+            {/* Seção de Exclusão de Conta */}
+            <Section title="Zona de Perigo" subtitle="Ações irreversíveis">
+              <div className="p-4 border border-red-200 rounded-lg bg-red-50">
+                <h4 className="font-semibold text-red-900 mb-2">Excluir Conta</h4>
+                <p className="text-sm text-red-700 mb-4">
+                  Uma vez excluída, sua conta não poderá ser recuperada. Todos os seus dados, desafios e progresso serão perdidos permanentemente.
+                </p>
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium text-sm cursor-pointer"
                 >
-                  <div className="h-64">
-                    <Line options={evolutionOptions} data={evolutionData} />
-                  </div>
-                  <div className="mt-4 text-center p-3 rounded-lg bg-emerald-50 border border-emerald-200">
-                    <p className="font-semibold text-emerald-700">
-                      📈 Crescimento de +44% em 5 meses!
-                    </p>
-                    <p className="text-sm text-zinc-600">
-                      Você está no caminho certo. Continue praticando
-                      regularmente.
-                    </p>
-                  </div>
-                </Section>
+                  Excluir Minha Conta
+                </button>
               </div>
-            </div>
+            </Section>
+          </div>
+
+          {/* Coluna Lateral (1/3) */}
+          <div className="space-y-8">
+            <Section title="Evolução da Pontuação" subtitle="Seu progresso nos últimos 5 meses">
+              <div className="h-64">
+                <Line options={evolutionOptions} data={evolutionData} />
+              </div>
+              <div className="mt-4 text-center p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+                <p className="font-semibold text-emerald-700">📈 Crescimento de +44% em 5 meses!</p>
+                <p className="text-sm text-zinc-600">Você está no caminho certo. Continue praticando regularmente.</p>
+              </div>
+            </Section>
+          </div>
+        </div>
           </>
         )}
       </main>
@@ -400,11 +332,10 @@ export default function Profile() {
               Tem certeza absoluta?
             </h3>
             <p className="text-zinc-600 mb-6">
-              Esta ação{" "}
-              <strong className="text-red-600">não pode ser desfeita</strong>.
+              Esta ação <strong className="text-red-600">não pode ser desfeita</strong>. 
               Você perderá permanentemente:
             </p>
-
+            
             <ul className="list-disc list-inside text-sm text-zinc-700 mb-6 space-y-1">
               <li>Todo o seu progresso e pontuação</li>
               <li>Histórico de desafios completados</li>
@@ -434,9 +365,7 @@ export default function Profile() {
                 disabled={deleteLoading}
                 className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
-                {deleteLoading
-                  ? "Excluindo..."
-                  : "Sim, Excluir Permanentemente"}
+                {deleteLoading ? "Excluindo..." : "Sim, Excluir Permanentemente"}
               </button>
             </div>
           </div>
