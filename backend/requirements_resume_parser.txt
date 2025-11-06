@@ -1,0 +1,80 @@
+# Requirements para Feature de Análise de Currículo
+# Adicione ao requirements.txt principal ou instale separadamente
+
+# ==================== PARSER DE DOCUMENTOS ====================
+
+# Unstructured.io - Parser inteligente de documentos
+# Suporta PDF, DOCX, PPTX, imagens com OCR, etc
+# Documentação: https://docs.unstructured.io/
+unstructured[all-docs]==0.11.6
+
+# Dependências específicas do Unstructured:
+
+# Para PDFs
+pdf2image==1.16.3
+pdfminer.six==20221105
+pypdf==3.17.1
+pypdfium2==4.26.0
+
+# Para Word/PowerPoint
+python-docx==1.1.0
+python-pptx==0.6.23
+
+# Para imagens e OCR
+pytesseract==0.3.10
+Pillow==10.1.0
+
+# Para tabelas
+openpyxl==3.1.2
+pandas==2.1.4
+
+# Para processamento de linguagem natural
+nltk==3.8.1
+
+# Para detectar tipos de arquivo
+python-magic-bin==0.4.14  # Windows
+# python-magic==0.4.27  # Linux/Mac (comentado, use apenas um)
+
+# ==================== ALTERNATIVAS LEVES (FALLBACK) ====================
+# Caso não queira instalar Unstructured completo, use apenas:
+
+# PyPDF2==3.0.1  # PDF básico (sem OCR)
+# python-docx==1.1.0  # DOCX básico
+# python-pptx==0.6.23  # PPTX básico
+
+# ==================== INSTRUÇÕES DE INSTALAÇÃO ====================
+
+# OPÇÃO 1: Instalação completa (recomendado)
+# pip install "unstructured[all-docs]"
+
+# OPÇÃO 2: Instalação mínima (apenas formatos básicos)
+# pip install unstructured
+# pip install pypdf python-docx python-pptx
+
+# OPÇÃO 3: Instalação por formato
+# pip install "unstructured[pdf]"  # Apenas PDF
+# pip install "unstructured[docx]"  # Apenas DOCX
+# pip install "unstructured[local-inference]"  # Com OCR local
+
+# ==================== DEPENDÊNCIAS DO SISTEMA (Linux) ====================
+# Para Tesseract OCR (necessário para PDFs escaneados e imagens):
+# sudo apt-get install tesseract-ocr
+# sudo apt-get install tesseract-ocr-por  # Português
+# sudo apt-get install libtesseract-dev
+
+# Para poppler (necessário para pdf2image):
+# sudo apt-get install poppler-utils
+
+# ==================== DEPENDÊNCIAS DO SISTEMA (macOS) ====================
+# brew install tesseract
+# brew install tesseract-lang  # Idiomas adicionais
+# brew install poppler
+
+# ==================== DEPENDÊNCIAS DO SISTEMA (Windows) ====================
+# 1. Tesseract:
+#    - Baixar de: https://github.com/UB-Mannheim/tesseract/wiki
+#    - Adicionar ao PATH
+#
+# 2. Poppler:
+#    - Baixar de: https://github.com/oschwartz10612/poppler-windows/releases/
+#    - Extrair e adicionar bin/ ao PATH

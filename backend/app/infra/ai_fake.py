@@ -471,3 +471,107 @@ class FakeAI(IAIService):
                 "reasoning": reasoning
             }
         }
+
+    def analyze_resume(self, resume_content: str, career_goal: str) -> dict:
+        """
+        Análise fake de currículo para desenvolvimento/testes.
+
+        Retorna uma análise mockada mas realista.
+        """
+        import random
+
+        # Detecta track baseado no career_goal
+        goal_lower = career_goal.lower()
+
+        if "frontend" in goal_lower or "front-end" in goal_lower:
+            track = "frontend"
+            pontos_fortes = [
+                "Experiência com React e componentes modernos",
+                "Conhecimento de CSS e design responsivo",
+                "Familiaridade com ferramentas de build (Webpack, Vite)"
+            ]
+            gaps = [
+                "Experiência com testes automatizados (Jest, Testing Library)",
+                "Conhecimento em acessibilidade (WCAG, ARIA)",
+                "Performance web (lazy loading, code splitting)"
+            ]
+            skills = {
+                "React": 75,
+                "CSS": 70,
+                "JavaScript": 80,
+                "TypeScript": 65
+            }
+        elif "backend" in goal_lower or "back-end" in goal_lower:
+            track = "backend"
+            pontos_fortes = [
+                "Experiência com APIs REST e FastAPI",
+                "Conhecimento de bancos de dados SQL",
+                "Familiaridade com Docker e containerização"
+            ]
+            gaps = [
+                "Experiência com microserviços e arquitetura distribuída",
+                "Conhecimento em message brokers (RabbitMQ, Kafka)",
+                "Testes de integração e mocking"
+            ]
+            skills = {
+                "Python": 80,
+                "FastAPI": 75,
+                "SQL": 70,
+                "Docker": 65
+            }
+        elif "data" in goal_lower or "dados" in goal_lower:
+            track = "data_engineer"
+            pontos_fortes = [
+                "Experiência com SQL e modelagem de dados",
+                "Conhecimento de Python para manipulação de dados",
+                "Familiaridade com conceitos de ETL"
+            ]
+            gaps = [
+                "Experiência com orquestração (Airflow, Dagster)",
+                "Conhecimento em processamento distribuído (Spark)",
+                "Cloud platforms (AWS, GCP, Azure)"
+            ]
+            skills = {
+                "SQL": 85,
+                "Python": 75,
+                "Pandas": 70,
+                "ETL": 65
+            }
+        else:  # fullstack
+            track = "fullstack"
+            pontos_fortes = [
+                "Experiência tanto em frontend quanto backend",
+                "Conhecimento de React e APIs REST",
+                "Visão holística de desenvolvimento de produtos"
+            ]
+            gaps = [
+                "Especialização profunda em frontend ou backend",
+                "Conhecimento avançado de arquitetura de sistemas",
+                "DevOps e CI/CD pipelines"
+            ]
+            skills = {
+                "React": 72,
+                "Python": 75,
+                "SQL": 68,
+                "APIs": 70
+            }
+
+        nota = random.randint(70, 88)
+
+        return {
+            "pontos_fortes": pontos_fortes,
+            "gaps_tecnicos": gaps,
+            "sugestoes_melhoria": [
+                f"Adicionar projetos práticos demonstrando {list(skills.keys())[0]}",
+                "Incluir métricas e resultados concretos nas experiências",
+                "Destacar contribuições em projetos open source ou side projects"
+            ],
+            "nota_geral": nota,
+            "resumo_executivo": f"Currículo adequado para {track} com base sólida. Recomenda-se aprofundar em áreas específicas e adicionar evidências concretas de impacto nos projetos.",
+            "habilidades_evidenciadas": skills,
+            "proximos_passos": [
+                f"Aprofundar conhecimento em {list(skills.keys())[0]}",
+                "Criar portfolio com 2-3 projetos robustos",
+                "Certificações relevantes para a área"
+            ]
+        }

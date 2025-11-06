@@ -408,3 +408,85 @@ class SqlRepo(IRepository):
             s.commit()
             s.refresh(fb)
             return {"id": fb.id, **payload}
+
+    # -------------- RESUME / CURRICULOS --------------
+    def create_resume(
+        self,
+        profile_id: str,
+        title: Optional[str],
+        content: str,
+        filename: Optional[str] = None,
+        file_type: Optional[str] = None,
+        file_size: Optional[int] = None,
+        file_data: Optional[bytes] = None
+    ) -> Resume:
+        """
+        Cria um novo currículo para o perfil.
+
+        Suporta dois modos:
+        1. Texto puro: apenas content
+        2. Arquivo: content + filename + file_type + file_size + file_data
+        """
+        with Session(self.engine) as s:
+            # Tenta converter para UUID, se falhar usa string diretamente
+            try:
+                pid = uuid.UUID(profile_id)
+            except ValueError:
+                pid = profile_id
+
+            resume = Resume(
+                profile_id=pid,
+                title=title,
+                original_content=content,
+                original_filename=filename,
+                file_type=file_type,
+                file_size_bytes=file_size,
+                file_data=file_data
+            )
+            s.add(resume)
+            s.commit()
+            s.refresh(resume)
+            return resume
+
+    def get_resumes(self, profile_id: str) -> List[Resume]:
+        """Busca todos os currículos de um perfil"""
+        with Session(self.engine) as s:
+            # Tenta converter para UUID, se falhar usa string diretamente
+            try:
+                pid = uuid.UUID(profile_id)
+            except ValueError:
+                pid = profile_id
+
+            resumes = s.exec(
+                select(Resume)
+                .where(Resume.profile_id == pid)
+                .order_by(Resume.created_at.desc())
+            ).all()
+            return list(resumes)
+
+    def get_resume(self, resume_id: int) -> Optional[Resume]:
+        """Busca um currículo específico"""
+        with Session(self.engine) as s:
+            return s.get(Resume, resume_id)
+
+    def create_resume_analysis(self, resume_id: int, strengths: str, improvements: str, full_report: dict) -> ResumeAnalysis:
+        """Cria uma análise de currículo"""
+        with Session(self.engine) as s:
+            analysis = ResumeAnalysis(
+                resume_id=resume_id,
+                strengths=strengths,
+                improvements=improvements,
+                full_report=full_report
+            )
+            s.add(analysis)
+            s.commit()
+            s.refresh(analysis)
+            return analysis
+
+    def get_resume_analysis(self, resume_id: int) -> Optional[ResumeAnalysis]:
+        """Busca a análise de um currículo"""
+        with Session(self.engine) as s:
+            return s.exec(
+                select(ResumeAnalysis)
+                .where(ResumeAnalysis.resume_id == resume_id)
+            ).first()

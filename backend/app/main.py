@@ -12,6 +12,7 @@ from backend.app.routers.submissions import router as submissions_router
 from backend.app.routers.dev import router as dev_router
 from backend.app.routers.account import router as account_router
 from backend.app.routers.profile import router as profile_router
+from backend.app.routers.resumes import router as resumes_router
 from backend.app.config import get_settings
 from backend.app.logging_config import setup_logging, get_logger
 from backend.app.domain.exceptions import PraxisError, get_http_status_code
@@ -103,6 +104,7 @@ app.include_router(profile_router)  # Perfil do usuário
 app.include_router(attributes_router)
 app.include_router(challenges_router)
 app.include_router(submissions_router)
+app.include_router(resumes_router)  # Análise de currículos
 app.include_router(account_router)  # Gerenciamento de conta
 app.include_router(dev_router)  # Endpoints de desenvolvimento/mock
 
