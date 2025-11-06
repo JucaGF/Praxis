@@ -32,6 +32,9 @@ python-dotenv==1.1.1
 pyyaml==6.0.3
 click==8.3.0
 
+# File Upload
+python-multipart==0.0.20
+
 # Server Optimization
 httptools==0.7.1
 watchfiles==1.1.1
@@ -46,13 +49,17 @@ idna==3.11
 # ==================== PARSER DE CURRÍCULO ====================
 
 # Unstructured.io - Parser inteligente de documentos
-unstructured[all-docs]==0.11.6
+# Nota: Sem [all-docs] para evitar PyTorch/CUDA (~3GB)
+unstructured==0.11.6
 
 # Dependências para PDFs
 pdf2image==1.16.3
 pdfminer.six==20221105
 pypdf==3.17.1
 pypdfium2==4.26.0
+
+# Fallback simples para PDF (usado quando unstructured não disponível)
+PyPDF2==3.0.1
 
 # Dependências para Word/PowerPoint
 python-docx==1.1.0
