@@ -20,24 +20,42 @@ class Profile(SQLModel, table=True):
     id: uuid.UUID = Field(primary_key=True)
     full_name: Optional[str] = None
     email: str = Field(index=True, nullable=False, unique=True)
-    
+
     resumes: List["Resume"] = Relationship(back_populates="profile")
     submissions: List["Submission"] = Relationship(back_populates="profile")
     attributes: Optional["Attributes"] = Relationship(back_populates="profile")
     challenges: List["Challenge"] = Relationship(back_populates="profile")
 
+
 class Resume(SQLModel, table=True):
     """
     Armazena os currículos enviados por um usuário.
+
+    Suporta dois modos:
+    1. Texto puro (original_content apenas)
+    2. Arquivo (PDF, DOCX, etc) com extração automática de texto
     """
     __tablename__ = "resumes"
 
     id: Optional[int] = Field(default=None, primary_key=True)
     profile_id: uuid.UUID = Field(foreign_key="profiles.id")
     title: Optional[str] = Field(default=None, index=True)
+
+    # Texto extraído do currículo (seja digitado ou extraído de arquivo)
     original_content: str
+
+    # Campos para suporte a arquivos
+    original_filename: Optional[str] = Field(
+        default=None)  # Nome original do arquivo
+    # MIME type (application/pdf, etc)
+    file_type: Optional[str] = Field(default=None)
+    file_size_bytes: Optional[int] = Field(default=None)  # Tamanho em bytes
+    # Dados binários (apenas arquivos pequenos <10MB)
+    file_data: Optional[bytes] = Field(default=None)
+
     created_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+        sa_column=Column(DateTime(timezone=True),
+                         server_default=func.now(), nullable=False)
     )
 
     # Relações: Cada currículo pertence a um perfil e tem uma análise
@@ -59,7 +77,8 @@ class Attributes(SQLModel, table=True):
     soft_skills: Optional[JsonB] = Field(default=None, sa_column=Column(JSONB))
     tech_skills: Optional[JsonB] = Field(default=None, sa_column=Column(JSONB))
     updated_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+        sa_column=Column(DateTime(timezone=True),
+                         server_default=func.now(), nullable=False)
     )
 
     # Relação com Profile
@@ -78,7 +97,8 @@ class ResumeAnalysis(SQLModel, table=True):
     improvements: Optional[str] = Field(default=None)
     full_report: Optional[JsonB] = Field(default=None, sa_column=Column(JSONB))
     created_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+        sa_column=Column(DateTime(timezone=True),
+                         server_default=func.now(), nullable=False)
     )
 
     # Relação: A análise pertence a um currículo
@@ -109,7 +129,8 @@ class Challenge(SQLModel, table=True):
     template_code: Optional[JsonB] = Field(
         default=None, sa_column=Column(JSONB))
     created_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+        sa_column=Column(DateTime(timezone=True),
+                         server_default=func.now(), nullable=False)
     )
 
     # Relação: Um desafio pode ter várias submissões
@@ -143,7 +164,8 @@ class Submission(SQLModel, table=True):
     notes: Optional[str] = None
     time_taken_sec: Optional[int] = None
     submitted_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+        sa_column=Column(DateTime(timezone=True),
+                         server_default=func.now(), nullable=False)
     )
 
     # Relações: Uma submissão pertence a um perfil, a um desafio e tem um feedback
@@ -171,7 +193,8 @@ class SubmissionFeedback(SQLModel, table=True):
     raw_ai_response: Optional[JsonB] = Field(
         default=None, sa_column=Column(JSONB))
     created_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+        sa_column=Column(DateTime(timezone=True),
+                         server_default=func.now(), nullable=False)
     )
 
     # Relação: O feedback pertence a uma submissão

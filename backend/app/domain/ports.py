@@ -243,3 +243,25 @@ class IAIService(ABC):
             }
         """
         pass
+
+    @abstractmethod
+    def analyze_resume(self, resume_content: str, career_goal: str) -> dict:
+        """
+        Analisa um currículo baseado no objetivo de carreira do usuário.
+
+        Args:
+            resume_content: Conteúdo do currículo em texto
+            career_goal: Objetivo de carreira (ex: "Frontend Developer")
+
+        Returns:
+            dict com {
+                "pontos_fortes": list[str],
+                "gaps_tecnicos": list[str],
+                "sugestoes_melhoria": list[str],
+                "nota_geral": int (0-100),
+                "resumo_executivo": str,
+                "habilidades_evidenciadas": dict[str, int],
+                "proximos_passos": list[str]
+            }
+        """
+        pass

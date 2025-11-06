@@ -1,7 +1,7 @@
 // src/pages/Home.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { fetchUser, fetchChallenges, generateChallengesStreaming } from "../lib/api.js";
+import { fetchUser, fetchChallenges, generateChallengesStreaming, uploadResume, uploadResumeFile, analyzeResume, listResumes } from "../lib/api.js";
 import { Pill, Difficulty, Skill, Meta, Card, PrimaryButton } from "../components/ui.jsx";
 import { supabase } from "../lib/supabaseClient";
 import PraxisLogo from "../components/PraxisLogo";
@@ -76,6 +76,24 @@ export default function Home() {
   const [streamProgress, setStreamProgress] = useState(0);
   const [streamMessage, setStreamMessage] = useState("");
   const [cancelStream, setCancelStream] = useState(null);
+  
+  // Estados para análise de currículo
+  const [resumeContent, setResumeContent] = useState("");
+  const [resumeTitle, setResumeTitle] = useState("");
+  const [uploadingResume, setUploadingResume] = useState(false);
+  const [analyzingResume, setAnalyzingResume] = useState(false);
+  const [resumeAnalysis, setResumeAnalysis] = useState(null);
+  const [myResumes, setMyResumes] = useState([]);
+  const [selectedResumeId, setSelectedResumeId] = useState(null);
+  
+  // Estados para upload de arquivo
+  const [uploadType, setUploadType] = useState("file"); // "text" ou "file"
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  
+  // Estados para expansão dos cards
+  const [expandedUploadCard, setExpandedUploadCard] = useState(false);
+  const [expandedMyResumesCard, setExpandedMyResumesCard] = useState(false);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -152,6 +170,136 @@ export default function Home() {
       setCancelStream(null);
     }
   };
+  
+  // Funções para análise de currículo
+  const handleUploadResume = async () => {
+    if (!resumeContent.trim()) {
+      alert("Por favor, cole o conteúdo do seu currículo");
+      return;
+    }
+    
+    setUploadingResume(true);
+    try {
+      const result = await uploadResume({
+        title: resumeTitle || "Meu Currículo",
+        content: resumeContent
+      });
+      
+      console.log("✅ Currículo enviado:", result);
+      
+      // Limpa o formulário
+      setResumeContent("");
+      setResumeTitle("");
+      
+      // Recarrega lista de currículos
+      await loadResumes();
+      
+      alert("Currículo enviado com sucesso! Agora você pode analisá-lo.");
+    } catch (error) {
+      console.error("❌ Erro ao enviar currículo:", error);
+      alert("Erro ao enviar currículo: " + error.message);
+    } finally {
+      setUploadingResume(false);
+    }
+  };
+  
+  const handleUploadResumeFile = async () => {
+    if (!selectedFile) {
+      alert("Por favor, selecione um arquivo");
+      return;
+    }
+    
+    setUploadingResume(true);
+    try {
+      const result = await uploadResumeFile(
+        selectedFile,
+        resumeTitle || selectedFile.name
+      );
+      
+      console.log("✅ Arquivo enviado:", result);
+      
+      // Limpa o formulário
+      setSelectedFile(null);
+      setResumeTitle("");
+      
+      // Recarrega lista de currículos
+      await loadResumes();
+      
+      alert("Currículo enviado com sucesso! Agora você pode analisá-lo.");
+    } catch (error) {
+      console.error("❌ Erro ao enviar arquivo:", error);
+      alert("Erro ao enviar arquivo: " + error.message);
+    } finally {
+      setUploadingResume(false);
+    }
+  };
+  
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      // Valida tipo de arquivo
+      const validTypes = [
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/msword',
+        'text/plain',
+        'text/markdown'
+      ];
+      
+      if (validTypes.includes(file.type) || file.name.endsWith('.pdf') || file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
+        setSelectedFile(file);
+      } else {
+        alert("Tipo de arquivo não suportado. Use PDF, DOCX ou TXT.");
+      }
+    }
+  };
+  
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+  
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+  
+  const handleFileInputChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+  
+  const handleAnalyzeResume = async (resumeId) => {
+    setAnalyzingResume(true);
+    setSelectedResumeId(resumeId);
+    setResumeAnalysis(null);
+    
+    try {
+      const result = await analyzeResume(resumeId);
+      
+      console.log("✅ Análise recebida:", result);
+      setResumeAnalysis(result);
+    } catch (error) {
+      console.error("❌ Erro ao analisar currículo:", error);
+      alert("Erro ao analisar currículo: " + error.message);
+    } finally {
+      setAnalyzingResume(false);
+    }
+  };
+  
+  const loadResumes = async () => {
+    try {
+      const resumes = await listResumes();
+      setMyResumes(resumes);
+    } catch (error) {
+      console.error("❌ Erro ao carregar currículos:", error);
+    }
+  };
 
   // carrega usuário + catálogo
   useEffect(() => {
@@ -212,6 +360,9 @@ export default function Home() {
                
                setUser(userData);
                setCatalog(transformedChallenges);
+               
+               // Carrega currículos do usuário
+               await loadResumes();
       } catch (error) {
         console.error("❌ Erro detalhado ao carregar dados:", error);
         console.error("❌ Mensagem de erro:", error.message);
@@ -524,8 +675,404 @@ export default function Home() {
         </div>
 
 
-        {/* Features futuras (fixas, não personalizadas) */}
-        <div className="mt-8 grid md:grid-cols-2 gap-5">
+        {/* ==================== ANÁLISE DE CURRÍCULO ==================== */}
+        <div className="mt-12 mb-8">
+          <div className="mb-6">
+            <h2 className="text-xl md:text-2xl font-extrabold tracking-tight">Análise de Currículo</h2>
+            <p className="text-zinc-600 text-sm">Receba feedback personalizado baseado na sua trilha de conhecimento</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6 items-start">
+              {/* Coluna 1: Upload de Currículo */}
+              <Card 
+                role="button"
+                aria-expanded={expandedUploadCard}
+                className={
+                  "p-5 cursor-pointer transition-all duration-300 ease-in-out animate-fade-in " +
+                  (expandedUploadCard 
+                    ? "ring-2 ring-primary-300" 
+                    : "hover:scale-[1.02]")
+                }
+                onClick={() => setExpandedUploadCard(prev => !prev)}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-9 w-9 rounded-md bg-primary-100 text-primary-800 grid place-content-center border border-primary-200 text-sm font-semibold">
+                      📄
+                    </div>
+                    <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                      Novo Currículo
+                    </span>
+                  </div>
+                </div>
+
+                {!expandedUploadCard && (
+                  <div className="mt-4">
+                    <h3 className="text-lg font-semibold text-zinc-900">Enviar Currículo</h3>
+                    <p className="mt-1.5 text-sm text-zinc-600">Clique para anexar seu currículo e receber análise personalizada</p>
+                  </div>
+                )}
+
+                {expandedUploadCard && (
+                  <div className="pt-4 mt-4 border-t border-zinc-200" onClick={(e) => e.stopPropagation()}>
+                    <h3 className="text-lg font-semibold text-zinc-900 mb-3">Enviar Currículo</h3>
+                    
+                    {/* Tabs para escolher método */}
+                    <div className="flex gap-2 mb-4 border-b border-zinc-200">
+                      <button
+                        onClick={() => setUploadType("file")}
+                        className={`px-4 py-2 text-sm font-medium border-b-2 transition cursor-pointer ${
+                          uploadType === "file"
+                            ? "border-primary-500 text-primary-700"
+                            : "border-transparent text-zinc-600 hover:text-zinc-900"
+                        }`}
+                      >
+                        📎 Enviar Arquivo
+                      </button>
+                      <button
+                        onClick={() => setUploadType("text")}
+                        className={`px-4 py-2 text-sm font-medium border-b-2 transition cursor-pointer ${
+                          uploadType === "text"
+                            ? "border-primary-500 text-primary-700"
+                            : "border-transparent text-zinc-600 hover:text-zinc-900"
+                        }`}
+                      >
+                        ✏️ Colar Texto
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-700 mb-1">
+                          Título (opcional)
+                        </label>
+                        <input
+                          type="text"
+                          value={resumeTitle}
+                          onChange={(e) => setResumeTitle(e.target.value)}
+                          placeholder={uploadType === "file" ? "Ex: Currículo - Desenvolvedor Frontend" : "Ex: Currículo Atualizado 2024"}
+                          className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        />
+                      </div>
+                      
+                      {uploadType === "file" ? (
+                        /* Upload de Arquivo com Drag and Drop */
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-700 mb-2">
+                            Arquivo do Currículo
+                          </label>
+                          <div
+                            onDrop={handleDrop}
+                            onDragOver={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            className={`
+                              border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition
+                              ${isDragging 
+                                ? 'border-primary-500 bg-primary-50' 
+                                : selectedFile
+                                  ? 'border-emerald-300 bg-emerald-50'
+                                  : 'border-zinc-300 hover:border-primary-400 hover:bg-zinc-50'
+                              }
+                            `}
+                          >
+                            <input
+                              type="file"
+                              id="file-upload"
+                              accept=".pdf,.doc,.docx,.txt,.md"
+                              onChange={handleFileInputChange}
+                              className="hidden"
+                            />
+                            
+                            <label htmlFor="file-upload" className="cursor-pointer">
+                              {selectedFile ? (
+                                <div className="space-y-2">
+                                  <div className="text-3xl">✅</div>
+                                  <p className="font-medium text-zinc-900">{selectedFile.name}</p>
+                                  <p className="text-sm text-zinc-500">
+                                    {(selectedFile.size / 1024).toFixed(2)} KB
+                                  </p>
+                                  <p className="text-xs text-zinc-400 mt-2">
+                                    Clique para selecionar outro arquivo
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  <div className="text-3xl">📤</div>
+                                  <p className="font-medium text-zinc-900">
+                                    Arraste seu currículo aqui
+                                  </p>
+                                  <p className="text-sm text-zinc-500">
+                                    ou clique para selecionar
+                                  </p>
+                                  <p className="text-xs text-zinc-400 mt-2">
+                                    PDF, DOCX, DOC, TXT (máx 10 MB)
+                                  </p>
+                                </div>
+                              )}
+                            </label>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Upload de Texto */
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-700 mb-1">
+                            Conteúdo do Currículo
+                          </label>
+                          <textarea
+                            value={resumeContent}
+                            onChange={(e) => setResumeContent(e.target.value)}
+                            placeholder="Cole aqui o conteúdo do seu currículo em texto ou markdown..."
+                            rows={8}
+                            className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono"
+                          />
+                        </div>
+                      )}
+                      
+                      <button
+                        onClick={uploadType === "file" ? handleUploadResumeFile : handleUploadResume}
+                        disabled={uploadingResume || (uploadType === "file" ? !selectedFile : !resumeContent.trim())}
+                        className="w-full px-4 py-2.5 bg-primary-500 text-black font-semibold rounded-lg hover:bg-primary-600 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                      >
+                        {uploadingResume 
+                          ? "Enviando..." 
+                          : uploadType === "file"
+                            ? "Enviar Arquivo"
+                            : "Enviar Texto"}
+                      </button>
+                    </div>
+
+                    {/* Botão Fechar (estilo dos desafios) */}
+                    <div className="mt-5 flex justify-end">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setExpandedUploadCard(false); }}
+                        className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50"
+                      >
+                        Fechar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </Card>
+
+              {/* Coluna 2: Meus Currículos e Análise */}
+              <Card 
+                role="button"
+                aria-expanded={expandedMyResumesCard}
+                className={
+                  "p-5 cursor-pointer transition-all duration-300 ease-in-out animate-fade-in " +
+                  (expandedMyResumesCard 
+                    ? "ring-2 ring-primary-300" 
+                    : "hover:scale-[1.02]")
+                }
+                onClick={() => setExpandedMyResumesCard(prev => !prev)}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-9 w-9 rounded-md bg-emerald-100 text-emerald-800 grid place-content-center border border-emerald-200 text-sm font-semibold">
+                      🤖
+                    </div>
+                    <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                      Análise Praxis
+                    </span>
+                  </div>
+                </div>
+
+                {!expandedMyResumesCard && (
+                  <div className="mt-4">
+                    <h3 className="text-lg font-semibold text-zinc-900">Meus Currículos</h3>
+                    <p className="mt-1.5 text-sm text-zinc-600">
+                      {myResumes.length === 0 
+                        ? "Nenhum currículo enviado ainda" 
+                        : `${myResumes.length} currículo${myResumes.length > 1 ? 's' : ''} enviado${myResumes.length > 1 ? 's' : ''}`}
+                    </p>
+                  </div>
+                )}
+
+                {expandedMyResumesCard && (
+                  <div className="pt-4 mt-4 border-t border-zinc-200" onClick={(e) => e.stopPropagation()}>
+                    <h3 className="text-lg font-semibold text-zinc-900 mb-3">Meus Currículos</h3>
+                    
+                    {myResumes.length === 0 ? (
+                      <div className="text-center py-8 text-zinc-500">
+                        <p className="text-sm">Nenhum currículo enviado ainda.</p>
+                        <p className="text-xs mt-1">Envie seu primeiro currículo ao lado!</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 max-h-96 overflow-y-auto">
+                        {myResumes.map((resume) => (
+                          <div key={resume.id} className="border border-zinc-200 rounded-lg p-4">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-zinc-900 text-sm">{resume.title || "Sem título"}</h4>
+                                <p className="text-xs text-zinc-500 mt-1">
+                                  Enviado em {new Date(resume.created_at).toLocaleDateString('pt-BR')}
+                                </p>
+                              </div>
+                              {resume.has_analysis && (
+                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  ✓ Analisado
+                                </span>
+                              )}
+                            </div>
+                            
+                            <button
+                              onClick={() => handleAnalyzeResume(resume.id)}
+                              disabled={analyzingResume && selectedResumeId === resume.id}
+                              className="w-full mt-2 px-3 py-1.5 text-sm font-medium border border-primary-200 text-primary-700 rounded-md hover:bg-primary-50 transition disabled:opacity-50 cursor-pointer"
+                            >
+                              {analyzingResume && selectedResumeId === resume.id
+                                ? "Analisando..."
+                                : resume.has_analysis
+                                ? "Ver Análise"
+                                : "Analisar com IA"}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Botão Fechar (estilo dos desafios) */}
+                    <div className="mt-5 flex justify-end">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setExpandedMyResumesCard(false); }}
+                        className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50"
+                      >
+                        Fechar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </Card>
+            </div>
+
+          {/* Resultado da Análise */}
+          {resumeAnalysis && (
+            <Card className="p-6 mt-6 border-2 border-primary-200">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-bold text-zinc-900">Resultado da Análise</h3>
+                  <p className="text-sm text-zinc-600 mt-1">Análise gerada pela Praxis com base na sua trilha</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl font-bold text-primary-600">
+                    {resumeAnalysis.full_report?.nota_geral || "N/A"}
+                  </span>
+                  <span className="text-sm text-zinc-500">/100</span>
+                </div>
+              </div>
+
+              {resumeAnalysis.full_report && (
+                <div className="space-y-6">
+                  {/* Resumo Executivo */}
+                  {resumeAnalysis.full_report.resumo_executivo && (
+                    <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-zinc-900 mb-2 text-sm">📋 Resumo Executivo</h4>
+                      <p className="text-sm text-zinc-700">{resumeAnalysis.full_report.resumo_executivo}</p>
+                    </div>
+                  )}
+
+                  {/* Pontos Fortes */}
+                  {resumeAnalysis.full_report.pontos_fortes && resumeAnalysis.full_report.pontos_fortes.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold text-emerald-800 mb-3 text-sm flex items-center gap-2">
+                        <span className="text-lg">✓</span> Pontos Fortes
+                      </h4>
+                      <ul className="space-y-2">
+                        {resumeAnalysis.full_report.pontos_fortes.map((ponto, idx) => (
+                          <li key={idx} className="flex items-start gap-2 text-sm">
+                            <span className="text-emerald-600 mt-0.5">●</span>
+                            <span className="text-zinc-700">{ponto}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Gaps Técnicos */}
+                  {resumeAnalysis.full_report.gaps_tecnicos && resumeAnalysis.full_report.gaps_tecnicos.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold text-orange-800 mb-3 text-sm flex items-center gap-2">
+                        <span className="text-lg">⚠</span> Habilidades Faltantes
+                      </h4>
+                      <ul className="space-y-2">
+                        {resumeAnalysis.full_report.gaps_tecnicos.map((gap, idx) => (
+                          <li key={idx} className="flex items-start gap-2 text-sm">
+                            <span className="text-orange-600 mt-0.5">●</span>
+                            <span className="text-zinc-700">{gap}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Sugestões de Melhoria */}
+                  {resumeAnalysis.full_report.sugestoes_melhoria && resumeAnalysis.full_report.sugestoes_melhoria.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold text-blue-800 mb-3 text-sm flex items-center gap-2">
+                        <span className="text-lg">💡</span> Sugestões de Melhoria
+                      </h4>
+                      <ul className="space-y-2">
+                        {resumeAnalysis.full_report.sugestoes_melhoria.map((sugestao, idx) => (
+                          <li key={idx} className="flex items-start gap-2 text-sm">
+                            <span className="text-blue-600 mt-0.5">●</span>
+                            <span className="text-zinc-700">{sugestao}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Habilidades Evidenciadas */}
+                  {resumeAnalysis.full_report.habilidades_evidenciadas && (
+                    <div>
+                      <h4 className="font-semibold text-zinc-900 mb-3 text-sm">📊 Habilidades Evidenciadas</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        {Object.entries(resumeAnalysis.full_report.habilidades_evidenciadas).map(([skill, level]) => (
+                          <div key={skill} className="bg-zinc-50 rounded-lg p-3 border border-zinc-200">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-sm font-medium text-zinc-700">{skill}</span>
+                              <span className="text-xs font-semibold text-zinc-600">{level}/100</span>
+                            </div>
+                            <div className="w-full bg-zinc-200 rounded-full h-2">
+                              <div 
+                                className="bg-primary-500 h-2 rounded-full transition-all"
+                                style={{ width: `${level}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Próximos Passos */}
+                  {resumeAnalysis.full_report.proximos_passos && resumeAnalysis.full_report.proximos_passos.length > 0 && (
+                    <div className="bg-gradient-to-r from-primary-50 to-emerald-50 border border-primary-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-zinc-900 mb-3 text-sm flex items-center gap-2">
+                        <span className="text-lg">🎯</span> Próximos Passos
+                      </h4>
+                      <ol className="space-y-2 list-decimal list-inside">
+                        {resumeAnalysis.full_report.proximos_passos.map((passo, idx) => (
+                          <li key={idx} className="text-sm text-zinc-700 ml-2">{passo}</li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+                </div>
+              )}
+            </Card>
+          )}
+        </div>
+
+
+        {/* ==================== ROADMAP - PRÓXIMAS FEATURES ==================== */}
+        <div className="mt-12 mb-8">
+          <div className="mb-6">
+            <h2 className="text-xl md:text-2xl font-extrabold tracking-tight">Próximas Features</h2>
+            <p className="text-zinc-600 text-sm">Funcionalidades em desenvolvimento para melhorar sua experiência</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-5">
         <Card className="p-5">
             <div className="flex items-start justify-between">
             <div className="h-9 w-9 rounded-md bg-primary-100 text-primary-800 grid place-content-center border border-primary-200">💬</div>
@@ -589,6 +1136,7 @@ export default function Home() {
             <PrimaryButton disabled>Em desenvolvimento</PrimaryButton>
             </div>
         </Card>
+        </div>
         </div>
 
       </main>

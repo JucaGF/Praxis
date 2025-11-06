@@ -1158,3 +1158,232 @@ REGRAS:
         except Exception as e:
             logger.error(f"Erro ao avaliar submissão: {e}")
             raise
+
+    def _build_resume_analysis_prompt(self, resume_content: str, career_goal: str, track: str) -> str:
+        """
+        Constrói o prompt para análise de currículo baseado na trilha do usuário.
+
+        Args:
+            resume_content: Conteúdo do currículo
+            career_goal: Objetivo de carreira do usuário
+            track: Track detectado (frontend, backend, data_engineer, fullstack)
+
+        Returns:
+            Prompt formatado
+        """
+        base_prompt = f"""Você é um recrutador técnico sênior especializado em {track.upper()}.
+
+PERFIL DO CANDIDATO:
+- Objetivo de carreira: {career_goal}
+- Trilha: {track.upper()}
+
+CURRÍCULO SUBMETIDO:
+```
+{resume_content}
+```
+
+"""
+
+        # Habilidades e requisitos específicos por track
+        if track == "data_engineer":
+            track_skills = """
+HABILIDADES ESPERADAS PARA DATA ENGINEER:
+
+Técnicas Fundamentais:
+- SQL avançado (CTEs, Window Functions, Otimização)
+- Python para manipulação de dados (Pandas, PySpark)
+- Modelagem de dados (dimensional, normalização)
+- ETL/ELT pipelines
+
+Ferramentas Comuns:
+- Orquestração: Airflow, Dagster, Prefect
+- Processing: Spark, Dask, Databricks
+- Cloud: AWS (S3, Redshift, Glue), GCP (BigQuery), Azure
+- Versionamento de dados: dbt, Great Expectations
+
+Soft Skills:
+- Comunicação com stakeholders de negócio
+- Documentação técnica clara
+- Colaboração com Data Scientists e Analistas
+"""
+        elif track == "frontend":
+            track_skills = """
+HABILIDADES ESPERADAS PARA FRONTEND:
+
+Técnicas Fundamentais:
+- JavaScript/TypeScript moderno (ES6+)
+- Frameworks: React, Vue, Angular
+- HTML5 semântico e acessibilidade (ARIA)
+- CSS moderno (Flexbox, Grid, animações)
+- Responsive Design
+
+Ferramentas Comuns:
+- Build tools: Vite, Webpack, esbuild
+- State management: Redux, Zustand, Pinia
+- Testing: Jest, Vitest, Testing Library
+- UI frameworks: Tailwind, Material-UI, Shadcn
+
+Soft Skills:
+- Colaboração com designers (UI/UX)
+- Atenção a detalhes visuais
+- Performance e otimização
+"""
+        elif track == "backend":
+            track_skills = """
+HABILIDADES ESPERADAS PARA BACKEND:
+
+Técnicas Fundamentais:
+- APIs RESTful e/ou GraphQL
+- Autenticação e autorização (JWT, OAuth)
+- Bancos de dados (SQL e NoSQL)
+- Arquitetura de microserviços
+- Segurança (SQL Injection, XSS, CSRF)
+
+Ferramentas Comuns:
+- Frameworks: FastAPI, Express, Django, Spring
+- Bancos: PostgreSQL, MongoDB, Redis
+- Message brokers: RabbitMQ, Kafka
+- Containerização: Docker, Kubernetes
+- CI/CD: GitHub Actions, GitLab CI
+
+Soft Skills:
+- Documentação de APIs
+- Code review
+- Resolução de problemas complexos
+"""
+        else:  # fullstack
+            track_skills = """
+HABILIDADES ESPERADAS PARA FULLSTACK:
+
+Técnicas Fundamentais:
+- Frontend: React/Vue + HTML/CSS/JS
+- Backend: APIs (Node.js, Python, Java)
+- Bancos de dados (SQL e NoSQL)
+- Autenticação e segurança
+- Deploy e DevOps básico
+
+Ferramentas Comuns:
+- Frontend: React, Vue, Tailwind
+- Backend: FastAPI, Express, Django
+- Bancos: PostgreSQL, MongoDB
+- Cloud: Vercel, AWS, Heroku
+- Version control: Git, GitHub
+
+Soft Skills:
+- Visão holística de produto
+- Comunicação entre front e back
+- Resolução de problemas end-to-end
+"""
+
+        analysis_instructions = """
+TAREFA DE ANÁLISE:
+
+Analise o currículo profundamente considerando as habilidades esperadas para a trilha do candidato.
+
+Avalie:
+1. **Alinhamento com a trilha**: O currículo mostra experiência relevante para o objetivo?
+2. **Profundidade técnica**: As habilidades são apenas citadas ou há evidências de uso (projetos, resultados)?
+3. **Gaps críticos**: Quais habilidades essenciais estão faltando?
+4. **Pontos fortes**: O que se destaca positivamente?
+5. **Oportunidades de melhoria**: Como o currículo poderia ser mais competitivo?
+
+FORMATO DE SAÍDA (JSON ESTRITO):
+Retorne APENAS JSON neste formato:
+
+{
+  "pontos_fortes": [
+    "Ponto forte 1 - seja específico e mencione exemplos do currículo",
+    "Ponto forte 2",
+    "Ponto forte 3"
+  ],
+  "gaps_tecnicos": [
+    "Skill/tecnologia ausente 1 que é importante para {track}",
+    "Skill/tecnologia ausente 2",
+    "Skill/tecnologia ausente 3"
+  ],
+  "sugestoes_melhoria": [
+    "Sugestão específica 1 para melhorar o currículo",
+    "Sugestão específica 2",
+    "Sugestão específica 3"
+  ],
+  "nota_geral": 75,
+  "resumo_executivo": "Análise geral em 2-4 linhas sobre como o currículo se posiciona para a trilha escolhida",
+  "habilidades_evidenciadas": {
+    "Skill 1": 85,
+    "Skill 2": 70,
+    "Skill 3": 60
+  },
+  "proximos_passos": [
+    "Ação concreta 1 que o candidato pode tomar",
+    "Ação concreta 2",
+    "Ação concreta 3"
+  ]
+}
+
+REGRAS:
+- Retorne APENAS o JSON, sem texto antes ou depois
+- Seja específico e cite exemplos do currículo
+- nota_geral: 0-100 (considerando alinhamento com trilha)
+- habilidades_evidenciadas: máximo 5 skills com nota 0-100
+- Seja construtivo mas honesto
+- Foque em gaps RELEVANTES para a trilha
+"""
+
+        return base_prompt + track_skills + analysis_instructions
+
+    def analyze_resume(self, resume_content: str, career_goal: str) -> dict:
+        """
+        Analisa um currículo baseado no objetivo de carreira do usuário.
+
+        Args:
+            resume_content: Conteúdo do currículo em texto
+            career_goal: Objetivo de carreira (ex: "Frontend Developer")
+
+        Returns:
+            Dict com análise detalhada:
+            - pontos_fortes: Lista de pontos fortes
+            - gaps_tecnicos: Habilidades faltantes
+            - sugestoes_melhoria: Sugestões para melhorar
+            - nota_geral: Nota de 0-100
+            - resumo_executivo: Resumo da análise
+            - habilidades_evidenciadas: Dict com skills e níveis
+            - proximos_passos: Ações concretas
+        """
+        # Detecta track baseado no career_goal
+        track = self._detect_track({"career_goal": career_goal})
+
+        logger.info(f"Analisando currículo para track: {track}")
+
+        prompt = self._build_resume_analysis_prompt(
+            resume_content, career_goal, track)
+
+        try:
+            response_text = self._call_gemini(
+                prompt, response_mime_type="application/json")
+            analysis = self._parse_json_response(response_text)
+
+            # Valida campos obrigatórios
+            required_fields = ["pontos_fortes", "gaps_tecnicos",
+                               "sugestoes_melhoria", "nota_geral", "resumo_executivo"]
+            for field in required_fields:
+                if field not in analysis:
+                    logger.warning(
+                        f"Campo obrigatório '{field}' ausente, adicionando default")
+                    if field == "pontos_fortes":
+                        analysis[field] = ["Análise não disponível"]
+                    elif field == "gaps_tecnicos":
+                        analysis[field] = ["Análise não disponível"]
+                    elif field == "sugestoes_melhoria":
+                        analysis[field] = ["Análise não disponível"]
+                    elif field == "nota_geral":
+                        analysis[field] = 70
+                    elif field == "resumo_executivo":
+                        analysis[field] = "Análise em processamento"
+
+            logger.info(
+                f"Análise de currículo completa: nota={analysis.get('nota_geral')}")
+            return analysis
+
+        except Exception as e:
+            logger.error(f"Erro ao analisar currículo: {e}")
+            raise

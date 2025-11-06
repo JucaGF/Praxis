@@ -137,6 +137,108 @@ export async function deleteAccount() {
   });
 }
 
+// ==================== RESUME / ANÁLISE DE CURRÍCULO ====================
+
+/**
+ * Faz upload de um currículo (texto)
+ * @param {Object} resumeData - Dados do currículo
+ * @param {string} resumeData.title - Título do currículo (opcional)
+ * @param {string} resumeData.content - Conteúdo do currículo
+ */
+export async function uploadResume(resumeData) {
+  return await fetchWithAuth(`${API_URL}/resumes/upload`, {
+    method: "POST",
+    body: JSON.stringify(resumeData),
+  });
+}
+
+/**
+ * Faz upload de um currículo (arquivo PDF, DOCX, etc)
+ * @param {File} file - Arquivo do currículo
+ * @param {string} title - Título do currículo (opcional)
+ */
+export async function uploadResumeFile(file, title = null) {
+  const token = await getAuthToken();
+  
+  if (!token) {
+    throw new AuthenticationError("Não autenticado");
+  }
+  
+  const formData = new FormData();
+  formData.append("file", file);
+  if (title) {
+    formData.append("title", title);
+  }
+  
+  const response = await fetch(`${API_URL}/resumes/upload/file`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      // NÃO adicione Content-Type aqui! O browser adiciona automaticamente com boundary
+    },
+    body: formData,
+  });
+  
+  // Trata erros HTTP
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ detail: "Erro desconhecido" }));
+    
+    const errorMessage = errorData.detail || `Erro HTTP: ${response.status}`;
+    
+    if (response.status === 401) {
+      console.warn("Sessão expirada ou inválida. Redirecionando para login...");
+      await supabase.auth.signOut();
+      window.location.href = "/login";
+      throw new AuthenticationError(errorMessage);
+    }
+    
+    if (response.status === 403) {
+      throw new AuthorizationError(errorMessage);
+    }
+    
+    throw new Error(errorMessage);
+  }
+  
+  return response.json();
+}
+
+/**
+ * Lista todos os currículos do usuário
+ */
+export async function listResumes() {
+  return await fetchWithAuth(`${API_URL}/resumes/`);
+}
+
+/**
+ * Busca um currículo específico com análise
+ * @param {number} resumeId - ID do currículo
+ */
+export async function getResumeWithAnalysis(resumeId) {
+  return await fetchWithAuth(`${API_URL}/resumes/${resumeId}`);
+}
+
+/**
+ * Analisa um currículo usando IA
+ * @param {number} resumeId - ID do currículo a ser analisado
+ */
+export async function analyzeResume(resumeId) {
+  return await fetchWithAuth(`${API_URL}/resumes/${resumeId}/analyze`, {
+    method: "POST",
+  });
+}
+
+/**
+ * Deleta um currículo
+ * @param {number} resumeId - ID do currículo a ser deletado
+ */
+export async function deleteResume(resumeId) {
+  return await fetchWithAuth(`${API_URL}/resumes/${resumeId}`, {
+    method: "DELETE",
+  });
+}
+
 /**
  * Conecta ao endpoint SSE de geração de desafios com streaming
  * 

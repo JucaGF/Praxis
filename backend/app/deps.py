@@ -26,24 +26,25 @@ logger = get_logger(__name__)
 
 # ==================== AI FACTORY ====================
 
+
 def _create_ai_service() -> IAIService:
     """
     Factory que cria a instância correta de IA baseado nas configurações.
-    
+
     Lê AI_PROVIDER do .env e retorna:
     - "fake": FakeAI (mock para desenvolvimento)
     - "gemini": GeminiAI (IA real do Google)
-    
+
     Raises:
         ValueError: Se AI_PROVIDER inválido ou GEMINI_API_KEY ausente
     """
     settings = get_settings()
     provider = settings.AI_PROVIDER.lower()
-    
+
     if provider == "fake":
         logger.info("🤖 Usando FakeAI (modo desenvolvimento)")
         return FakeAI()
-    
+
     elif provider == "gemini":
         # Import tardio (só quando necessário)
         try:
@@ -53,14 +54,14 @@ def _create_ai_service() -> IAIService:
             raise ValueError(
                 "GeminiAI não disponível. Instale: pip install google-generativeai"
             )
-        
+
         # Valida API key
         if not settings.GEMINI_API_KEY:
             raise ValueError(
                 "GEMINI_API_KEY não configurada! "
                 "Adicione no .env ou use AI_PROVIDER=fake para desenvolvimento."
             )
-        
+
         logger.info(
             f"🚀 Usando GeminiAI (modelo: {settings.GEMINI_MODEL})",
             extra={"extra_data": {
@@ -69,14 +70,14 @@ def _create_ai_service() -> IAIService:
                 "timeout": settings.AI_TIMEOUT
             }}
         )
-        
+
         return GeminiAI(
             api_key=settings.GEMINI_API_KEY,
             model_name=settings.GEMINI_MODEL,
             max_retries=settings.AI_MAX_RETRIES,
             timeout=settings.AI_TIMEOUT
         )
-    
+
     else:
         raise ValueError(
             f"AI_PROVIDER inválido: '{provider}'. "
@@ -95,7 +96,7 @@ _ai = _create_ai_service()  # Factory pattern!
 def get_repo() -> IRepository:
     """
     Fornece instância de Repository.
-    
+
     Usado em endpoints que precisam acesso direto ao banco.
     Exemplo: get_attributes(), patch_attributes()
     """
@@ -105,12 +106,21 @@ def get_repo() -> IRepository:
 def get_ai() -> IAIService:
     """
     Fornece instância de AI Service.
-    
+
     Retorna automaticamente:
     - FakeAI se AI_PROVIDER=fake (desenvolvimento)
     - GeminiAI se AI_PROVIDER=gemini (produção)
-    
+
     A escolha é feita pelo factory _create_ai_service() baseado no .env
+    """
+    return _ai
+
+
+def get_ai_service() -> IAIService:
+    """
+    Alias para get_ai() - fornece instância de AI Service.
+
+    Mesma funcionalidade que get_ai(), mantido para compatibilidade.
     """
     return _ai
 
@@ -121,7 +131,7 @@ def get_ai() -> IAIService:
 def get_challenge_service() -> ChallengeService:
     """
     Fornece instância de ChallengeService.
-    
+
     Service que encapsula lógica de geração e listagem de desafios.
     Endpoints devem usar este service ao invés de chamar repo + ai diretamente.
     """
@@ -131,13 +141,13 @@ def get_challenge_service() -> ChallengeService:
 def get_submission_service() -> SubmissionService:
     """
     Fornece instância de SubmissionService.
-    
+
     Service que encapsula TODA a lógica complexa de:
     - Criar submissão
     - Avaliar com IA
     - Calcular progressão
     - Salvar feedback
-    
+
     Este é o service mais importante! 🚀
     """
     return SubmissionService(repository=_repo, ai_service=_ai)
@@ -148,7 +158,7 @@ def get_submission_service() -> SubmissionService:
 def get_auth_service_dep() -> AuthService:
     """
     Fornece instância de AuthService.
-    
+
     Service para validar tokens JWT do Supabase.
     """
     return get_auth_service()
@@ -160,27 +170,27 @@ def get_current_user(
 ) -> AuthUser:
     """
     Extrai e valida usuário autenticado do token JWT.
-    
+
     Uso em endpoints protegidos:
         @router.get("/meus-dados")
         def get_meus_dados(current_user: AuthUser = Depends(get_current_user)):
             # current_user.id contém o ID do usuário autenticado
             # current_user.email contém o email
             return {"user_id": current_user.id, "email": current_user.email}
-    
+
     Fluxo:
     1. Extrai header "Authorization: Bearer <token>"
     2. Valida token JWT com Supabase
     3. Retorna dados do usuário (id, email, role)
     4. Se inválido: lança exceção (FastAPI retorna 401 automaticamente)
-    
+
     Args:
         authorization: Header Authorization (FastAPI extrai automaticamente)
         auth_service: Service de autenticação (injetado)
-    
+
     Returns:
         Usuário autenticado
-        
+
     Raises:
         AuthenticationError: Token inválido, expirado ou ausente (FastAPI converte em 401)
     """
@@ -193,9 +203,9 @@ def get_optional_user(
 ) -> Optional[AuthUser]:
     """
     Tenta extrair usuário autenticado, mas NÃO força autenticação.
-    
+
     Útil para endpoints que funcionam com ou sem autenticação.
-    
+
     Uso:
         @router.get("/public-data")
         def get_data(user: Optional[AuthUser] = Depends(get_optional_user)):
@@ -205,7 +215,7 @@ def get_optional_user(
             else:
                 # Usuário anônimo: retorna dados genéricos
                 return dados_publicos()
-    
+
     Returns:
         Usuário autenticado ou None
     """
