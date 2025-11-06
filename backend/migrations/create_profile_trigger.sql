@@ -31,7 +31,7 @@ BEGIN
     -- Soft skills mockadas
     jsonb_build_array(
       jsonb_build_object('name', 'Comunicação', 'level', 'Intermediário'),
-      jsonb_build_object('name', 'Trabalho em Equipe', 'level', 'Avançado'),
+      jsonb_build_object('name', 'Criatividade  ', 'level', 'Avançado'),
       jsonb_build_object('name', 'Resolução de Problemas', 'level', 'Intermediário'),
       jsonb_build_object('name', 'Adaptabilidade', 'level', 'Básico')
     ),
