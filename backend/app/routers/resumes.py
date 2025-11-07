@@ -4,6 +4,7 @@ Router para upload e análise de currículos
 """
 
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
+from fastapi.responses import StreamingResponse
 from backend.app.deps import get_current_user, get_repo, get_ai_service
 from backend.app.schemas.resumes import (
     ResumeUpload,
@@ -15,6 +16,7 @@ from backend.app.domain.ports import IRepository, IAIService
 from backend.app.logging_config import get_logger
 from backend.app.infra.document_parser import document_parser
 from typing import List, Optional
+import json
 
 logger = get_logger(__name__)
 
@@ -289,6 +291,251 @@ async def analyze_resume(
         logger.exception("Erro ao analisar currículo")
         raise HTTPException(
             status_code=500, detail=f"Erro ao analisar currículo: {str(e)}")
+
+
+@router.get("/{resume_id}/analyze/stream")
+async def analyze_resume_stream(
+    resume_id: int,
+    current_user=Depends(get_current_user),
+    repo: IRepository = Depends(get_repo),
+    ai: IAIService = Depends(get_ai_service)
+):
+    """
+    Analisa um currículo usando IA com streaming SSE.
+    
+    🔒 ENDPOINT PROTEGIDO - Requer autenticação
+    🚀 STREAMING: Retorna eventos progressivamente em tempo real
+    
+    Eventos SSE:
+    - event: start
+      data: {"message": "📄 Analisando currículo..."}
+      
+    - event: progress  
+      data: {"percent": 0-100, "message": "🤖 Gemini gerando..."}
+      
+    - event: field_chunk
+      data: {"field": "resumo_executivo", "content": "...", "is_complete": false}
+      
+    - event: complete
+      data: {"analysis": {...}, "message": "🎉 Concluído!"}
+      
+    - event: error
+      data: {"message": "Erro ao analisar currículo"}
+    """
+    
+    async def event_generator():
+        """Generator que formata eventos SSE corretamente"""
+        try:
+            profile_id = str(current_user.id)
+            
+            # Busca o currículo
+            resume = repo.get_resume(resume_id)
+            if not resume:
+                yield f"event: error\n"
+                yield f"data: {json.dumps({'message': 'Currículo não encontrado'})}\n\n"
+                return
+            
+            # Verifica permissão
+            if str(resume.profile_id) != profile_id:
+                yield f"event: error\n"
+                yield f"data: {json.dumps({'message': 'Sem permissão para analisar este currículo'})}\n\n"
+                return
+            
+            # Busca career_goal
+            attributes = repo.get_attributes(profile_id)
+            career_goal = attributes.get("career_goal", "Desenvolvedor Full Stack")
+            
+            logger.info(f"Iniciando análise streaming para currículo {resume_id}")
+            
+            # Streaming da IA
+            async for event in ai.analyze_resume_streaming(
+                resume_content=resume.original_content,
+                career_goal=career_goal
+            ):
+                event_type = event.get("type", "message")
+                event_data = {k: v for k, v in event.items() if k != "type"}
+                
+                logger.info(f"📤 Enviando evento SSE: {event_type}")
+                
+                # Se é evento complete, salvar análise no banco
+                if event_type == "complete" and "analysis" in event_data:
+                    analysis_result = event_data["analysis"]
+                    
+                    # Formata pontos fortes e melhorias
+                    strengths = "\n".join(
+                        [f"• {p}" for p in analysis_result.get("pontos_fortes", [])])
+                    improvements = "\n".join(
+                        [f"• {g}" for g in analysis_result.get("gaps_tecnicos", [])])
+                    
+                    # Salva análise no banco
+                    analysis_obj = repo.create_resume_analysis(
+                        resume_id=resume_id,
+                        strengths=strengths,
+                        improvements=improvements,
+                        full_report=analysis_result
+                    )
+                    
+                    # Adiciona ID da análise ao evento
+                    event_data["analysis_id"] = analysis_obj.id
+                    
+                    logger.info(f"💾 Análise salva com ID {analysis_obj.id}")
+                
+                # Formato SSE correto
+                yield f"event: {event_type}\n"
+                yield f"data: {json.dumps(event_data, default=str)}\n\n"
+                
+                # Pequeno delay para forçar flush
+                import asyncio
+                await asyncio.sleep(0.01)
+                
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            logger.error(f"Erro inesperado no streaming de análise:\n{error_trace}")
+            yield f"event: error\n"
+            yield f"data: {json.dumps({'message': 'Erro inesperado ao analisar currículo'})}\n\n"
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+            "Transfer-Encoding": "chunked",
+            "Access-Control-Allow-Origin": "*",
+        }
+    )
+
+
+@router.post("/upload/file/analyze")
+async def upload_and_analyze_resume_file_stream(
+    file: UploadFile = File(...),
+    title: Optional[str] = Form(None),
+    current_user=Depends(get_current_user),
+    repo: IRepository = Depends(get_repo),
+    ai: IAIService = Depends(get_ai_service)
+):
+    """
+    Faz upload de arquivo E analisa em um único passo com streaming SSE.
+    
+    🔒 ENDPOINT PROTEGIDO - Requer autenticação
+    🚀 STREAMING: Upload + análise em tempo real
+    
+    Formatos suportados:
+    - PDF (.pdf)
+    - Word (.docx, .doc)
+    - PowerPoint (.pptx, .ppt)
+    - Texto (.txt, .md)
+    - Imagens com OCR (.png, .jpg)
+    
+    Eventos SSE iguais ao endpoint /analyze/stream
+    """
+    
+    async def event_generator():
+        """Generator que faz upload e depois analisa com streaming"""
+        try:
+            profile_id = str(current_user.id)
+            
+            # Evento inicial
+            yield f"event: start\n"
+            yield f"data: {json.dumps({'message': '📤 Fazendo upload do arquivo...'})}\n\n"
+            
+            # Lê conteúdo do arquivo
+            file_content = await file.read()
+            
+            # Extrai texto do documento
+            logger.info(f"Extraindo texto de {file.filename} ({file.content_type})")
+            
+            yield f"event: progress\n"
+            yield f"data: {json.dumps({'percent': 2, 'message': '📄 Processando documento...'})}\n\n"
+            
+            result = document_parser.parse_file(
+                file_data=file_content,
+                filename=file.filename or "resume",
+                mime_type=file.content_type
+            )
+            extracted_text = result.get("text", "")
+            
+            if not extracted_text or len(extracted_text.strip()) < 50:
+                yield f"event: error\n"
+                yield f"data: {json.dumps({'message': 'Não foi possível extrair texto do arquivo'})}\n\n"
+                return
+            
+            # Cria currículo no banco
+            resume = repo.create_resume(
+                profile_id=profile_id,
+                title=title or file.filename or "Meu Currículo",
+                content=extracted_text,
+                filename=file.filename,
+                file_type=file.content_type,
+                file_size=len(file_content),
+                file_data=file_content
+            )
+            
+            logger.info(f"Currículo criado: ID={resume.id}")
+            
+            yield f"event: progress\n"
+            yield f"data: {json.dumps({'percent': 5, 'message': '✅ Arquivo salvo! Iniciando análise...', 'resume_id': resume.id})}\n\n"
+            
+            # Busca career_goal
+            attributes = repo.get_attributes(profile_id)
+            career_goal = attributes.get("career_goal", "Desenvolvedor Full Stack")
+            
+            # Streaming da análise
+            async for event in ai.analyze_resume_streaming(
+                resume_content=extracted_text,
+                career_goal=career_goal
+            ):
+                event_type = event.get("type", "message")
+                event_data = {k: v for k, v in event.items() if k != "type"}
+                
+                # Adiciona resume_id em todos os eventos
+                event_data["resume_id"] = resume.id
+                
+                # Se é evento complete, salvar análise
+                if event_type == "complete" and "analysis" in event_data:
+                    analysis_result = event_data["analysis"]
+                    
+                    strengths = "\n".join(
+                        [f"• {p}" for p in analysis_result.get("pontos_fortes", [])])
+                    improvements = "\n".join(
+                        [f"• {g}" for g in analysis_result.get("gaps_tecnicos", [])])
+                    
+                    analysis_obj = repo.create_resume_analysis(
+                        resume_id=resume.id,
+                        strengths=strengths,
+                        improvements=improvements,
+                        full_report=analysis_result
+                    )
+                    
+                    event_data["analysis_id"] = analysis_obj.id
+                    logger.info(f"💾 Análise salva com ID {analysis_obj.id}")
+                
+                yield f"event: {event_type}\n"
+                yield f"data: {json.dumps(event_data, default=str)}\n\n"
+                
+                import asyncio
+                await asyncio.sleep(0.01)
+                
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            logger.error(f"Erro no upload+análise streaming:\n{error_trace}")
+            yield f"event: error\n"
+            yield f"data: {json.dumps({'message': f'Erro: {str(e)}'})}\n\n"
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+            "Transfer-Encoding": "chunked",
+            "Access-Control-Allow-Origin": "*",
+        }
+    )
 
 
 @router.get("/{resume_id}", response_model=ResumeWithAnalysis)

@@ -813,6 +813,48 @@ REGRAS:
 
         return True
 
+    def _extract_partial_fields(self, json_buffer: str) -> List[dict]:
+        """
+        Extrai campos parciais dos desafios (title, description) durante streaming.
+        
+        Returns:
+            Lista de dicts com campos parciais: [{index: 0, title: "...", description: "..."}]
+        """
+        import re
+        partial_challenges = []
+        
+        try:
+            # Tentar encontrar títulos parciais com regex
+            # Procura por padrões como: "title": "texto aqui"
+            title_pattern = r'"title"\s*:\s*"([^"]*)"'
+            titles = re.findall(title_pattern, json_buffer)
+            
+            # Procura por descrições parciais
+            desc_pattern = r'"description"\s*:\s*\{[^}]*"text"\s*:\s*"([^"]*)"'
+            descriptions = re.findall(desc_pattern, json_buffer)
+            
+            # Procura por categorias
+            category_pattern = r'"category"\s*:\s*"([^"]*)"'
+            categories = re.findall(category_pattern, json_buffer)
+            
+            # Combina os campos encontrados
+            for i in range(max(len(titles), len(descriptions), len(categories))):
+                partial = {"index": i}
+                if i < len(titles):
+                    partial["title"] = titles[i]
+                if i < len(descriptions):
+                    partial["description"] = descriptions[i]
+                if i < len(categories):
+                    partial["category"] = categories[i]
+                
+                if len(partial) > 1:  # Tem pelo menos um campo além do index
+                    partial_challenges.append(partial)
+            
+            return partial_challenges
+        except Exception as e:
+            logger.debug(f"Erro ao extrair campos parciais: {e}")
+            return []
+    
     def _extract_complete_challenges(self, json_buffer: str) -> List[dict]:
         """
         Extrai desafios completos de um JSON parcialmente recebido (streaming).
@@ -917,23 +959,36 @@ REGRAS:
                 safety_settings=self.safety_settings
             )
 
-            # Progresso inicial simulado (5% -> 35%) bem devagar
+            # Progresso inicial simulado (5% -> 40%) otimizado
             import asyncio
-            for i in range(5, 36, 1):
+            progress_steps = [
+                (5, "🧠 Analisando seu perfil..."),
+                (10, "🎯 Identificando skills relevantes..."),
+                (15, "📊 Avaliando nível de experiência..."),
+                (20, "🔍 Buscando desafios compatíveis..."),
+                (25, "💡 Personalizando conteúdo..."),
+                (30, "⚙️ Configurando geradores..."),
+                (35, "⏳ Preparando contexto para IA..."),
+                (40, "🤖 Iniciando geração...")
+            ]
+            
+            for percent, message in progress_steps:
                 yield {
                     "type": "progress",
-                    "percent": i,
-                    "message": "⏳ Processando..."
+                    "percent": percent,
+                    "message": message
                 }
-                await asyncio.sleep(1.5)  # 1.5 segundos entre updates
+                await asyncio.sleep(2.0)  # 2 segundos entre updates
 
             # Streaming do Gemini
             response = model.generate_content(prompt, stream=True)
 
             buffer = ""
             challenges_sent = 0
-            last_progress = 35
+            last_progress = 40
             chunk_count = 0
+            last_extracted_length = 0  # Para detectar novo conteúdo nos chunks
+            sent_chunks = {}  # Rastreia chunks já enviados por desafio: {index: {title: "...", desc: "..."}}
 
             logger.info("📡 Aguardando chunks do Gemini...")
 
@@ -950,7 +1005,7 @@ REGRAS:
 
                 # Atualizar progresso baseado no tamanho do buffer
                 # Estimativa: ~10k chars = 3 desafios completos
-                estimated_progress = min(85, 35 + (len(buffer) / 10000) * 50)
+                estimated_progress = min(85, 40 + (len(buffer) / 10000) * 45)
 
                 # Só envia progresso se mudou significativamente (evita spam)
                 if estimated_progress - last_progress >= 5:
@@ -960,6 +1015,37 @@ REGRAS:
                         "message": f"🤖 Gerando desafios... ({len(buffer)} caracteres)"
                     }
                     last_progress = estimated_progress
+
+                # Extrair e enviar campos parciais (para efeito typewriter no frontend)
+                if len(buffer) > last_extracted_length + 50:  # Só processa se tiver conteúdo novo significativo
+                    partial_fields = self._extract_partial_fields(buffer)
+                    
+                    for partial in partial_fields:
+                        challenge_idx = partial.get("index", 0)
+                        
+                        # Inicializa rastreamento deste desafio se necessário
+                        if challenge_idx not in sent_chunks:
+                            sent_chunks[challenge_idx] = {}
+                        
+                        # Envia novos campos ou campos que mudaram
+                        for field in ["title", "description", "category"]:
+                            if field in partial:
+                                current_value = partial[field]
+                                last_value = sent_chunks[challenge_idx].get(field, "")
+                                
+                                # Só envia se há novo conteúdo
+                                if len(current_value) > len(last_value):
+                                    yield {
+                                        "type": "challenge_chunk",
+                                        "challenge_index": challenge_idx,
+                                        "field": field,
+                                        "content": current_value,
+                                        "is_complete": False
+                                    }
+                                    sent_chunks[challenge_idx][field] = current_value
+                                    logger.debug(f"📝 Chunk parcial enviado: desafio {challenge_idx}, campo {field}, {len(current_value)} chars")
+                    
+                    last_extracted_length = len(buffer)
 
                 # Tentar extrair desafios completos
                 current_challenges = self._extract_complete_challenges(buffer)
@@ -1387,3 +1473,227 @@ REGRAS:
         except Exception as e:
             logger.error(f"Erro ao analisar currículo: {e}")
             raise
+
+    def _extract_partial_resume_fields(self, json_buffer: str) -> dict:
+        """
+        Extrai campos parciais da análise de currículo durante streaming.
+        
+        Returns:
+            Dict com campos parciais: {resumo_executivo: "...", pontos_fortes: [...], etc}
+        """
+        import re
+        partial_fields = {}
+        
+        try:
+            # Tenta encontrar resumo executivo
+            resumo_pattern = r'"resumo_executivo"\s*:\s*"([^"]*)"'
+            resumo_match = re.search(resumo_pattern, json_buffer)
+            if resumo_match:
+                partial_fields["resumo_executivo"] = resumo_match.group(1)
+            
+            # Tenta encontrar nota geral
+            nota_pattern = r'"nota_geral"\s*:\s*(\d+)'
+            nota_match = re.search(nota_pattern, json_buffer)
+            if nota_match:
+                partial_fields["nota_geral"] = int(nota_match.group(1))
+            
+            # Tenta encontrar arrays (pontos fortes, gaps, sugestões)
+            # Pontos fortes
+            pontos_pattern = r'"pontos_fortes"\s*:\s*\[(.*?)\]'
+            pontos_match = re.search(pontos_pattern, json_buffer, re.DOTALL)
+            if pontos_match:
+                items_str = pontos_match.group(1)
+                items = re.findall(r'"([^"]*)"', items_str)
+                if items:
+                    partial_fields["pontos_fortes"] = items
+            
+            # Gaps técnicos
+            gaps_pattern = r'"gaps_tecnicos"\s*:\s*\[(.*?)\]'
+            gaps_match = re.search(gaps_pattern, json_buffer, re.DOTALL)
+            if gaps_match:
+                items_str = gaps_match.group(1)
+                items = re.findall(r'"([^"]*)"', items_str)
+                if items:
+                    partial_fields["gaps_tecnicos"] = items
+            
+            # Sugestões de melhoria
+            sugestoes_pattern = r'"sugestoes_melhoria"\s*:\s*\[(.*?)\]'
+            sugestoes_match = re.search(sugestoes_pattern, json_buffer, re.DOTALL)
+            if sugestoes_match:
+                items_str = sugestoes_match.group(1)
+                items = re.findall(r'"([^"]*)"', items_str)
+                if items:
+                    partial_fields["sugestoes_melhoria"] = items
+            
+            return partial_fields
+        except Exception as e:
+            logger.debug(f"Erro ao extrair campos parciais de currículo: {e}")
+            return {}
+
+    async def analyze_resume_streaming(self, resume_content: str, career_goal: str):
+        """
+        Analisa currículo com streaming e yielda eventos SSE progressivamente.
+        
+        Args:
+            resume_content: Conteúdo do currículo
+            career_goal: Objetivo de carreira
+            
+        Yields:
+            Dicionários com eventos SSE:
+            - {"type": "start", "message": "..."}
+            - {"type": "progress", "percent": 0-100, "message": "..."}
+            - {"type": "field_chunk", "field": "resumo_executivo", "content": "..."}
+            - {"type": "complete", "analysis": {...}}
+            - {"type": "error", "message": "..."}
+        """
+        try:
+            track = self._detect_track({"career_goal": career_goal})
+            logger.info(f"🎬 Iniciando análise streaming para track: {track}")
+            
+            yield {
+                "type": "start",
+                "message": f"📄 Analisando currículo para {track}..."
+            }
+            
+            prompt = self._build_resume_analysis_prompt(
+                resume_content, career_goal, track)
+            
+            # Configurar modelo com streaming
+            generation_config = self.generation_config.copy()
+            generation_config["max_output_tokens"] = 8192
+            
+            model = genai.GenerativeModel(
+                model_name=self.model_name,
+                generation_config=generation_config,
+                safety_settings=self.safety_settings
+            )
+            
+            # Progresso inicial simulado (5% → 40%) otimizado
+            import asyncio
+            progress_steps = [
+                (5, "📄 Lendo currículo..."),
+                (10, "🔍 Identificando habilidades..."),
+                (15, "💼 Avaliando experiências..."),
+                (20, "🎓 Analisando formação..."),
+                (25, "💡 Verificando projetos..."),
+                (30, "📊 Comparando com mercado..."),
+                (35, "🎯 Gerando sugestões..."),
+                (40, "🤖 Iniciando análise detalhada...")
+            ]
+            
+            for percent, message in progress_steps:
+                yield {
+                    "type": "progress",
+                    "percent": percent,
+                    "message": message
+                }
+                await asyncio.sleep(2.0)  # 2 segundos entre updates
+            
+            # Streaming do Gemini
+            response = model.generate_content(prompt, stream=True)
+            
+            buffer = ""
+            last_progress = 40
+            chunk_count = 0
+            last_extracted_length = 0
+            sent_fields = {}  # Rastreia campos já enviados
+            
+            logger.info("📡 Aguardando chunks do Gemini para análise...")
+            
+            import time
+            start_time = time.time()
+            
+            for chunk in response:
+                chunk_count += 1
+                elapsed = time.time() - start_time
+                if chunk.text:
+                    buffer += chunk.text
+                    logger.info(
+                        f"📦 Chunk {chunk_count} (+{elapsed:.2f}s): +{len(chunk.text)} chars (total: {len(buffer)})")
+                
+                # Atualizar progresso baseado no tamanho do buffer
+                estimated_progress = min(90, 40 + (len(buffer) / 5000) * 50)
+                
+                if estimated_progress - last_progress >= 5:
+                    yield {
+                        "type": "progress",
+                        "percent": int(estimated_progress),
+                        "message": f"🤖 Analisando... ({len(buffer)} caracteres)"
+                    }
+                    last_progress = estimated_progress
+                
+                # Extrair e enviar campos parciais
+                if len(buffer) > last_extracted_length + 100:
+                    partial_fields = self._extract_partial_resume_fields(buffer)
+                    
+                    for field, content in partial_fields.items():
+                        last_value = sent_fields.get(field)
+                        
+                        # Para strings, só envia se mudou
+                        if isinstance(content, str):
+                            if content and (not last_value or len(content) > len(str(last_value))):
+                                yield {
+                                    "type": "field_chunk",
+                                    "field": field,
+                                    "content": content,
+                                    "is_complete": False
+                                }
+                                sent_fields[field] = content
+                                logger.debug(f"📝 Campo parcial enviado: {field}, {len(content)} chars")
+                        
+                        # Para arrays, só envia se cresceu
+                        elif isinstance(content, list):
+                            if content and (not last_value or len(content) > len(last_value)):
+                                yield {
+                                    "type": "field_chunk",
+                                    "field": field,
+                                    "content": content,
+                                    "is_complete": False
+                                }
+                                sent_fields[field] = content
+                                logger.debug(f"📝 Campo parcial enviado: {field}, {len(content)} items")
+                        
+                        # Para números, sempre envia se mudou
+                        elif isinstance(content, (int, float)):
+                            if content != last_value:
+                                yield {
+                                    "type": "field_chunk",
+                                    "field": field,
+                                    "content": content,
+                                    "is_complete": False
+                                }
+                                sent_fields[field] = content
+                                logger.debug(f"📝 Campo parcial enviado: {field} = {content}")
+                    
+                    last_extracted_length = len(buffer)
+            
+            # Parse final
+            analysis = self._parse_json_response(buffer)
+            
+            # Valida campos obrigatórios
+            required_fields = ["pontos_fortes", "gaps_tecnicos",
+                             "sugestoes_melhoria", "nota_geral", "resumo_executivo"]
+            for field in required_fields:
+                if field not in analysis:
+                    logger.warning(f"Campo '{field}' ausente, adicionando default")
+                    if field in ["pontos_fortes", "gaps_tecnicos", "sugestoes_melhoria"]:
+                        analysis[field] = ["Análise não disponível"]
+                    elif field == "nota_geral":
+                        analysis[field] = 70
+                    elif field == "resumo_executivo":
+                        analysis[field] = "Análise em processamento"
+            
+            yield {
+                "type": "complete",
+                "analysis": analysis,
+                "message": "🎉 Análise completa!"
+            }
+            
+            logger.info(f"🎉 Análise streaming concluída: nota={analysis.get('nota_geral')}")
+            
+        except Exception as e:
+            logger.exception("❌ Erro na análise streaming de currículo")
+            yield {
+                "type": "error",
+                "message": f"Erro ao analisar currículo: {str(e)}"
+            }

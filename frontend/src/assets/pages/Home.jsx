@@ -1,7 +1,7 @@
 // src/pages/Home.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { fetchUser, fetchChallenges, generateChallengesStreaming, uploadResume, uploadResumeFile, analyzeResume, listResumes } from "../lib/api.js";
+import { fetchUser, fetchChallenges, generateChallengesStreaming, uploadResume, uploadResumeFile, analyzeResume, listResumes, uploadAndAnalyzeResumeFileStreaming, analyzeResumeStreaming } from "../lib/api.js";
 import { Pill, Difficulty, Skill, Meta, Card, PrimaryButton } from "../components/ui.jsx";
 import { supabase } from "../lib/supabaseClient";
 import PraxisLogo from "../components/PraxisLogo";
@@ -76,6 +76,8 @@ export default function Home() {
   const [streamProgress, setStreamProgress] = useState(0);
   const [streamMessage, setStreamMessage] = useState("");
   const [cancelStream, setCancelStream] = useState(null);
+  const [challengePlaceholders, setChallengePlaceholders] = useState([]);
+  const [typewriterTimers, setTypewriterTimers] = useState([]);
   
   // Estados para análise de currículo
   const [resumeContent, setResumeContent] = useState("");
@@ -86,6 +88,20 @@ export default function Home() {
   const [myResumes, setMyResumes] = useState([]);
   const [selectedResumeId, setSelectedResumeId] = useState(null);
   
+  // Estados para análise em tempo real com streaming
+  const [analysisInProgress, setAnalysisInProgress] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [analysisMessage, setAnalysisMessage] = useState("");
+  const [analysisPlaceholder, setAnalysisPlaceholder] = useState({
+    resumo_executivo: "",
+    pontos_fortes: [],
+    gaps_tecnicos: [],
+    sugestoes_melhoria: [],
+    nota_geral: null,
+    habilidades_evidenciadas: {}
+  });
+  const [cancelAnalysisStream, setCancelAnalysisStream] = useState(null);
+  
   // Estados para upload de arquivo
   const [uploadType, setUploadType] = useState("file"); // "text" ou "file"
   const [selectedFile, setSelectedFile] = useState(null);
@@ -94,10 +110,53 @@ export default function Home() {
   // Estados para expansão dos cards
   const [expandedUploadCard, setExpandedUploadCard] = useState(false);
   const [expandedMyResumesCard, setExpandedMyResumesCard] = useState(false);
+  
+  // Ref para scroll automático até a análise
+  const analysisResultRef = useRef(null);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/");
+  };
+
+  // Função para simular efeito typewriter (digitação letra por letra)
+  const typewriterEffect = (challengeIndex, field, targetText, speed = 30) => {
+    let currentIndex = 0;
+    
+    const typeNextChar = () => {
+      if (currentIndex <= targetText.length) {
+        const currentText = targetText.substring(0, currentIndex);
+        
+        // Se challengeIndex é 0 e estamos no contexto de análise, atualiza analysisPlaceholder
+        // Senão, atualiza challengePlaceholders
+        if (challengeIndex === 0 && (field === "resumo_executivo" || analysisInProgress)) {
+          setAnalysisPlaceholder(prev => ({
+            ...prev,
+            [field]: currentText
+          }));
+        } else {
+          setChallengePlaceholders(prev => {
+            const updated = [...prev];
+            if (updated[challengeIndex]) {
+              updated[challengeIndex] = {
+                ...updated[challengeIndex],
+                [field]: currentText
+              };
+            }
+            return updated;
+          });
+        }
+        
+        currentIndex++;
+        
+        if (currentIndex <= targetText.length) {
+          const timer = setTimeout(typeNextChar, speed);
+          setTypewriterTimers(prev => [...prev, timer]);
+        }
+      }
+    };
+    
+    typeNextChar();
   };
 
   const handleGenerateChallenges = async () => {
@@ -105,6 +164,17 @@ export default function Home() {
     setStreamProgress(0);
     setStreamMessage("");
     setCatalog([]); // Limpa desafios antigos
+    
+    // Limpar timers anteriores
+    typewriterTimers.forEach(timer => clearTimeout(timer));
+    setTypewriterTimers([]);
+    
+    // Inicializar 3 placeholders vazios
+    setChallengePlaceholders([
+      { id: 0, title: "", desc: "", category: null, difficulty: null, skills: [], isLoading: true },
+      { id: 1, title: "", desc: "", category: null, difficulty: null, skills: [], isLoading: true },
+      { id: 2, title: "", desc: "", category: null, difficulty: null, skills: [], isLoading: true }
+    ]);
     
     try {
       console.log("🎯 Iniciando geração com streaming...");
@@ -121,22 +191,61 @@ export default function Home() {
           setStreamMessage(data.message || "Gerando...");
         },
         
+        onChallengeChunk: (data) => {
+          console.log("📝 Chunk recebido:", data);
+          const { challenge_index, field, content } = data;
+          
+          // Aplicar typewriter effect no campo correspondente
+          if (field === "title") {
+            typewriterEffect(challenge_index, "title", content, 20);
+          } else if (field === "description") {
+            typewriterEffect(challenge_index, "desc", content, 15);
+          } else if (field === "category") {
+            // Categoria não precisa de typewriter, atualiza direto
+            setChallengePlaceholders(prev => {
+              const updated = [...prev];
+              if (updated[challenge_index]) {
+                updated[challenge_index] = {
+                  ...updated[challenge_index],
+                  category: content
+                };
+              }
+              return updated;
+            });
+          }
+        },
+        
         onChallenge: (data) => {
           console.log("✅ Desafio recebido:", data);
           // Transformar e adicionar ao catálogo imediatamente
           const transformed = transformChallenges([data.data]);
           setCatalog(prev => [...prev, ...transformed]);
           setStreamMessage(`✅ Desafio ${data.number}/${data.total} gerado!`);
+          
+          // Marcar placeholder como completo
+          setChallengePlaceholders(prev => {
+            const updated = [...prev];
+            if (updated[data.number - 1]) {
+              updated[data.number - 1].isLoading = false;
+            }
+            return updated;
+          });
         },
         
         onComplete: (data) => {
           console.log("🎉 Geração concluída:", data);
           setStreamMessage(data.message || "🎉 Concluído!");
           setStreamProgress(100);
+          
+          // Limpar timers
+          typewriterTimers.forEach(timer => clearTimeout(timer));
+          setTypewriterTimers([]);
+          
           setTimeout(() => {
             setGeneratingChallenges(false);
             setStreamProgress(0);
             setStreamMessage("");
+            setChallengePlaceholders([]);
           }, 1500);
         },
         
@@ -146,6 +255,11 @@ export default function Home() {
           setGeneratingChallenges(false);
           setStreamProgress(0);
           setStreamMessage("");
+          setChallengePlaceholders([]);
+          
+          // Limpar timers
+          typewriterTimers.forEach(timer => clearTimeout(timer));
+          setTypewriterTimers([]);
         }
       });
       
@@ -168,6 +282,11 @@ export default function Home() {
       setStreamProgress(0);
       setStreamMessage("");
       setCancelStream(null);
+      setChallengePlaceholders([]);
+      
+      // Limpar timers do typewriter
+      typewriterTimers.forEach(timer => clearTimeout(timer));
+      setTypewriterTimers([]);
     }
   };
   
@@ -209,28 +328,129 @@ export default function Home() {
       return;
     }
     
-    setUploadingResume(true);
+    setAnalysisInProgress(true);
+    setAnalysisProgress(0);
+    setAnalysisMessage("");
+    setResumeAnalysis(null);
+    
+    // Limpar timers anteriores
+    typewriterTimers.forEach(timer => clearTimeout(timer));
+    setTypewriterTimers([]);
+    
+    // Resetar placeholder
+    setAnalysisPlaceholder({
+      resumo_executivo: "",
+      pontos_fortes: [],
+      gaps_tecnicos: [],
+      sugestoes_melhoria: [],
+      nota_geral: null,
+      habilidades_evidenciadas: {}
+    });
+    
     try {
-      const result = await uploadResumeFile(
+      console.log("🎯 Iniciando upload + análise com streaming...");
+      
+      const cancel = await uploadAndAnalyzeResumeFileStreaming(
         selectedFile,
-        resumeTitle || selectedFile.name
+        resumeTitle || selectedFile.name,
+        {
+          onStart: (data) => {
+            console.log("🎬 Stream iniciado:", data);
+            setAnalysisMessage(data.message || "Iniciando...");
+          },
+          
+          onProgress: (data) => {
+            console.log("📊 Progresso:", data);
+            setAnalysisProgress(data.percent || 0);
+            setAnalysisMessage(data.message || "Processando...");
+          },
+          
+          onFieldChunk: (data) => {
+            console.log("📝 Campo recebido:", data);
+            const { field, content } = data;
+            
+            // Aplicar typewriter effect para strings
+            if (field === "resumo_executivo" && typeof content === "string") {
+              typewriterEffect(0, field, content, 15);
+            }
+            // Para arrays e números, atualizar direto
+            else {
+              setAnalysisPlaceholder(prev => ({
+                ...prev,
+                [field]: content
+              }));
+            }
+          },
+          
+          onComplete: (data) => {
+            console.log("🎉 Análise concluída:", data);
+            setAnalysisMessage(data.message || "🎉 Análise completa!");
+            setAnalysisProgress(100);
+            
+            // Preenche a análise final com dados completos do placeholder
+            const finalAnalysis = {
+              ...data.analysis,
+              resumo_executivo: analysisPlaceholder.resumo_executivo || data.analysis?.resumo_executivo,
+              pontos_fortes: analysisPlaceholder.pontos_fortes.length > 0 ? analysisPlaceholder.pontos_fortes : data.analysis?.pontos_fortes || [],
+              gaps_tecnicos: analysisPlaceholder.gaps_tecnicos.length > 0 ? analysisPlaceholder.gaps_tecnicos : data.analysis?.gaps_tecnicos || [],
+              sugestoes_melhoria: analysisPlaceholder.sugestoes_melhoria.length > 0 ? analysisPlaceholder.sugestoes_melhoria : data.analysis?.sugestoes_melhoria || [],
+              nota_geral: analysisPlaceholder.nota_geral !== null ? analysisPlaceholder.nota_geral : data.analysis?.nota_geral
+            };
+            
+            setResumeAnalysis(finalAnalysis);
+            
+            // Limpar timers
+            typewriterTimers.forEach(timer => clearTimeout(timer));
+            setTypewriterTimers([]);
+            
+            // Limpa o formulário
+            setSelectedFile(null);
+            setResumeTitle("");
+            
+            // Recarrega lista de currículos
+            loadResumes();
+            
+            // Esconde barra de progresso após conclusão e faz scroll até a análise
+            setTimeout(() => {
+              setAnalysisInProgress(false);
+              setAnalysisProgress(0);
+              setAnalysisMessage("");
+              
+              // Scroll suave até a seção de análise após um pequeno delay para garantir que o DOM foi atualizado
+              setTimeout(() => {
+                if (analysisResultRef.current) {
+                  analysisResultRef.current.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'start' 
+                  });
+                }
+              }, 100);
+            }, 1500);
+          },
+          
+          onError: (data) => {
+            console.error("❌ Erro no stream:", data);
+            alert("Erro ao analisar currículo: " + (data.message || "Erro desconhecido"));
+            setAnalysisInProgress(false);
+            setAnalysisProgress(0);
+            setAnalysisMessage("");
+            
+            // Limpar timers
+            typewriterTimers.forEach(timer => clearTimeout(timer));
+            setTypewriterTimers([]);
+          }
+        }
       );
       
-      console.log("✅ Arquivo enviado:", result);
+      // Guardar função de cancelamento
+      setCancelAnalysisStream(() => cancel);
       
-      // Limpa o formulário
-      setSelectedFile(null);
-      setResumeTitle("");
-      
-      // Recarrega lista de currículos
-      await loadResumes();
-      
-      alert("Currículo enviado com sucesso! Agora você pode analisá-lo.");
     } catch (error) {
-      console.error("❌ Erro ao enviar arquivo:", error);
-      alert("Erro ao enviar arquivo: " + error.message);
-    } finally {
-      setUploadingResume(false);
+      console.error("❌ Erro ao iniciar streaming:", error);
+      alert("Erro ao processar arquivo: " + error.message);
+      setAnalysisInProgress(false);
+      setAnalysisProgress(0);
+      setAnalysisMessage("");
     }
   };
   
@@ -284,9 +504,34 @@ export default function Home() {
       
       console.log("✅ Análise recebida:", result);
       setResumeAnalysis(result);
+      
+      // Scroll suave até a seção de análise após carregar
+      setTimeout(() => {
+        if (analysisResultRef.current) {
+          analysisResultRef.current.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          });
+        }
+      }, 100);
     } catch (error) {
       console.error("❌ Erro ao analisar currículo:", error);
-      alert("Erro ao analisar currículo: " + error.message);
+      
+      // Detectar erros de timeout ou conexão
+      const errorMsg = error.message || "";
+      const isTimeoutError = errorMsg.toLowerCase().includes("timeout") || 
+                             errorMsg.toLowerCase().includes("connection") ||
+                             errorMsg.toLowerCase().includes("timed out");
+      
+      if (isTimeoutError) {
+        alert(
+          "⏱️ Timeout de conexão com o banco de dados.\n\n" +
+          "Isso pode acontecer quando o servidor está sobrecarregado ou com problemas de rede.\n\n" +
+          "Por favor, tente novamente em alguns segundos."
+        );
+      } else {
+        alert("Erro ao analisar currículo: " + errorMsg);
+      }
     } finally {
       setAnalyzingResume(false);
     }
@@ -571,6 +816,67 @@ export default function Home() {
           </div>
         )}
 
+        {/* Placeholders durante geração (skeleton cards) */}
+        {generatingChallenges && challengePlaceholders.length > 0 && (
+          <div className="grid md:grid-cols-6 gap-5 mb-5">
+            {challengePlaceholders.map((placeholder, index) => (
+              <Card
+                key={`placeholder-${placeholder.id}`}
+                style={{ gridColumn: 'span 2' }}
+                className="p-5 animate-pulse"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-9 w-9 rounded-md bg-zinc-200 grid place-content-center border border-zinc-300">
+                      {placeholder.category ? getChallengeIcon(placeholder.category) : '●'}
+                    </div>
+                    <span className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
+                      {placeholder.category ? getChallengeCategoryName(placeholder.category) : 'Gerando...'}
+                    </span>
+                  </div>
+                  {placeholder.difficulty && <Difficulty level={placeholder.difficulty} />}
+                  {!placeholder.difficulty && (
+                    <div className="h-6 w-16 bg-zinc-200 rounded-full"></div>
+                  )}
+                </div>
+
+                <h3 className="mt-4 text-lg font-semibold text-zinc-900 min-h-[28px]">
+                  {placeholder.title || (
+                    <span className="text-zinc-400 italic">
+                      {placeholder.isLoading ? '...' : ''}
+                    </span>
+                  )}
+                </h3>
+                
+                <p className="mt-1.5 text-sm text-zinc-600 min-h-[40px]">
+                  {placeholder.desc || (
+                    <span className="text-zinc-400 italic">
+                      {placeholder.isLoading ? '...' : ''}
+                    </span>
+                  )}
+                </p>
+
+                <div className="mt-4">
+                  <Meta icon="⏲️">
+                    {placeholder.time || '...'}
+                  </Meta>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {placeholder.skills.length > 0 ? (
+                    placeholder.skills.map((s, i) => <Skill key={i}>{s}</Skill>)
+                  ) : (
+                    <>
+                      <div className="h-6 w-16 bg-zinc-200 rounded-full"></div>
+                      <div className="h-6 w-20 bg-zinc-200 rounded-full"></div>
+                    </>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+
         <div className="grid md:grid-cols-6 gap-5">
         {/* Reordena para colocar o expandido primeiro */}
         {recommended.slice(0, 3)
@@ -830,14 +1136,16 @@ export default function Home() {
                       
                       <button
                         onClick={uploadType === "file" ? handleUploadResumeFile : handleUploadResume}
-                        disabled={uploadingResume || (uploadType === "file" ? !selectedFile : !resumeContent.trim())}
+                        disabled={uploadingResume || analysisInProgress || (uploadType === "file" ? !selectedFile : !resumeContent.trim())}
                         className="w-full px-4 py-2.5 bg-primary-500 text-black font-semibold rounded-lg hover:bg-primary-600 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                       >
-                        {uploadingResume 
-                          ? "Enviando..." 
-                          : uploadType === "file"
-                            ? "Enviar Arquivo"
-                            : "Enviar Texto"}
+                        {analysisInProgress
+                          ? "Analisando..." 
+                          : uploadingResume 
+                            ? "Enviando..." 
+                            : uploadType === "file"
+                              ? "Enviar e Analisar"
+                              : "Enviar Texto"}
                       </button>
                     </div>
 
@@ -945,9 +1253,99 @@ export default function Home() {
               </Card>
             </div>
 
+          {/* Progresso e Análise em Tempo Real */}
+          {analysisInProgress && (
+            <div className="mt-6 space-y-4 bg-white rounded-lg shadow-md p-6 border border-primary-200">
+              {/* Barra de progresso */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-zinc-700">{analysisMessage}</span>
+                  <span className="text-sm font-semibold text-primary-600">{Math.round(analysisProgress)}%</span>
+                </div>
+                <div className="w-full bg-zinc-200 rounded-full h-2.5 overflow-hidden">
+                  <div 
+                    className="bg-gradient-to-r from-primary-400 to-primary-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                    style={{ width: `${analysisProgress}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Placeholder da análise */}
+              <div className="space-y-3 bg-zinc-50 rounded-lg p-4 border border-zinc-200">
+                {/* Resumo Executivo */}
+                {analysisPlaceholder.resumo_executivo && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-zinc-900 mb-2">📋 Resumo Executivo</h4>
+                    <p className="text-sm text-zinc-700 whitespace-pre-wrap">
+                      {analysisPlaceholder.resumo_executivo}
+                    </p>
+                  </div>
+                )}
+
+                {/* Nota Geral */}
+                {analysisPlaceholder.nota_geral !== null && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-zinc-900 mb-2">⭐ Nota Geral</h4>
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl font-bold text-primary-600">
+                        {analysisPlaceholder.nota_geral}
+                      </span>
+                      <span className="text-sm text-zinc-600">/ 100</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Pontos Fortes */}
+                {analysisPlaceholder.pontos_fortes.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-zinc-900 mb-2">✅ Pontos Fortes</h4>
+                    <ul className="space-y-1">
+                      {analysisPlaceholder.pontos_fortes.map((ponto, idx) => (
+                        <li key={idx} className="text-sm text-zinc-700 flex items-start gap-2">
+                          <span className="text-emerald-500">•</span>
+                          <span>{ponto}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Gaps Técnicos */}
+                {analysisPlaceholder.gaps_tecnicos.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-zinc-900 mb-2">⚠️ Gaps Técnicos</h4>
+                    <ul className="space-y-1">
+                      {analysisPlaceholder.gaps_tecnicos.map((gap, idx) => (
+                        <li key={idx} className="text-sm text-zinc-700 flex items-start gap-2">
+                          <span className="text-amber-500">•</span>
+                          <span>{gap}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Sugestões de Melhoria */}
+                {analysisPlaceholder.sugestoes_melhoria.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-zinc-900 mb-2">💡 Sugestões de Melhoria</h4>
+                    <ul className="space-y-1">
+                      {analysisPlaceholder.sugestoes_melhoria.map((sugestao, idx) => (
+                        <li key={idx} className="text-sm text-zinc-700 flex items-start gap-2">
+                          <span className="text-blue-500">•</span>
+                          <span>{sugestao}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Resultado da Análise */}
           {resumeAnalysis && (
-            <Card className="p-6 mt-6 border-2 border-primary-200">
+            <Card ref={analysisResultRef} className="p-6 mt-6 border-2 border-primary-200">
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h3 className="text-xl font-bold text-zinc-900">Resultado da Análise</h3>
@@ -955,30 +1353,30 @@ export default function Home() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-2xl font-bold text-primary-600">
-                    {resumeAnalysis.full_report?.nota_geral || "N/A"}
+                    {resumeAnalysis.nota_geral || resumeAnalysis.full_report?.nota_geral || "N/A"}
                   </span>
                   <span className="text-sm text-zinc-500">/100</span>
                 </div>
               </div>
 
-              {resumeAnalysis.full_report && (
+              {(resumeAnalysis.resumo_executivo || resumeAnalysis.full_report) && (
                 <div className="space-y-6">
                   {/* Resumo Executivo */}
-                  {resumeAnalysis.full_report.resumo_executivo && (
+                  {(resumeAnalysis.resumo_executivo || resumeAnalysis.full_report?.resumo_executivo) && (
                     <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
                       <h4 className="font-semibold text-zinc-900 mb-2 text-sm">📋 Resumo Executivo</h4>
-                      <p className="text-sm text-zinc-700">{resumeAnalysis.full_report.resumo_executivo}</p>
+                      <p className="text-sm text-zinc-700">{resumeAnalysis.resumo_executivo || resumeAnalysis.full_report?.resumo_executivo}</p>
                     </div>
                   )}
 
                   {/* Pontos Fortes */}
-                  {resumeAnalysis.full_report.pontos_fortes && resumeAnalysis.full_report.pontos_fortes.length > 0 && (
+                  {((resumeAnalysis.pontos_fortes && resumeAnalysis.pontos_fortes.length > 0) || (resumeAnalysis.full_report?.pontos_fortes && resumeAnalysis.full_report.pontos_fortes.length > 0)) && (
                     <div>
                       <h4 className="font-semibold text-emerald-800 mb-3 text-sm flex items-center gap-2">
                         <span className="text-lg">✓</span> Pontos Fortes
                       </h4>
                       <ul className="space-y-2">
-                        {resumeAnalysis.full_report.pontos_fortes.map((ponto, idx) => (
+                        {(resumeAnalysis.pontos_fortes || resumeAnalysis.full_report?.pontos_fortes || []).map((ponto, idx) => (
                           <li key={idx} className="flex items-start gap-2 text-sm">
                             <span className="text-emerald-600 mt-0.5">●</span>
                             <span className="text-zinc-700">{ponto}</span>
@@ -989,13 +1387,13 @@ export default function Home() {
                   )}
 
                   {/* Gaps Técnicos */}
-                  {resumeAnalysis.full_report.gaps_tecnicos && resumeAnalysis.full_report.gaps_tecnicos.length > 0 && (
+                  {((resumeAnalysis.gaps_tecnicos && resumeAnalysis.gaps_tecnicos.length > 0) || (resumeAnalysis.full_report?.gaps_tecnicos && resumeAnalysis.full_report.gaps_tecnicos.length > 0)) && (
                     <div>
                       <h4 className="font-semibold text-orange-800 mb-3 text-sm flex items-center gap-2">
                         <span className="text-lg">⚠</span> Habilidades Faltantes
                       </h4>
                       <ul className="space-y-2">
-                        {resumeAnalysis.full_report.gaps_tecnicos.map((gap, idx) => (
+                        {(resumeAnalysis.gaps_tecnicos || resumeAnalysis.full_report?.gaps_tecnicos || []).map((gap, idx) => (
                           <li key={idx} className="flex items-start gap-2 text-sm">
                             <span className="text-orange-600 mt-0.5">●</span>
                             <span className="text-zinc-700">{gap}</span>
@@ -1006,13 +1404,13 @@ export default function Home() {
                   )}
 
                   {/* Sugestões de Melhoria */}
-                  {resumeAnalysis.full_report.sugestoes_melhoria && resumeAnalysis.full_report.sugestoes_melhoria.length > 0 && (
+                  {((resumeAnalysis.sugestoes_melhoria && resumeAnalysis.sugestoes_melhoria.length > 0) || (resumeAnalysis.full_report?.sugestoes_melhoria && resumeAnalysis.full_report.sugestoes_melhoria.length > 0)) && (
                     <div>
                       <h4 className="font-semibold text-blue-800 mb-3 text-sm flex items-center gap-2">
                         <span className="text-lg">💡</span> Sugestões de Melhoria
                       </h4>
                       <ul className="space-y-2">
-                        {resumeAnalysis.full_report.sugestoes_melhoria.map((sugestao, idx) => (
+                        {(resumeAnalysis.sugestoes_melhoria || resumeAnalysis.full_report?.sugestoes_melhoria || []).map((sugestao, idx) => (
                           <li key={idx} className="flex items-start gap-2 text-sm">
                             <span className="text-blue-600 mt-0.5">●</span>
                             <span className="text-zinc-700">{sugestao}</span>
@@ -1023,11 +1421,11 @@ export default function Home() {
                   )}
 
                   {/* Habilidades Evidenciadas */}
-                  {resumeAnalysis.full_report.habilidades_evidenciadas && (
+                  {(resumeAnalysis.habilidades_evidenciadas || resumeAnalysis.full_report?.habilidades_evidenciadas) && (
                     <div>
                       <h4 className="font-semibold text-zinc-900 mb-3 text-sm">📊 Habilidades Evidenciadas</h4>
                       <div className="grid grid-cols-2 gap-3">
-                        {Object.entries(resumeAnalysis.full_report.habilidades_evidenciadas).map(([skill, level]) => (
+                        {Object.entries(resumeAnalysis.habilidades_evidenciadas || resumeAnalysis.full_report?.habilidades_evidenciadas || {}).map(([skill, level]) => (
                           <div key={skill} className="bg-zinc-50 rounded-lg p-3 border border-zinc-200">
                             <div className="flex justify-between items-center mb-1">
                               <span className="text-sm font-medium text-zinc-700">{skill}</span>
@@ -1046,13 +1444,13 @@ export default function Home() {
                   )}
 
                   {/* Próximos Passos */}
-                  {resumeAnalysis.full_report.proximos_passos && resumeAnalysis.full_report.proximos_passos.length > 0 && (
+                  {((resumeAnalysis.proximos_passos && resumeAnalysis.proximos_passos.length > 0) || (resumeAnalysis.full_report?.proximos_passos && resumeAnalysis.full_report.proximos_passos.length > 0)) && (
                     <div className="bg-gradient-to-r from-primary-50 to-emerald-50 border border-primary-200 rounded-lg p-4">
                       <h4 className="font-semibold text-zinc-900 mb-3 text-sm flex items-center gap-2">
                         <span className="text-lg">🎯</span> Próximos Passos
                       </h4>
                       <ol className="space-y-2 list-decimal list-inside">
-                        {resumeAnalysis.full_report.proximos_passos.map((passo, idx) => (
+                        {(resumeAnalysis.proximos_passos || resumeAnalysis.full_report?.proximos_passos || []).map((passo, idx) => (
                           <li key={idx} className="text-sm text-zinc-700 ml-2">{passo}</li>
                         ))}
                       </ol>
