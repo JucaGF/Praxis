@@ -1,7 +1,7 @@
 // src/pages/Home.jsx
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { fetchUser, fetchChallenges, generateChallengesStreaming, uploadResume, uploadResumeFile, analyzeResume, listResumes, uploadAndAnalyzeResumeFileStreaming, analyzeResumeStreaming } from "../lib/api.js";
+import { fetchUser, fetchChallenges, generateChallengesStreaming, uploadResume, uploadResumeFile, analyzeResume, listResumes, uploadAndAnalyzeResumeFileStreaming, analyzeResumeStreaming, deleteResume } from "../lib/api.js";
 import { Pill, Difficulty, Skill, Meta, Card, PrimaryButton } from "../components/ui.jsx";
 import { supabase } from "../lib/supabaseClient";
 import PraxisLogo from "../components/PraxisLogo";
@@ -87,6 +87,7 @@ export default function Home() {
   const [resumeAnalysis, setResumeAnalysis] = useState(null);
   const [myResumes, setMyResumes] = useState([]);
   const [selectedResumeId, setSelectedResumeId] = useState(null);
+  const [deletingResumeId, setDeletingResumeId] = useState(null);
   
   // Estados para análise em tempo real com streaming
   const [analysisInProgress, setAnalysisInProgress] = useState(false);
@@ -543,6 +544,37 @@ export default function Home() {
       setMyResumes(resumes);
     } catch (error) {
       console.error("❌ Erro ao carregar currículos:", error);
+    }
+  };
+  
+  const handleDeleteResume = async (resumeId) => {
+    setDeletingResumeId(resumeId);
+    
+    try {
+      // Delay para mostrar animação de fade-out
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Remove da lista local IMEDIATAMENTE (otimista) para os outros subirem
+      setMyResumes(prev => prev.filter(r => r.id !== resumeId));
+      
+      // Se o currículo deletado era o que estava sendo visualizado, limpa a análise
+      if (resumeAnalysis && selectedResumeId === resumeId) {
+        setResumeAnalysis(null);
+        setSelectedResumeId(null);
+      }
+      
+      // Chama API em background (se falhar, recarrega para sincronizar)
+      await deleteResume(resumeId);
+      
+      console.log("✅ Currículo deletado:", resumeId);
+      
+    } catch (error) {
+      console.error("❌ Erro ao deletar currículo:", error);
+      alert("Erro ao deletar currículo: " + error.message);
+      // Se deu erro, recarrega para sincronizar com o backend
+      await loadResumes();
+    } finally {
+      setDeletingResumeId(null);
     }
   };
 
@@ -1177,7 +1209,7 @@ export default function Home() {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
                     <div className="h-9 w-9 rounded-md bg-emerald-100 text-emerald-800 grid place-content-center border border-emerald-200 text-sm font-semibold">
-                      🤖
+                      ✔
                     </div>
                     <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
                       Análise Praxis
@@ -1208,7 +1240,14 @@ export default function Home() {
                     ) : (
                       <div className="space-y-3 max-h-96 overflow-y-auto">
                         {myResumes.map((resume) => (
-                          <div key={resume.id} className="border border-zinc-200 rounded-lg p-4">
+                          <div 
+                            key={resume.id} 
+                            className={`border border-zinc-200 rounded-lg p-4 transition-all duration-300 ${
+                              deletingResumeId === resume.id 
+                                ? 'opacity-0 scale-95 translate-x-4' 
+                                : 'opacity-100 scale-100 translate-x-0'
+                            }`}
+                          >
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
                                 <h4 className="font-semibold text-zinc-900 text-sm">{resume.title || "Sem título"}</h4>
@@ -1223,17 +1262,28 @@ export default function Home() {
                               )}
                             </div>
                             
-                            <button
-                              onClick={() => handleAnalyzeResume(resume.id)}
-                              disabled={analyzingResume && selectedResumeId === resume.id}
-                              className="w-full mt-2 px-3 py-1.5 text-sm font-medium border border-primary-200 text-primary-700 rounded-md hover:bg-primary-50 transition disabled:opacity-50 cursor-pointer"
-                            >
-                              {analyzingResume && selectedResumeId === resume.id
-                                ? "Analisando..."
-                                : resume.has_analysis
-                                ? "Ver Análise"
-                                : "Analisar com IA"}
-                            </button>
+                            <div className="flex gap-2 mt-2">
+                              <button
+                                onClick={() => handleAnalyzeResume(resume.id)}
+                                disabled={analyzingResume && selectedResumeId === resume.id}
+                                className="flex-1 px-3 py-1.5 text-sm font-medium border border-primary-200 text-primary-700 rounded-md hover:bg-primary-50 transition disabled:opacity-50 cursor-pointer"
+                              >
+                                {analyzingResume && selectedResumeId === resume.id
+                                  ? "Analisando..."
+                                  : resume.has_analysis
+                                  ? "Ver Análise"
+                                  : "Analisar com IA"}
+                              </button>
+                              
+                              <button
+                                onClick={() => handleDeleteResume(resume.id)}
+                                disabled={deletingResumeId === resume.id}
+                                className="px-3 py-1.5 text-sm font-medium border border-red-200 text-red-600 rounded-md hover:bg-red-50 transition disabled:opacity-50 cursor-pointer"
+                                title="Excluir currículo"
+                              >
+                                {deletingResumeId === resume.id ? "..." : "🗑️"}
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>

@@ -619,11 +619,14 @@ async def delete_resume(
         if str(resume.profile_id) != profile_id:
             raise HTTPException(
                 status_code=403, detail="Você não tem permissão para deletar este currículo")
-
-        # Aqui você precisaria implementar um método delete_resume no repo
-        # Por enquanto retorna sucesso
-        logger.info(
-            f"Currículo {resume_id} marcado para deleção (implementação pendente)")
+        # Deleta o currículo e sua análise
+        deleted = repo.delete_resume(resume_id)
+        
+        if not deleted:
+            raise HTTPException(
+                status_code=404, detail="Currículo não encontrado")
+        
+        logger.info(f"✅ Currículo {resume_id} e sua análise foram deletados com sucesso")
 
         return {"message": "Currículo deletado com sucesso"}
 

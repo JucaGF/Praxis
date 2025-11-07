@@ -490,3 +490,33 @@ class SqlRepo(IRepository):
                 select(ResumeAnalysis)
                 .where(ResumeAnalysis.resume_id == resume_id)
             ).first()
+
+    def delete_resume_analysis(self, resume_id: int) -> bool:
+        """Deleta a análise de um currículo (se existir)"""
+        with Session(self.engine) as s:
+            analysis = s.exec(
+                select(ResumeAnalysis)
+                .where(ResumeAnalysis.resume_id == resume_id)
+            ).first()
+            
+            if analysis:
+                s.delete(analysis)
+                s.commit()
+                return True
+            return False
+
+    def delete_resume(self, resume_id: int) -> bool:
+        """Deleta um currículo e sua análise associada"""
+        with Session(self.engine) as s:
+            resume = s.get(Resume, resume_id)
+            
+            if not resume:
+                return False
+            
+            # Primeiro deleta a análise (se existir) devido à FK
+            self.delete_resume_analysis(resume_id)
+            
+            # Depois deleta o currículo
+            s.delete(resume)
+            s.commit()
+            return True
