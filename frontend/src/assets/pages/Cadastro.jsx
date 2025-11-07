@@ -1,46 +1,52 @@
-// src/pages/Cadastro.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
-import PraxisLogo from "../components/PraxisLogo";
-
-const LinkedInIcon = () => (
-  <svg
-    className="w-5 h-5 mr-2"
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path d="M4.98 3.5c0 1.381-1.11 2.5-2.489 2.5C1.11 6 0 4.881 0 3.5S1.11 1 2.491 1C3.869 1 4.98 2.119 4.98 3.5zm-2.5 5.5H5v14H2.48v-14zM8.254 8h5.084v2.18h.073c.712-1.34 2.457-2.18 4.93-2.18 5.27 0 6.24 3.46 6.24 7.96v9.04h-5.08V16.7c0-1.85-.353-3.12-1.996-3.12-1.638 0-1.87 1.25-1.87 3.09v6.33H8.254V8z" />
-  </svg>
-);
 
 export default function Cadastro() {
-  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     nome: "",
     email: "",
     senha: "",
     career_goal: "",
   });
-  
-  const [etapa, setEtapa] = useState("cadastro"); // "cadastro" | "questionario" | "finalizado"
-  const [error, setError] = useState("");
+
+  const [etapa, setEtapa] = useState("cadastro"); // cadastro | questionario | finalizado
+  const [mensagem, setMensagem] = useState("");
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // 🚀 Se veio dos questionários hard, pula direto pra tela final
+  useEffect(() => {
+    if (location.state?.etapa === "finalizado") {
+      setEtapa("finalizado");
+      setFormData(location.state?.formData || {});
+      setMensagem(
+        `Cadastro de ${
+          location.state?.formData?.nome || "usuário"
+        } realizado com sucesso! Verifique seu e-mail (${
+          location.state?.formData?.email || ""
+        }) para confirmar sua conta e fazer login.`
+      );
+    }
+  }, [location.state]);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+    setMensagem("");
 
-    // Se não houver trilha de carreira, abre o questionário
     if (!formData.career_goal) {
       setEtapa("questionario");
       return;
     }
 
     setLoading(true);
-
-    const { error: authError } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: formData.email,
       password: formData.senha,
       options: {
@@ -51,271 +57,76 @@ export default function Cadastro() {
         },
       },
     });
-
     setLoading(false);
 
-    if (authError) {
-      setError(`Erro ao criar conta: ${authError.message}`);
+    if (error) {
+      setMensagem(`Erro ao cadastrar: ${error.message}`);
       setEtapa("cadastro");
-    } else {
-      setEtapa("finalizado");
+      return;
     }
+
+    setMensagem(
+      `Cadastro de ${formData.nome} realizado com sucesso! Verifique seu e-mail (${formData.email}) para confirmar sua conta e fazer login.`
+    );
+    setEtapa("finalizado");
   };
 
+  // 🚀 Novo fluxo — vai para o questionário antes de cadastrar
   const selecionarCarreira = (trilhaEscolhida) => {
     const novosDados = { ...formData, career_goal: trilhaEscolhida };
     setFormData(novosDados);
-    
-    // Simula o submit com a carreira escolhida
-    const mockEvent = { preventDefault: () => {} };
-    const tempFormData = formData;
-    formData.career_goal = trilhaEscolhida;
-    handleSubmit(mockEvent);
-    setFormData(tempFormData);
+    navigate("/questionario-soft", { state: { formData: novosDados } });
   };
 
-  // Renderização do conteúdo baseado na etapa
-  const renderContent = () => {
-    if (etapa === "finalizado") {
-      return (
-        <div className="text-center">
-          <div className="mb-6">
-            <svg className="w-16 h-16 text-green-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Cadastro realizado!</h2>
-          <p className="text-gray-600 mb-6">
-            Verifique seu e-mail ({formData.email}) para confirmar sua conta e fazer login.
-          </p>
-          <Link
-            to="/login"
-            className="inline-block px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold transition"
-          >
-            Ir para Login
-          </Link>
-        </div>
-      );
-    }
-
-    if (etapa === "questionario") {
-      return (
-        <div>
-          <div className="mb-8 text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Escolha sua trilha</h2>
-            <p className="text-sm text-gray-600">
-              Selecione a área que você deseja focar seus estudos
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            {[
-              { value: "frontend", label: "Frontend Developer", icon: "💻", desc: "React, Vue, Angular" },
-              { value: "backend", label: "Backend Developer", icon: "⚙️", desc: "Node.js, Python, Java" },
-              { value: "fullstack", label: "Fullstack Developer", icon: "🚀", desc: "Frontend + Backend" },
-              { value: "mobile", label: "Mobile Developer", icon: "📱", desc: "React Native, Flutter" },
-              { value: "data", label: "Data Science", icon: "📊", desc: "Python, ML, Analytics" },
-              { value: "devops", label: "DevOps", icon: "🔧", desc: "CI/CD, Cloud, Docker" },
-            ].map((trilha) => (
-              <button
-                key={trilha.value}
-                onClick={() => selecionarCarreira(trilha.value)}
-                disabled={loading}
-                className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-yellow-500 hover:bg-yellow-50 transition text-left group disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-3xl">{trilha.icon}</span>
-                  <div className="flex-1">
-                    <div className="font-semibold text-gray-900 group-hover:text-yellow-600 transition">
-                      {trilha.label}
-                    </div>
-                    <div className="text-sm text-gray-500">{trilha.desc}</div>
-                  </div>
-                  <svg className="w-5 h-5 text-gray-400 group-hover:text-yellow-500 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <button
-            onClick={() => setEtapa("cadastro")}
-            className="mt-6 w-full text-center text-sm text-gray-600 hover:text-gray-900"
-          >
-            ← Voltar
-          </button>
-        </div>
-      );
-    }
-
-    // Etapa de cadastro (formulário inicial)
-    return (
-      <>
-        <div className="mb-8 text-center">
-          <div className="flex justify-center mb-4">
-            <PraxisLogo className="h-16" />
-          </div>
-          <p className="text-sm text-gray-500 font-medium">
-            Crie sua conta e comece a evoluir.
-          </p>
-        </div>
-
-        <div className="mb-6">
-          <button
-            type="button"
-            className="w-full flex items-center justify-center py-3 px-4 rounded-lg shadow-sm text-base font-semibold text-white transition duration-150 ease-in-out bg-blue-600 hover:bg-blue-700"
-          >
-            <LinkedInIcon />
-            Conecte-se com o LinkedIn
-          </button>
-        </div>
-
-        <div className="flex items-center my-6">
-          <div className="flex-grow border-t border-gray-200"></div>
-          <span className="mx-4 text-gray-400 text-sm font-medium">OU</span>
-          <div className="flex-grow border-t border-gray-200"></div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="nome" className="block text-sm font-medium text-gray-700 mb-2">
-              Nome Completo
-            </label>
-            <input
-              id="nome"
-              name="nome"
-              type="text"
-              required
-              value={formData.nome}
-              onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-              className="block w-full px-4 py-3 border border-gray-300 bg-white rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-500 text-sm transition duration-150"
-              placeholder="Seu nome completo"
-              disabled={loading}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-              E-mail
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              required
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="block w-full px-4 py-3 border border-gray-300 bg-white rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-500 text-sm transition duration-150"
-              placeholder="seu@email.com"
-              disabled={loading}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="senha" className="block text-sm font-medium text-gray-700 mb-2">
-              Senha
-            </label>
-            <input
-              id="senha"
-              name="senha"
-              type="password"
-              required
-              value={formData.senha}
-              onChange={(e) => setFormData({ ...formData, senha: e.target.value })}
-              className="block w-full px-4 py-3 border border-gray-300 bg-white rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-500 text-sm transition duration-150"
-              placeholder="Mínimo 6 caracteres"
-              disabled={loading}
-              minLength={6}
-            />
-          </div>
-
-          {error && (
-            <div className="bg-red-50 border-l-4 border-red-400 text-red-700 p-4 text-sm rounded-lg" role="alert">
-              <p className="font-medium">{error}</p>
-            </div>
-          )}
-
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className={`w-full py-3 rounded-lg text-sm font-semibold transition duration-150 ${
-                loading
-                  ? "bg-gray-400 text-gray-100 cursor-not-allowed"
-                  : "bg-yellow-500 hover:bg-yellow-600 shadow-sm text-white cursor-pointer"
-              }`}
-            >
-              {loading ? "Criando conta..." : "Continuar"}
-            </button>
-          </div>
-
-          <div className="mt-6 text-center">
-            <p className="text-xs text-gray-600">
-              Já possui uma conta?{" "}
-              <Link to="/login" className="font-semibold text-yellow-600 hover:text-yellow-700">
-                Entrar agora
-              </Link>
-            </p>
-          </div>
-        </form>
-
-        <div className="pt-6 border-t border-gray-100 mt-8 text-center">
-          <h1 className="text-xs text-gray-400 font-semibold tracking-widest uppercase">
-            SIMULE | PRATIQUE | EVOLUA
-          </h1>
-        </div>
-      </>
-    );
+  const handleVoltar = () => {
+    navigate("/");
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white font-sans relative overflow-hidden">
-      {/* Botão Voltar */}
-      <Link 
-        to="/" 
-        className="absolute top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 transition"
+    <div className="relative h-screen bg-white overflow-hidden">
+      {/* BOTÃO VOLTAR */}
+      <button
+        onClick={handleVoltar}
+        className="fixed top-6 left-6 z-[100] text-gray-600 hover:text-gray-800 font-medium transition flex items-center gap-2 text-sm"
       >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M10 19l-7-7m0 0l7-7m-7 7h18"
+          />
         </svg>
         Voltar
-      </Link>
-
-      <style>{`
-        @keyframes floatY { 
-          0%{transform:translateY(0)} 
-          50%{transform:translateY(-8px)} 
-          100%{transform:translateY(0)} 
-        }
-        .float-slow{animation:floatY 8s ease-in-out infinite}
-      `}</style>
+      </button>
 
       {/* FORMAS GEOMÉTRICAS */}
-      {Array.from({ length: 120 }).map((_, i) => {
+      {Array.from({ length: 180 }).map((_, i) => {
         let left, top;
         let validPosition = false;
-
         while (!validPosition) {
           left = Math.random() * 100;
           top = Math.random() * 100;
-
-          const isInFormArea = left > 12 && left < 46 && top > 7 && top < 92;
-          const isInTextArea = left > 60 && top > 70;
-          const isNearPhotos =
-            (left > 70 && left < 90 && top > 10 && top < 25) ||
-            (left > 85 && top > 60 && top < 80) ||
-            (left > 15 && left < 35 && top > 75) ||
-            (left < 20 && top < 25);
-
-          validPosition = !isInFormArea && !isInTextArea && !isNearPhotos;
+          const isInFormArea = left > 38 && left < 53 && top > 10 && top < 90;
+          validPosition = !isInFormArea;
         }
-
         return (
           <div
             key={i}
             className={`absolute ${
-              ["w-3 h-3", "w-4 h-4", "w-5 h-5", "w-6 h-6"][i % 4]
+              [
+                "w-3 h-3",
+                "w-4 h-4",
+                "w-5 h-5",
+                "w-6 h-6",
+                "w-2 h-2",
+                "w-7 h-7",
+              ][i % 6]
             } ${
               [
                 "bg-yellow-500/70",
@@ -324,13 +135,17 @@ export default function Cadastro() {
                 "bg-yellow-400/80",
                 "bg-gray-900/50",
                 "bg-yellow-700/50",
-              ][i % 6]
-            } ${["rounded-full", "rounded-lg"][i % 2]} float-slow`}
+                "bg-amber-600/60",
+                "bg-yellow-300/70",
+              ][i % 8]
+            } ${
+              ["rounded-full", "rounded-lg", "rounded-md"][i % 3]
+            } float-slow`}
             style={{
               top: `${top}%`,
               left: `${left}%`,
               transform: `rotate(${Math.random() * 360}deg)`,
-              opacity: 0.6 + Math.random() * 0.3,
+              opacity: 0.5 + Math.random() * 0.4,
               zIndex: 1,
               animationDelay: `${Math.random() * 5}s`,
             }}
@@ -338,38 +153,158 @@ export default function Cadastro() {
         );
       })}
 
-      {/* FORMAS GEOMÉTRICAS PEQUENAS */}
-      <div className="absolute rounded-full bg-yellow-500/70 float-slow z-20" style={{ top: "8%", left: "8%", width: "24px", height: "24px", animationDelay: "1s" }} />
-      <div className="absolute rounded-lg bg-yellow-600/60 float-slow z-20 rotate-6" style={{ bottom: "20%", left: "24%", width: "20px", height: "20px", animationDelay: "2s" }} />
-      <div className="absolute rounded-full bg-amber-500/70 float-slow z-20 -rotate-3" style={{ top: "12%", right: "12%", width: "16px", height: "16px", animationDelay: "3s" }} />
-      <div className="absolute rounded-lg bg-yellow-400/80 float-slow z-20 rotate-8" style={{ top: "32%", right: "32%", width: "24px", height: "24px", animationDelay: "4s" }} />
-      <div className="absolute rounded-full bg-yellow-500/70 float-slow z-20" style={{ bottom: "32%", left: "50%", transform: "translateX(-50%)", width: "20px", height: "20px", animationDelay: "5s" }} />
+      {/* CONTAINER PRINCIPAL */}
+      <div className="relative z-10 flex flex-col justify-center items-start w-full max-w-md h-screen p-8 ml-28 md:ml-52 bg-white shadow-2xl md:rounded-r-[3rem] border-r border-gray-200">
+        <div className="w-full max-h-[90vh] overflow-hidden flex flex-col justify-center">
+          <img
+            src="/Logo.png"
+            alt="Praxis"
+            className="w-44 h-44 mb-8 self-center"
+          />
 
-      {/* CONTEÚDO PRINCIPAL */}
-      <div className="w-full max-w-7xl mx-6 lg:mx-12 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center relative z-30">
-        {/* Área de cadastro */}
-        <div className="flex items-center">
-          <div className="w-full max-w-md mx-auto p-8 rounded-2xl bg-white/95 backdrop-blur-sm shadow-2xl border border-gray-100">
-            {renderContent()}
-          </div>
-        </div>
-
-        {/* Frases */}
-        <aside className="flex items-end justify-end">
-          <div className="w-full max-w-md relative h-[560px] flex items-end justify-end">
-            <div className="absolute right-0 bottom-4 text-right z-30">
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 tracking-tight mb-1">
-                PREPARE-SE
-              </h2>
-              <h3 className="text-3xl md:text-4xl font-bold text-yellow-500 tracking-tight mb-4">
-                PARA O FUTURO
-              </h3>
-              <p className="text-sm text-gray-600 max-w-xs ml-auto leading-relaxed">
-                Desenvolva suas habilidades profissionais com desafios práticos e feedback personalizado
-              </p>
+          {mensagem && etapa !== "finalizado" && (
+            <div
+              className={`p-3 mb-6 rounded-lg text-sm font-medium ${
+                mensagem.includes("sucesso")
+                  ? "bg-green-100 text-green-700"
+                  : "bg-red-100 text-red-700"
+              }`}
+            >
+              {mensagem}
             </div>
-          </div>
-        </aside>
+          )}
+
+          {/* ETAPA 1 - Cadastro */}
+          {etapa === "cadastro" && (
+            <form onSubmit={handleSubmit} className="w-full space-y-5">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-6">
+                Crie sua conta Praxis
+              </h2>
+
+              <div>
+                <label className="block text-gray-700 font-medium mb-2 text-sm">
+                  Nome completo
+                </label>
+                <input
+                  type="text"
+                  value={formData.nome}
+                  onChange={(e) =>
+                    setFormData({ ...formData, nome: e.target.value })
+                  }
+                  placeholder="Digite seu nome"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-yellow-400 outline-none text-sm"
+                  required
+                  disabled={loading}
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-medium mb-2 text-sm">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
+                  placeholder="Digite seu email"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-yellow-400 outline-none text-sm"
+                  required
+                  disabled={loading}
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-medium mb-2 text-sm">
+                  Senha
+                </label>
+                <input
+                  type="password"
+                  value={formData.senha}
+                  onChange={(e) =>
+                    setFormData({ ...formData, senha: e.target.value })
+                  }
+                  placeholder="Crie uma senha (mínimo 6 caracteres)"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-yellow-400 outline-none text-sm"
+                  required
+                  minLength={6}
+                  disabled={loading}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className={`w-full py-3 rounded-lg font-medium transition text-sm ${
+                  loading
+                    ? "bg-gray-400 text-gray-100 cursor-not-allowed"
+                    : "bg-yellow-400 hover:bg-yellow-500 text-black cursor-pointer"
+                }`}
+              >
+                {loading ? "Aguarde..." : "Criar conta"}
+              </button>
+
+              <p className="text-xs text-gray-600 text-center">
+                Já tem conta?{" "}
+                <Link to="/login" className="text-yellow-600 hover:underline">
+                  Faça login
+                </Link>
+              </p>
+            </form>
+          )}
+
+          {/* ETAPA 2 - Escolha de Carreira */}
+          {etapa === "questionario" && (
+            <div className="w-full text-center">
+              <h2 className="text-xl font-semibold mb-6 text-gray-900">
+                Qual trilha de carreira você quer seguir?
+              </h2>
+              <p className="text-gray-600 mb-8 text-sm">
+                Escolha a área que melhor representa seu objetivo profissional.
+              </p>
+
+              <div className="flex flex-col gap-4">
+                {[
+                  "Desenvolvedor Frontend",
+                  "Desenvolvedor Backend",
+                  "Desenvolvedor Full Stack",
+                  "Engenheiro de Dados",
+                ].map((opcao) => (
+                  <button
+                    type="button"
+                    key={opcao}
+                    onClick={() => selecionarCarreira(opcao)}
+                    disabled={loading}
+                    className="border border-yellow-400 hover:bg-yellow-400 hover:text-black text-yellow-600 font-medium py-3 rounded-lg transition disabled:bg-gray-100 disabled:text-gray-400 text-sm cursor-pointer"
+                  >
+                    {opcao}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ETAPA 3 - Confirmação */}
+          {etapa === "finalizado" && (
+            <div className="text-center">
+              <h2 className="text-xl font-semibold text-green-600 mb-4">
+                Quase lá! Confirme seu e-mail
+              </h2>
+              <p className="text-gray-700 text-sm">{mensagem}</p>
+              <p className="mt-4 text-xs text-gray-500">
+                Após a confirmação, você pode acessar sua área de evolução na
+                Praxis 🚀
+              </p>
+              <Link
+                to="/login"
+                className="mt-6 inline-block bg-yellow-400 hover:bg-yellow-500 text-black py-2 px-6 rounded-lg font-medium transition text-sm cursor-pointer"
+              >
+                Ir para o Login
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

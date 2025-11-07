@@ -14,6 +14,11 @@ import Cadastro from "./assets/pages/Cadastro";
 import Home from "./assets/pages/Home";
 import Profile from "./assets/pages/Profile";
 import Challenge from "./assets/pages/Challenge";
+import QuestionarioSoft from "./assets/pages/Questionario_soft"; // ✅ Soft Skills
+import QuestionarioHardBack from "./assets/pages/Questionario_hard_back"; // ✅ Backend
+import QuestionarioHardFront from "./assets/pages/Questionario_hard_front"; // ✅ Frontend
+import QuestionarioHardDados from "./assets/pages/Questionario_hard_dados"; // ✅ Engenheiro de Dados
+import QuestionarioHardFullstack from "./assets/pages/Questionario_hard_fullstack"; // ✅ Full Stack
 
 // --- Hook de autenticação ---
 import { useAuth } from "./assets/hooks/useAuth";
@@ -34,17 +39,9 @@ function LoadingSpinner() {
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
 
-  // Mostra loading enquanto verifica autenticação
-  if (loading) {
-    return <LoadingSpinner />;
-  }
+  if (loading) return <LoadingSpinner />;
+  if (!user) return <Navigate to="/login" replace />;
 
-  // Se não tem usuário, redireciona para login
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  // Se tem usuário, renderiza a rota protegida
   return children;
 }
 
@@ -52,15 +49,8 @@ function PrivateRoute({ children }) {
 function PublicRoute({ children }) {
   const { user, loading } = useAuth();
 
-  // Se já está logado, redireciona IMEDIATAMENTE sem mostrar a página
-  if (user) {
-    return <Navigate to="/home" replace />;
-  }
-
-  // Mostra loading enquanto verifica autenticação
-  if (loading) {
-    return <LoadingSpinner />;
-  }
+  if (loading) return <LoadingSpinner />;
+  if (user) return <Navigate to="/home" replace />;
 
   return children;
 }
@@ -72,7 +62,7 @@ export default function App() {
         {/* --- Rota pública (acessível a todos) --- */}
         <Route path="/" element={<Landing />} />
 
-        {/* --- Rotas públicas (só para não logados) --- */}
+        {/* --- Rotas públicas --- */}
         <Route
           path="/login"
           element={
@@ -90,34 +80,53 @@ export default function App() {
           }
         />
 
-              {/* --- Rotas protegidas (só para logados) --- */}
-              <Route
-                path="/home"
-                element={
-                  <PrivateRoute>
-                    <Home />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/perfil"
-                element={
-                  <PrivateRoute>
-                    <Profile />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/desafio/:id"
-                element={
-                  <PrivateRoute>
-                    <Challenge />
-                  </PrivateRoute>
-                }
-              />
+        {/* ✅ Questionários */}
+        <Route path="/questionario-soft" element={<QuestionarioSoft />} />
+        <Route
+          path="/questionario-hard-back"
+          element={<QuestionarioHardBack />}
+        />
+        <Route
+          path="/questionario-hard-front"
+          element={<QuestionarioHardFront />}
+        />
+        <Route
+          path="/questionario-hard-dados"
+          element={<QuestionarioHardDados />}
+        />
+        <Route
+          path="/questionario-hard-fullstack"
+          element={<QuestionarioHardFullstack />}
+        />
 
-              {/* --- Rota fallback (404) --- */}
-              <Route path="*" element={<Navigate to="/" replace />} />
+        {/* --- Rotas protegidas (só para logados) --- */}
+        <Route
+          path="/home"
+          element={
+            <PrivateRoute>
+              <Home />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/perfil"
+          element={
+            <PrivateRoute>
+              <Profile />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/desafio/:id"
+          element={
+            <PrivateRoute>
+              <Challenge />
+            </PrivateRoute>
+          }
+        />
+
+        {/* --- Fallback --- */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );
