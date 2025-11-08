@@ -44,7 +44,7 @@ export default function Cadastro() {
       email: formData.email,
       password: formData.senha,
       options: {
-r        data: {
+        data: {
           full_name: formData.nome,
           nome: formData.nome,
           career_goal: formData.career_goal,
