@@ -10,11 +10,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Instalar dependências do sistema necessárias para psycopg2
+# Instalar dependências do sistema
 RUN apt-get update && apt-get install -y \
     gcc \
     postgresql-client \
     libpq-dev \
+    tesseract-ocr \
+    tesseract-ocr-por \
+    libtesseract-dev \
+    poppler-utils \
+    libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiar apenas requirements.txt primeiro (cache layer)

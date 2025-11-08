@@ -1,5 +1,10 @@
 # backend/app/infra/repo_sql.py
 from __future__ import annotations
+from backend.app.domain.ports import IRepository
+from backend.models import (
+    Profile, Attributes, Challenge, Submission, SubmissionFeedback, Resume, ResumeAnalysis
+)
+from backend.db import engine
 import uuid
 from typing import List, Dict, Optional, Any
 from datetime import datetime
@@ -13,13 +18,8 @@ from pathlib import Path
 backend_path = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_path))
 
-from db import engine
-from models import (
-    Profile, Attributes, Challenge, Submission, SubmissionFeedback
-)
 
 # ✅ Importa a interface que vamos implementar
-from backend.app.domain.ports import IRepository
 
 # normalização simples de nível de dificuldade
 LEVEL_MAP = {
@@ -28,26 +28,31 @@ LEVEL_MAP = {
     "dificil": "hard", "difícil": "hard",
     "easy": "easy", "medium": "medium", "hard": "hard",
 }
+
+
 def _norm_level(v: str) -> str:
     return LEVEL_MAP.get(v, str(v).lower())
 
 # -------- helpers de saída (dicts usados pelos endpoints) ----------
+
+
 def _profile_out(p: Profile) -> dict:
     return {"id": str(p.id), "full_name": p.full_name or "", "email": p.email}
 
+
 def _attributes_out(profile_id: uuid.UUID, a: Attributes) -> dict:
     import json
-    
+
     # Parse JSONB fields se eles vierem como string
     soft_skills = a.soft_skills or []
     tech_skills = a.tech_skills or []
-    
+
     # Se vier como string, parseia
     if isinstance(soft_skills, str):
         soft_skills = json.loads(soft_skills)
     if isinstance(tech_skills, str):
         tech_skills = json.loads(tech_skills)
-    
+
     return {
         "profile_id": str(profile_id),
         "career_goal": a.career_goal,
@@ -55,6 +60,7 @@ def _attributes_out(profile_id: uuid.UUID, a: Attributes) -> dict:
         "tech_skills": tech_skills if isinstance(tech_skills, list) else [],
         "updated_at": a.updated_at,
     }
+
 
 def _challenge_out(ch: Challenge) -> dict:
     difficulty = ch.difficulty or {}
@@ -72,17 +78,19 @@ def _challenge_out(ch: Challenge) -> dict:
         "created_at": ch.created_at,
     }
 
+
 class SqlRepo(IRepository):
     """
     Implementação SQL do repositório.
-    
+
     Herda de IRepository, o que significa:
     - "Eu prometo implementar TODOS os métodos definidos na interface"
     - Se esquecer algum método, Python vai dar erro
     - Qualquer código que espera IRepository pode usar SqlRepo
-    
+
     Adapter que conversa com o Postgres (Supabase) via SQLModel.
     """
+
     def __init__(self, engine_=None):
         self.engine = engine_ or engine
 
@@ -128,9 +136,10 @@ class SqlRepo(IRepository):
                 p = s.get(Profile, pid)
             except ValueError:
                 # ID não é UUID válido, busca como string
-                p = s.exec(select(Profile).where(Profile.id == profile_id)).first()
+                p = s.exec(select(Profile).where(
+                    Profile.id == profile_id)).first()
             return _profile_out(p) if p else None
-    
+
     def create_profile(self, profile_id: str, profile_data: dict) -> dict:
         """
         Cria um novo perfil com ID específico.
@@ -143,7 +152,7 @@ class SqlRepo(IRepository):
             except ValueError:
                 # Não é UUID, usa o profile_id como string
                 pid = profile_id
-            
+
             new_profile = Profile(
                 id=pid,
                 full_name=profile_data.get("name"),
@@ -164,10 +173,12 @@ class SqlRepo(IRepository):
             except ValueError:
                 # ID não é UUID válido
                 pid = profile_id
-            
-            a = s.exec(select(Attributes).where(Attributes.user_id == pid)).first()
+
+            a = s.exec(select(Attributes).where(
+                Attributes.user_id == pid)).first()
             if not a:
-                raise ValueError(f"Attributes não encontrados para profile_id: {profile_id}")
+                raise ValueError(
+                    f"Attributes não encontrados para profile_id: {profile_id}")
             return _attributes_out(pid, a)
 
     def update_attributes(self, profile_id: str, patch: dict) -> dict:
@@ -178,8 +189,9 @@ class SqlRepo(IRepository):
             except ValueError:
                 # ID não é UUID válido
                 pid = profile_id
-            
-            a = s.exec(select(Attributes).where(Attributes.user_id == pid)).first()
+
+            a = s.exec(select(Attributes).where(
+                Attributes.user_id == pid)).first()
             if not a:
                 # Se não existe, cria com os dados do patch
                 a = Attributes(
@@ -188,17 +200,23 @@ class SqlRepo(IRepository):
                     soft_skills=patch.get("soft_skills", {}),
                     tech_skills=patch.get("tech_skills", {})
                 )
-                s.add(a); s.commit(); s.refresh(a)
+                s.add(a)
+                s.commit()
+                s.refresh(a)
                 return _attributes_out(pid, a)
-            
+
             if "career_goal" in patch and patch["career_goal"] is not None:
                 a.career_goal = patch["career_goal"]
             if "soft_skills" in patch and patch["soft_skills"]:
-                a.soft_skills = {**(a.soft_skills or {}), **patch["soft_skills"]}
+                a.soft_skills = {**(a.soft_skills or {}),
+                                 **patch["soft_skills"]}
             if "tech_skills" in patch and patch["tech_skills"]:
-                a.tech_skills = {**(a.tech_skills or {}), **patch["tech_skills"]}
+                a.tech_skills = {**(a.tech_skills or {}),
+                                 **patch["tech_skills"]}
             a.updated_at = datetime.utcnow()
-            s.add(a); s.commit(); s.refresh(a)
+            s.add(a)
+            s.commit()
+            s.refresh(a)
             return _attributes_out(pid, a)
 
     def get_tech_skills(self, profile_id: str) -> Dict[str, int]:
@@ -209,13 +227,15 @@ class SqlRepo(IRepository):
             except ValueError:
                 # ID não é UUID válido
                 pid = profile_id
-            
-            a = s.exec(select(Attributes).where(Attributes.user_id == pid)).first()
-            
+
+            a = s.exec(select(Attributes).where(
+                Attributes.user_id == pid)).first()
+
             # ✅ CORREÇÃO: Verificar se 'a' existe antes de acessar
             if not a:
-                raise ValueError(f"Attributes não encontrados para profile_id: {profile_id}")
-            
+                raise ValueError(
+                    f"Attributes não encontrados para profile_id: {profile_id}")
+
             return dict(a.tech_skills or {})
 
     def update_tech_skills(self, profile_id: str, tech_skills: Dict[str, int]) -> None:
@@ -226,16 +246,19 @@ class SqlRepo(IRepository):
             except ValueError:
                 # ID não é UUID válido
                 pid = profile_id
-            
-            a = s.exec(select(Attributes).where(Attributes.user_id == pid)).first()
-            
+
+            a = s.exec(select(Attributes).where(
+                Attributes.user_id == pid)).first()
+
             # ✅ CORREÇÃO: Verificar se 'a' existe antes de usar
             if not a:
-                raise ValueError(f"Attributes não encontrados para profile_id: {profile_id}")
-            
+                raise ValueError(
+                    f"Attributes não encontrados para profile_id: {profile_id}")
+
             a.tech_skills = tech_skills
             a.updated_at = datetime.utcnow()
-            s.add(a); s.commit()
+            s.add(a)
+            s.commit()
 
     # -------------- CHALLENGES --------------
     def create_challenges_for_profile(self, profile_id: str, challenges: List[dict]) -> List[dict]:
@@ -248,7 +271,7 @@ class SqlRepo(IRepository):
         except ValueError:
             # ID não é UUID válido
             pid = profile_id
-        
+
         rows = []
         with Session(self.engine) as s:
             for ch in challenges:
@@ -266,7 +289,7 @@ class SqlRepo(IRepository):
             for row in rows:
                 s.refresh(row)
         return [_challenge_out(r) for r in rows]
-    
+
     def delete_challenges_for_profile(self, profile_id: str) -> int:
         """
         Deleta todos os desafios de um perfil.
@@ -278,23 +301,23 @@ class SqlRepo(IRepository):
         except ValueError:
             # ID não é UUID válido
             pid = profile_id
-        
+
         with Session(self.engine) as s:
             # Busca todos os challenges do usuário
             challenges = s.exec(
                 select(Challenge)
                 .where(Challenge.profile_id == pid)
             ).all()
-            
+
             count = len(challenges)
-            
+
             if count > 0:
                 # SQLAlchemy vai deletar em cascata as submissions e feedbacks
                 # graças aos relacionamentos definidos nos models
                 for ch in challenges:
                     s.delete(ch)
                 s.commit()
-            
+
             return count
 
     def list_active_challenges(self, profile_id: str, limit: int = 3) -> List[dict]:
@@ -305,7 +328,7 @@ class SqlRepo(IRepository):
             except ValueError:
                 # ID não é UUID válido
                 pid = profile_id
-            
+
             rows = s.exec(
                 select(Challenge)
                 .where(Challenge.profile_id == pid)
@@ -328,7 +351,7 @@ class SqlRepo(IRepository):
             except ValueError:
                 # ID não é UUID válido
                 pid = profile_id
-            
+
             return int(s.exec(
                 select(func.count(Submission.id)).where(
                     Submission.profile_id == pid,
@@ -344,7 +367,7 @@ class SqlRepo(IRepository):
             except ValueError:
                 # ID não é UUID válido
                 pid = payload["profile_id"]
-            
+
             row = Submission(
                 profile_id=pid,
                 challenge_id=payload["challenge_id"],
@@ -355,7 +378,9 @@ class SqlRepo(IRepository):
                 notes=payload.get("notes"),
                 time_taken_sec=payload.get("time_taken_sec"),
             )
-            s.add(row); s.commit(); s.refresh(row)
+            s.add(row)
+            s.commit()
+            s.refresh(row)
             return {"id": row.id, **payload}
 
     def update_submission(self, submission_id: int, patch: dict) -> None:
@@ -365,7 +390,8 @@ class SqlRepo(IRepository):
                 return
             for k, v in patch.items():
                 setattr(sub, k, v)
-            s.add(sub); s.commit()
+            s.add(sub)
+            s.commit()
 
     # -------------- FEEDBACK --------------
     def create_submission_feedback(self, payload: dict) -> dict:
@@ -378,5 +404,119 @@ class SqlRepo(IRepository):
                 metrics=payload.get("metrics"),
                 raw_ai_response=payload.get("raw_ai_response"),
             )
-            s.add(fb); s.commit(); s.refresh(fb)
+            s.add(fb)
+            s.commit()
+            s.refresh(fb)
             return {"id": fb.id, **payload}
+
+    # -------------- RESUME / CURRICULOS --------------
+    def create_resume(
+        self,
+        profile_id: str,
+        title: Optional[str],
+        content: str,
+        filename: Optional[str] = None,
+        file_type: Optional[str] = None,
+        file_size: Optional[int] = None,
+        file_data: Optional[bytes] = None
+    ) -> Resume:
+        """
+        Cria um novo currículo para o perfil.
+
+        Suporta dois modos:
+        1. Texto puro: apenas content
+        2. Arquivo: content + filename + file_type + file_size + file_data
+        """
+        with Session(self.engine) as s:
+            # Tenta converter para UUID, se falhar usa string diretamente
+            try:
+                pid = uuid.UUID(profile_id)
+            except ValueError:
+                pid = profile_id
+
+            resume = Resume(
+                profile_id=pid,
+                title=title,
+                original_content=content,
+                original_filename=filename,
+                file_type=file_type,
+                file_size_bytes=file_size,
+                file_data=file_data
+            )
+            s.add(resume)
+            s.commit()
+            s.refresh(resume)
+            return resume
+
+    def get_resumes(self, profile_id: str) -> List[Resume]:
+        """Busca todos os currículos de um perfil"""
+        with Session(self.engine) as s:
+            # Tenta converter para UUID, se falhar usa string diretamente
+            try:
+                pid = uuid.UUID(profile_id)
+            except ValueError:
+                pid = profile_id
+
+            resumes = s.exec(
+                select(Resume)
+                .where(Resume.profile_id == pid)
+                .order_by(Resume.created_at.desc())
+            ).all()
+            return list(resumes)
+
+    def get_resume(self, resume_id: int) -> Optional[Resume]:
+        """Busca um currículo específico"""
+        with Session(self.engine) as s:
+            return s.get(Resume, resume_id)
+
+    def create_resume_analysis(self, resume_id: int, strengths: str, improvements: str, full_report: dict) -> ResumeAnalysis:
+        """Cria uma análise de currículo"""
+        with Session(self.engine) as s:
+            analysis = ResumeAnalysis(
+                resume_id=resume_id,
+                strengths=strengths,
+                improvements=improvements,
+                full_report=full_report
+            )
+            s.add(analysis)
+            s.commit()
+            s.refresh(analysis)
+            return analysis
+
+    def get_resume_analysis(self, resume_id: int) -> Optional[ResumeAnalysis]:
+        """Busca a análise de um currículo"""
+        with Session(self.engine) as s:
+            return s.exec(
+                select(ResumeAnalysis)
+                .where(ResumeAnalysis.resume_id == resume_id)
+            ).first()
+
+    def delete_resume_analysis(self, resume_id: int) -> bool:
+        """Deleta a análise de um currículo (se existir)"""
+        with Session(self.engine) as s:
+            analysis = s.exec(
+                select(ResumeAnalysis)
+                .where(ResumeAnalysis.resume_id == resume_id)
+            ).first()
+            
+            if analysis:
+                s.delete(analysis)
+                s.commit()
+                return True
+            return False
+
+    def delete_resume(self, resume_id: int) -> bool:
+        """Deleta um currículo e sua análise associada"""
+        with Session(self.engine) as s:
+            resume = s.get(Resume, resume_id)
+            
+            if not resume:
+                return False
+            
+            # Primeiro deleta a análise (se existir) devido à FK
+            self.delete_resume_analysis(resume_id)
+            
+            # Depois deleta o currículo
+            s.delete(resume)
+            s.commit()
+            return True
