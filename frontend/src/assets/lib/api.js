@@ -124,8 +124,8 @@ export async function submitSolution(submissionData) {
   });
 }
 
-export async function updateAttributes(updates) {
-  return await fetchWithAuth(`${API_URL}/attributes`, {
+export async function updateAttributes(profileId, updates) {
+  return await fetchWithAuth(`${API_URL}/attributes/${profileId}`, {
     method: "PATCH",
     body: JSON.stringify(updates),
   });

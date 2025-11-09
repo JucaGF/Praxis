@@ -6,6 +6,7 @@ export default function QuestionarioSoft() {
   const navigate = useNavigate();
   const location = useLocation();
   const formData = location.state?.formData;
+  const hardSkills = location.state?.hardSkills;
 
   const perguntas = [
     {
@@ -63,22 +64,29 @@ export default function QuestionarioSoft() {
       return;
     }
 
-    setMensagem("Questionário concluído! Redirecionando...");
-    setTimeout(() => {
-      const carreira = formData?.career_goal;
-
-      if (carreira === "Desenvolvedor Backend") {
-        navigate("/questionario-hard-back", { state: { formData } });
-      } else if (carreira === "Desenvolvedor Frontend") {
-        navigate("/questionario-hard-front", { state: { formData } });
-      } else if (carreira === "Engenheiro de Dados") {
-        navigate("/questionario-hard-dados", { state: { formData } });
-      } else if (carreira === "Desenvolvedor Full Stack") {
-        // ✅ Novo caso para Full Stack
-        navigate("/questionario-hard-fullstack", { state: { formData } });
-      } else {
-        navigate("/cadastro", { state: { fromQuestionario: true, formData } });
+    // Processar respostas para o formato da API
+    const softSkillsProcessed = {};
+    Object.keys(respostas).forEach((key) => {
+      const [categoria, indice] = key.split('-');
+      const questao = perguntas.find(p => p.categoria === categoria)?.questoes[indice];
+      if (questao) {
+        // Normalizar valor de 0-5 para 0-100
+        softSkillsProcessed[questao] = Math.round((respostas[key] / 5) * 100);
       }
+    });
+
+    setMensagem("Questionário concluído! Criando sua conta...");
+    
+    // Redireciona para cadastro com todos os dados (hard skills + soft skills)
+    setTimeout(() => {
+      navigate("/cadastro", { 
+        state: { 
+          etapa: "finalizado",
+          formData,
+          softSkills: softSkillsProcessed,
+          hardSkills: hardSkills || null
+        } 
+      });
     }, 2000);
   };
 

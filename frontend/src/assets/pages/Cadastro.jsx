@@ -1,7 +1,8 @@
 // src/pages/Cadastro.jsx
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
+import { updateAttributes } from "../lib/api";
 import PraxisLogo from "../components/PraxisLogo";
 
 const LinkedInIcon = () => (
@@ -17,16 +18,94 @@ const LinkedInIcon = () => (
 
 export default function Cadastro() {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
+  const location = useLocation();
+  
+  // Recebe dados dos questionários se estiver voltando deles
+  const stateData = location.state || {};
+  const initialFormData = stateData.formData || {
     nome: "",
     email: "",
     senha: "",
     career_goal: "",
-  });
+  };
   
-  const [etapa, setEtapa] = useState("cadastro"); // "cadastro" | "questionario" | "finalizado"
+  const [formData, setFormData] = useState(initialFormData);
+  const [etapa, setEtapa] = useState(stateData.etapa || "cadastro"); // "cadastro" | "questionario" | "finalizado"
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [questionariosCompletos, setQuestionariosCompletos] = useState({
+    softSkills: stateData.softSkills || null,
+    hardSkills: stateData.hardSkills || null,
+  });
+
+  // Detecta quando voltamos dos questionários com respostas completas
+  useEffect(() => {
+    if (stateData.etapa === "finalizado" && stateData.formData) {
+      // Vindo dos questionários, vamos criar a conta
+      criarContaComQuestionarios();
+    }
+  }, []);
+
+  const criarContaComQuestionarios = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      // 1. Criar conta no Supabase
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.senha,
+        options: {
+          data: {
+            full_name: formData.nome,
+            nome: formData.nome,
+            career_goal: formData.career_goal,
+          },
+        },
+      });
+
+      if (authError) {
+        throw new Error(authError.message);
+      }
+
+      // Obter o user ID do Supabase
+      const userId = authData?.user?.id;
+      if (!userId) {
+        throw new Error("Erro ao obter ID do usuário");
+      }
+
+      // 2. Se temos respostas dos questionários, salvar na API
+      if (stateData.softSkills || stateData.hardSkills) {
+        // Aguardar um pouco para garantir que o usuário foi criado
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        const attributesPayload = {};
+        
+        if (stateData.softSkills) {
+          attributesPayload.soft_skills = stateData.softSkills;
+        }
+        
+        if (stateData.hardSkills) {
+          attributesPayload.tech_skills = stateData.hardSkills;
+        }
+
+        // Salvar atributos (pode falhar se o usuário ainda não estiver confirmado)
+        try {
+          await updateAttributes(userId, attributesPayload);
+        } catch (apiError) {
+          console.warn("Não foi possível salvar atributos imediatamente:", apiError);
+          // Não vamos bloquear o cadastro por isso
+        }
+      }
+
+      setEtapa("finalizado");
+    } catch (err) {
+      setError(`Erro ao criar conta: ${err.message}`);
+      setEtapa("cadastro");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,40 +117,37 @@ export default function Cadastro() {
       return;
     }
 
-    setLoading(true);
-
-    const { error: authError } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.senha,
-      options: {
-        data: {
-          full_name: formData.nome,
-          nome: formData.nome,
-          career_goal: formData.career_goal,
-        },
-      },
-    });
-
-    setLoading(false);
-
-    if (authError) {
-      setError(`Erro ao criar conta: ${authError.message}`);
-      setEtapa("cadastro");
-    } else {
-      setEtapa("finalizado");
+    // Se já passou pelos questionários, criar conta
+    if (questionariosCompletos.softSkills && questionariosCompletos.hardSkills) {
+      await criarContaComQuestionarios();
+      return;
     }
+
+    // Caso contrário, iniciar fluxo normal (redirecionar para questionários)
+    setLoading(true);
   };
 
   const selecionarCarreira = (trilhaEscolhida) => {
     const novosDados = { ...formData, career_goal: trilhaEscolhida };
     setFormData(novosDados);
     
-    // Simula o submit com a carreira escolhida
-    const mockEvent = { preventDefault: () => {} };
-    const tempFormData = formData;
-    formData.career_goal = trilhaEscolhida;
-    handleSubmit(mockEvent);
-    setFormData(tempFormData);
+    // Mapear carreiras para rotas de questionários hard skills
+    const careerRoutes = {
+      "backend": "/questionario-hard-back",
+      "frontend": "/questionario-hard-front",
+      "fullstack": "/questionario-hard-fullstack",
+      "data": "/questionario-hard-dados",
+    };
+
+    const route = careerRoutes[trilhaEscolhida] || "/questionario-hard-back";
+    
+    // Redireciona para o questionário de tech skills (hard skills) primeiro
+    navigate(route, { 
+      state: { 
+        formData: novosDados,
+        fromCadastro: true 
+      } 
+    });
   };
 
   // Renderização do conteúdo baseado na etapa
@@ -110,18 +186,16 @@ export default function Cadastro() {
 
           <div className="space-y-3">
             {[
-              { value: "frontend", label: "Frontend Developer", icon: "💻", desc: "React, Vue, Angular" },
-              { value: "backend", label: "Backend Developer", icon: "⚙️", desc: "Node.js, Python, Java" },
-              { value: "fullstack", label: "Fullstack Developer", icon: "🚀", desc: "Frontend + Backend" },
-              { value: "mobile", label: "Mobile Developer", icon: "📱", desc: "React Native, Flutter" },
-              { value: "data", label: "Data Science", icon: "📊", desc: "Python, ML, Analytics" },
-              { value: "devops", label: "DevOps", icon: "🔧", desc: "CI/CD, Cloud, Docker" },
+              { value: "frontend", label: "Frontend Developer", icon: "", desc: "React, Vue, Angular" },
+              { value: "backend", label: "Backend Developer", icon: "", desc: "Node.js, Python, Java" },
+              { value: "fullstack", label: "Fullstack Developer", icon: "", desc: "Frontend + Backend" },
+              { value: "data", label: "Data Engineer", icon: "", desc: "Python, ML, Analytics" },
             ].map((trilha) => (
               <button
                 key={trilha.value}
                 onClick={() => selecionarCarreira(trilha.value)}
                 disabled={loading}
-                className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-yellow-500 hover:bg-yellow-50 transition text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-yellow-500 hover:bg-yellow-50 transition text-left group disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 <div className="flex items-center gap-3">
                   <span className="text-3xl">{trilha.icon}</span>
@@ -141,7 +215,7 @@ export default function Cadastro() {
 
           <button
             onClick={() => setEtapa("cadastro")}
-            className="mt-6 w-full text-center text-sm text-gray-600 hover:text-gray-900"
+            className="mt-6 w-full text-center text-sm text-gray-600 hover:text-gray-900 cursor-pointer"
           >
             ← Voltar
           </button>
@@ -274,7 +348,7 @@ export default function Cadastro() {
       {/* Botão Voltar */}
       <Link 
         to="/" 
-        className="absolute top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 transition"
+        className="absolute top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 transition cursor-pointer"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
