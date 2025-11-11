@@ -168,7 +168,7 @@ export default function Profile() {
           setAttributes(attributesData);
         } catch (error) {
           console.error("Erro ao buscar atributos:", error);
-          setAttributes({ tech_skills: [], soft_skills: [], career_goal: "" });
+          setAttributes({ tech_skills: {}, soft_skills: {}, career_goal: "" });
         }
         
         try {
@@ -184,7 +184,7 @@ export default function Profile() {
         console.error("Erro ao carregar dados do perfil:", error);
         // Seta valores padrão se tudo falhar
         setUser({ full_name: "Usuário" });
-        setAttributes({ tech_skills: [], soft_skills: [], career_goal: "" });
+        setAttributes({ tech_skills: {}, soft_skills: {}, career_goal: "" });
         setSubmissions([]);
       } finally {
         setLoading(false);
@@ -268,8 +268,15 @@ export default function Profile() {
 
                 <Section title="Habilidades Técnicas" subtitle="Suas competências atualizadas com base nos desafios completados">
                     <div className="space-y-6">
-                        {attributes?.tech_skills && attributes.tech_skills.length > 0 ? (
-                          attributes.tech_skills.map(skill => <SkillBar key={skill.name} skill={skill.name} percentage={skill.percentage} date={skill.last_updated} />)
+                        {attributes?.tech_skills && Object.keys(attributes.tech_skills).length > 0 ? (
+                          Object.entries(attributes.tech_skills).map(([skillName, percentage]) => (
+                            <SkillBar 
+                              key={skillName} 
+                              skill={skillName} 
+                              percentage={percentage} 
+                              date={attributes.updated_at} 
+                            />
+                          ))
                         ) : (
                           <p className="text-zinc-500 text-center py-4">Nenhuma habilidade registrada ainda.</p>
                         )}
@@ -286,7 +293,7 @@ export default function Profile() {
 
                 <div className="grid grid-cols-3 gap-4">
                     <StatCard value={submissions?.length || 0} label="Desafios Completados" />
-                    <StatCard value={attributes?.tech_skills?.length || 0} label="Habilidades Rastreadas" />
+                    <StatCard value={attributes?.tech_skills ? Object.keys(attributes.tech_skills).length : 0} label="Habilidades Rastreadas" />
                     <StatCard value="90" label="Score Médio" />
                 </div>
 

@@ -1,8 +1,7 @@
 // src/pages/Cadastro.jsx
-import React, { useState, useEffect } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
-import { updateAttributes } from "../lib/api";
 import PraxisLogo from "../components/PraxisLogo";
 
 const LinkedInIcon = () => (
@@ -18,141 +17,69 @@ const LinkedInIcon = () => (
 
 export default function Cadastro() {
   const navigate = useNavigate();
-  const location = useLocation();
-  
-  // Recebe dados dos questionários se estiver voltando deles
-  const stateData = location.state || {};
-  const initialFormData = stateData.formData || {
+  const [formData, setFormData] = useState({
     nome: "",
     email: "",
     senha: "",
-    career_goal: "",
-  };
+  });
   
-  const [formData, setFormData] = useState(initialFormData);
-  const [etapa, setEtapa] = useState(stateData.etapa || "cadastro"); // "cadastro" | "questionario" | "finalizado"
+  const [cadastroRealizado, setCadastroRealizado] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [questionariosCompletos, setQuestionariosCompletos] = useState({
-    softSkills: stateData.softSkills || null,
-    hardSkills: stateData.hardSkills || null,
-  });
 
-  // Detecta quando voltamos dos questionários com respostas completas
-  useEffect(() => {
-    if (stateData.etapa === "finalizado" && stateData.formData) {
-      // Vindo dos questionários, vamos criar a conta
-      criarContaComQuestionarios();
-    }
-  }, []);
-
-  const criarContaComQuestionarios = async () => {
-    setLoading(true);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setError("");
+    setLoading(true);
 
     try {
-      // 1. Criar conta no Supabase
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const { error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.senha,
         options: {
           data: {
             full_name: formData.nome,
             nome: formData.nome,
-            career_goal: formData.career_goal,
           },
         },
       });
 
       if (authError) {
-        throw new Error(authError.message);
+        throw authError;
       }
 
-      // Obter o user ID do Supabase
-      const userId = authData?.user?.id;
-      if (!userId) {
-        throw new Error("Erro ao obter ID do usuário");
-      }
-
-      // 2. Se temos respostas dos questionários, salvar na API
-      if (stateData.softSkills || stateData.hardSkills) {
-        // Aguardar um pouco para garantir que o usuário foi criado
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        const attributesPayload = {};
-        
-        if (stateData.softSkills) {
-          attributesPayload.soft_skills = stateData.softSkills;
-        }
-        
-        if (stateData.hardSkills) {
-          attributesPayload.tech_skills = stateData.hardSkills;
-        }
-
-        // Salvar atributos (pode falhar se o usuário ainda não estiver confirmado)
-        try {
-          await updateAttributes(userId, attributesPayload);
-        } catch (apiError) {
-          console.warn("Não foi possível salvar atributos imediatamente:", apiError);
-          // Não vamos bloquear o cadastro por isso
-        }
-      }
-
-      setEtapa("finalizado");
+      setCadastroRealizado(true);
     } catch (err) {
       setError(`Erro ao criar conta: ${err.message}`);
-      setEtapa("cadastro");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-
-    // Se não houver trilha de carreira, abre o questionário
-    if (!formData.career_goal) {
-      setEtapa("questionario");
-      return;
-    }
-
-    // Se já passou pelos questionários, criar conta
-    if (questionariosCompletos.softSkills && questionariosCompletos.hardSkills) {
-      await criarContaComQuestionarios();
-      return;
-    }
-
-    // Caso contrário, iniciar fluxo normal (redirecionar para questionários)
+  // Função para reenviar email de confirmação
+  const reenviarEmail = async () => {
     setLoading(true);
+    setError("");
+    
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: formData.email,
+      });
+      
+      if (error) throw error;
+      
+      alert("Email de confirmação reenviado! Verifique sua caixa de entrada.");
+    } catch (err) {
+      setError(`Erro ao reenviar email: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const selecionarCarreira = (trilhaEscolhida) => {
-    const novosDados = { ...formData, career_goal: trilhaEscolhida };
-    setFormData(novosDados);
-    
-    // Mapear carreiras para rotas de questionários hard skills
-    const careerRoutes = {
-      "backend": "/questionario-hard-back",
-      "frontend": "/questionario-hard-front",
-      "fullstack": "/questionario-hard-fullstack",
-      "data": "/questionario-hard-dados",
-    };
-
-    const route = careerRoutes[trilhaEscolhida] || "/questionario-hard-back";
-    
-    // Redireciona para o questionário de tech skills (hard skills) primeiro
-    navigate(route, { 
-      state: { 
-        formData: novosDados,
-        fromCadastro: true 
-      } 
-    });
-  };
-
-  // Renderização do conteúdo baseado na etapa
+  // Renderização do conteúdo
   const renderContent = () => {
-    if (etapa === "finalizado") {
+    if (cadastroRealizado) {
       return (
         <div className="text-center">
           <div className="mb-6">
@@ -164,66 +91,28 @@ export default function Cadastro() {
           <p className="text-gray-600 mb-6">
             Verifique seu e-mail ({formData.email}) para confirmar sua conta e fazer login.
           </p>
-          <Link
-            to="/login"
-            className="inline-block px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold transition"
-          >
-            Ir para Login
-          </Link>
-        </div>
-      );
-    }
-
-    if (etapa === "questionario") {
-      return (
-        <div>
-          <div className="mb-8 text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Escolha sua trilha</h2>
-            <p className="text-sm text-gray-600">
-              Selecione a área que você deseja focar seus estudos
-            </p>
-          </div>
-
+          
           <div className="space-y-3">
-            {[
-              { value: "frontend", label: "Frontend Developer", icon: "", desc: "React, Vue, Angular" },
-              { value: "backend", label: "Backend Developer", icon: "", desc: "Node.js, Python, Java" },
-              { value: "fullstack", label: "Fullstack Developer", icon: "", desc: "Frontend + Backend" },
-              { value: "data", label: "Data Engineer", icon: "", desc: "Python, ML, Analytics" },
-            ].map((trilha) => (
-              <button
-                key={trilha.value}
-                onClick={() => selecionarCarreira(trilha.value)}
-                disabled={loading}
-                className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-yellow-500 hover:bg-yellow-50 transition text-left group disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-3xl">{trilha.icon}</span>
-                  <div className="flex-1">
-                    <div className="font-semibold text-gray-900 group-hover:text-yellow-600 transition">
-                      {trilha.label}
-                    </div>
-                    <div className="text-sm text-gray-500">{trilha.desc}</div>
-                  </div>
-                  <svg className="w-5 h-5 text-gray-400 group-hover:text-yellow-500 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </button>
-            ))}
+            <Link
+              to="/login"
+              className="inline-block px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold transition w-full"
+            >
+              Ir para Login
+            </Link>
+            
+            <button
+              onClick={reenviarEmail}
+              disabled={loading}
+              className="text-sm text-gray-600 hover:text-gray-900 underline cursor-pointer disabled:opacity-50"
+            >
+              {loading ? "Reenviando..." : "Não recebeu o email? Clique para reenviar"}
+            </button>
           </div>
-
-          <button
-            onClick={() => setEtapa("cadastro")}
-            className="mt-6 w-full text-center text-sm text-gray-600 hover:text-gray-900 cursor-pointer"
-          >
-            ← Voltar
-          </button>
         </div>
       );
     }
 
-    // Etapa de cadastro (formulário inicial)
+    // Formulário de cadastro
     return (
       <>
         <div className="mb-8 text-center">
@@ -320,7 +209,7 @@ export default function Cadastro() {
                   : "bg-yellow-500 hover:bg-yellow-600 shadow-sm text-white cursor-pointer"
               }`}
             >
-              {loading ? "Criando conta..." : "Continuar"}
+              {loading ? "Criando conta..." : "Criar Conta"}
             </button>
           </div>
 

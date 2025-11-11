@@ -3,10 +3,10 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import TelaSaudacaoQuestionario from "../components/TelaSaudacaoQuestionario";
 
-export default function QuestionarioHardFullstack() {
+export default function QuestionarioHardFullstack({ modoOnboarding = false, onConcluir = null, onVoltar: onVoltarProp = null }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const formData = location.state?.formData;
+  const formData = modoOnboarding ? {} : location.state?.formData;
 
   const [mostrarSaudacao, setMostrarSaudacao] = useState(true);
   const [etapa, setEtapa] = useState("selecao");
@@ -128,14 +128,21 @@ export default function QuestionarioHardFullstack() {
 
     setMensagem("Questionário concluído! Próxima etapa...");
 
-    setTimeout(() => {
-      navigate("/questionario-soft", { 
-        state: { 
-          formData,
-          hardSkills: hardSkillsProcessed
-        } 
-      });
-    }, 2000);
+    // Se está em modo onboarding, usa callback
+    if (modoOnboarding && onConcluir) {
+      setTimeout(() => {
+        onConcluir(hardSkillsProcessed);
+      }, 1000);
+    } else {
+      setTimeout(() => {
+        navigate("/questionario-soft", { 
+          state: { 
+            formData,
+            hardSkills: hardSkillsProcessed
+          } 
+        });
+      }, 2000);
+    }
   };
 
   const handleVoltar = () => {
@@ -146,7 +153,12 @@ export default function QuestionarioHardFullstack() {
       setMostrarSaudacao(true);
       setMensagem("");
     } else {
-      navigate(-1);
+      // Se está em modo onboarding, usa callback
+      if (modoOnboarding && onVoltarProp) {
+        onVoltarProp();
+      } else {
+        navigate(-1);
+      }
     }
   };
 
@@ -189,7 +201,7 @@ export default function QuestionarioHardFullstack() {
         titulo="Questionário de Hard Skills (Fullstack)"
         descricao="Escolha 5 habilidades técnicas nas quais você possui mais experiência. Depois, você irá avaliar seu nível em cada uma delas."
         onComecar={() => setMostrarSaudacao(false)}
-        onVoltar={() => navigate(-1)}
+        onVoltar={modoOnboarding && onVoltarProp ? onVoltarProp : () => navigate(-1)}
       />
     );
   }

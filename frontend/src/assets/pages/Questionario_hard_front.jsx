@@ -3,10 +3,10 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import TelaSaudacaoQuestionario from "../components/TelaSaudacaoQuestionario";
 
-export default function QuestionarioHardFront() {
+export default function QuestionarioHardFront({ modoOnboarding = false, onConcluir = null, onVoltar: onVoltarProp = null }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const formData = location.state?.formData;
+  const formData = modoOnboarding ? {} : location.state?.formData;
 
   const [mostrarSaudacao, setMostrarSaudacao] = useState(true);
   const [etapa, setEtapa] = useState("selecao"); // "selecao" | "avaliacao"
@@ -134,15 +134,22 @@ export default function QuestionarioHardFront() {
 
     setMensagem("Questionário concluído! Próxima etapa...");
 
-    // Redireciona para questionário de soft skills
-    setTimeout(() => {
-      navigate("/questionario-soft", { 
-        state: { 
-          formData,
-          hardSkills: hardSkillsProcessed
-        } 
-      });
-    }, 2000);
+    // Se está em modo onboarding, usa callback
+    if (modoOnboarding && onConcluir) {
+      setTimeout(() => {
+        onConcluir(hardSkillsProcessed);
+      }, 1000);
+    } else {
+      // Modo standalone: redireciona para questionário de soft skills
+      setTimeout(() => {
+        navigate("/questionario-soft", { 
+          state: { 
+            formData,
+            hardSkills: hardSkillsProcessed
+          } 
+        });
+      }, 2000);
+    }
   };
 
   const handleVoltar = () => {
@@ -153,7 +160,12 @@ export default function QuestionarioHardFront() {
       setMostrarSaudacao(true);
       setMensagem("");
     } else {
-      navigate(-1);
+      // Se está em modo onboarding, usa callback
+      if (modoOnboarding && onVoltarProp) {
+        onVoltarProp();
+      } else {
+        navigate(-1);
+      }
     }
   };
 
@@ -198,7 +210,7 @@ export default function QuestionarioHardFront() {
         titulo="Questionário de Hard Skills (Frontend)"
         descricao="Escolha 5 habilidades técnicas nas quais você possui mais experiência. Depois, você irá avaliar seu nível em cada uma delas."
         onComecar={() => setMostrarSaudacao(false)}
-        onVoltar={() => navigate(-1)}
+        onVoltar={modoOnboarding && onVoltarProp ? onVoltarProp : () => navigate(-1)}
       />
     );
   }

@@ -44,8 +44,8 @@ def _attributes_out(profile_id: uuid.UUID, a: Attributes) -> dict:
     import json
 
     # Parse JSONB fields se eles vierem como string
-    soft_skills = a.soft_skills or []
-    tech_skills = a.tech_skills or []
+    soft_skills = a.soft_skills or {}
+    tech_skills = a.tech_skills or {}
 
     # Se vier como string, parseia
     if isinstance(soft_skills, str):
@@ -53,11 +53,18 @@ def _attributes_out(profile_id: uuid.UUID, a: Attributes) -> dict:
     if isinstance(tech_skills, str):
         tech_skills = json.loads(tech_skills)
 
+    # Skills devem ser dicionários, mas se vier como lista, mantém
+    # (para compatibilidade com dados antigos)
+    if not isinstance(soft_skills, (dict, list)):
+        soft_skills = {}
+    if not isinstance(tech_skills, (dict, list)):
+        tech_skills = {}
+
     return {
         "profile_id": str(profile_id),
         "career_goal": a.career_goal,
-        "soft_skills": soft_skills if isinstance(soft_skills, list) else [],
-        "tech_skills": tech_skills if isinstance(tech_skills, list) else [],
+        "soft_skills": soft_skills,
+        "tech_skills": tech_skills,
         "updated_at": a.updated_at,
     }
 
@@ -177,8 +184,8 @@ class SqlRepo(IRepository):
             a = s.exec(select(Attributes).where(
                 Attributes.user_id == pid)).first()
             if not a:
-                raise ValueError(
-                    f"Attributes não encontrados para profile_id: {profile_id}")
+                from backend.app.domain.exceptions import AttributesNotFoundError
+                raise AttributesNotFoundError(profile_id)
             return _attributes_out(pid, a)
 
     def update_attributes(self, profile_id: str, patch: dict) -> dict:
