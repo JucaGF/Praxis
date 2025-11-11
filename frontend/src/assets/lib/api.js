@@ -68,7 +68,7 @@ async function fetchWithAuth(url, options = {}) {
     
     // 401: Não autenticado - Redireciona para login
     if (response.status === 401) {
-      console.warn("Sessão expirada ou inválida. Redirecionando para login...");
+      console.warn("⚠️ Sessão expirada ou inválida. Redirecionando para login...");
       
       // Limpa sessão do Supabase
       await supabase.auth.signOut();
@@ -84,7 +84,23 @@ async function fetchWithAuth(url, options = {}) {
       throw new AuthorizationError(errorMessage);
     }
     
-    // Outros erros
+    // 404: Recurso não encontrado (pode ser usuário novo sem attributes)
+    if (response.status === 404) {
+      console.warn("⚠️ Recurso não encontrado (404):", errorMessage);
+      
+      // Cria erro customizado para 404
+      const notFoundError = new Error(errorMessage);
+      notFoundError.status = 404;
+      throw notFoundError;
+    }
+    
+    // 500: Erro interno do servidor
+    if (response.status === 500) {
+      console.error("❌ Erro interno do servidor (500):", errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    // Outros erros HTTP
     throw new Error(errorMessage);
   }
   
@@ -124,8 +140,8 @@ export async function submitSolution(submissionData) {
   });
 }
 
-export async function updateAttributes(updates) {
-  return await fetchWithAuth(`${API_URL}/attributes`, {
+export async function updateAttributes(profileId, updates) {
+  return await fetchWithAuth(`${API_URL}/attributes/${profileId}`, {
     method: "PATCH",
     body: JSON.stringify(updates),
   });

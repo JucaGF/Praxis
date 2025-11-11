@@ -36,13 +36,19 @@ class AttributesOut(BaseModel):
     """
     Resposta completa dos atributos do perfil.
     
-    IMPORTANTE: tech_skills e soft_skills são LISTAS DE OBJETOS agora,
-    não dicionários, para corresponder ao formato no banco.
+    IMPORTANTE: tech_skills e soft_skills são DICIONÁRIOS (Dict[str, int])
+    onde a chave é o nome da skill e o valor é a porcentagem/nível.
+    
+    Exemplo:
+    {
+      "tech_skills": {"Python": 80, "FastAPI": 70},
+      "soft_skills": {"Comunicação": 90, "Trabalho em Equipe": 85}
+    }
     """
     profile_id: str
     career_goal: Optional[str] = None
-    soft_skills: List[SoftSkill] = Field(default_factory=list)
-    tech_skills: List[TechSkill] = Field(default_factory=list)
+    soft_skills: Dict[str, int] = Field(default_factory=dict)
+    tech_skills: Dict[str, int] = Field(default_factory=dict)
     updated_at: datetime
     
     class Config:

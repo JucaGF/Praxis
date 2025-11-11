@@ -582,23 +582,105 @@ export default function Home() {
   useEffect(() => {
     (async () => {
       try {
-        // Busca apenas atributos e desafios (profile vem do Supabase)
-        const [attributes, challenges] = await Promise.all([
-          fetchUser(),
-          fetchChallenges()
-        ]);
-        
-        // Pega o nome do Supabase
+        // Primeiro, verifica se o usuário está autenticado
         const { data: { user: authUser } } = await supabase.auth.getUser();
+        
+        if (!authUser) {
+          console.warn("⚠️ Usuário não autenticado. Redirecionando para login...");
+          navigate("/login");
+          return;
+        }
+        
         const fullName = authUser?.user_metadata?.full_name || authUser?.user_metadata?.nome || "Usuário";
+        
+        // Tenta buscar atributos e desafios
+        let attributes = null;
+        let challenges = [];
+        
+        try {
+          // Busca atributos
+          attributes = await fetchUser();
+        } catch (attrError) {
+          console.log("⚠️ Erro ao buscar attributes:", attrError);
+          
+          // Se erro 404, significa que attributes não existe (usuário precisa fazer onboarding)
+          if (attrError.status === 404 || 
+              attrError.message?.includes("404") ||
+              attrError.message?.includes("não encontrado") ||
+              attrError.message?.includes("not found")) {
+            console.warn("⚠️ Attributes não encontrados (404). Redirecionando para onboarding...");
+            navigate("/onboarding");
+            return;
+          }
+          
+          // Se erro de autenticação, já foi tratado (redirecionou para login)
+          if (attrError.name === "AuthenticationError") {
+            return; // Não precisa fazer nada, já redirecionou
+          }
+          
+          // Outros erros: re-throw
+          throw attrError;
+        }
+        
+        // Busca desafios
+        try {
+          challenges = await fetchChallenges();
+        } catch (chalError) {
+          console.warn("⚠️ Erro ao buscar desafios (não crítico):", chalError);
+          challenges = []; // Continua sem desafios
+        }
         
         console.log("📊 Dados recebidos da API:", { authUser, attributes, challenges });
         
-        // Verifica se os atributos existem
-        if (!attributes || !attributes.tech_skills || attributes.tech_skills.length === 0) {
-          console.warn("⚠️ Atributos não encontrados ou vazios. Usuário precisa criar dados mockados.");
-          throw new Error("Atributos não encontrados. Clique no botão para criar dados mockados.");
+        // Debug: Ver estrutura exata dos attributes
+        console.log("🔍 Attributes detalhado:", {
+          attributes,
+          tech_skills: attributes?.tech_skills,
+          tech_skills_type: typeof attributes?.tech_skills,
+          tech_skills_is_array: Array.isArray(attributes?.tech_skills),
+          tech_skills_length: attributes?.tech_skills?.length,
+          tech_skills_keys: attributes?.tech_skills && typeof attributes.tech_skills === 'object' ? Object.keys(attributes.tech_skills) : null,
+          soft_skills: attributes?.soft_skills,
+          soft_skills_type: typeof attributes?.soft_skills,
+          soft_skills_is_array: Array.isArray(attributes?.soft_skills),
+          soft_skills_length: attributes?.soft_skills?.length,
+          soft_skills_keys: attributes?.soft_skills && typeof attributes.soft_skills === 'object' ? Object.keys(attributes.soft_skills) : null,
+        });
+        
+        // Verifica se os atributos existem e são reais (não mockados)
+        // Attributes podem vir como objeto ou array, precisamos tratar ambos os casos
+        const hasTechSkills = attributes?.tech_skills && (
+          (Array.isArray(attributes.tech_skills) && attributes.tech_skills.length > 0) ||
+          (typeof attributes.tech_skills === 'object' && !Array.isArray(attributes.tech_skills) && Object.keys(attributes.tech_skills).length > 0)
+        );
+        
+        const hasSoftSkills = attributes?.soft_skills && (
+          (Array.isArray(attributes.soft_skills) && attributes.soft_skills.length > 0) ||
+          (typeof attributes.soft_skills === 'object' && !Array.isArray(attributes.soft_skills) && Object.keys(attributes.soft_skills).length > 0)
+        );
+        
+        const hasRealData = attributes && hasTechSkills && hasSoftSkills;
+        
+        if (!hasRealData) {
+          console.warn("⚠️ Atributos vazios ou mockados. Redirecionando para onboarding...");
+          console.warn("Debug validação:", { 
+            hasTechSkills, 
+            hasSoftSkills, 
+            hasRealData,
+            tech_skills_check: {
+              exists: !!attributes?.tech_skills,
+              is_array: Array.isArray(attributes?.tech_skills),
+              array_length: Array.isArray(attributes?.tech_skills) ? attributes.tech_skills.length : null,
+              is_object: typeof attributes?.tech_skills === 'object' && !Array.isArray(attributes?.tech_skills),
+              object_keys: typeof attributes?.tech_skills === 'object' && !Array.isArray(attributes?.tech_skills) ? Object.keys(attributes.tech_skills).length : null
+            }
+          });
+          navigate("/onboarding");
+          return;
         }
+        
+        console.log("✅ Attributes válidos, continuando para Home...");
+        
         
         // Mapeia career_goal para interesses relevantes
         const getInterests = (careerGoal) => {
@@ -624,7 +706,8 @@ export default function Home() {
         const userData = {
           name: fullName,
           // Extrai nomes das tech_skills para usar como skills
-          skills: attributes.tech_skills.map(skill => skill.name),
+          // tech_skills agora é um objeto {skill_name: percentage}, então pegamos as chaves
+          skills: attributes.tech_skills ? Object.keys(attributes.tech_skills) : [],
           // Mapeia career_goal para interesses
           interests: getInterests(attributes.career_goal)
         };

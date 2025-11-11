@@ -85,6 +85,8 @@ Para rodar este projeto localmente, siga os passos abaixo.
         ```
     
     📖 **Guia completo de configuração da IA**: Veja [`backend/AI_SETUP.md`](backend/AI_SETUP.md)
+    📖 **Autenticação e Supabase**: Veja [`backend/AUTHENTICATION.md`](backend/AUTHENTICATION.md)
+    📖 **Desenvolvimento Backend**: Veja [`backend/README_DEV.md`](backend/README_DEV.md)
 
 5.  **Rode o servidor:**
     ```bash
@@ -117,3 +119,15 @@ Para rodar este projeto localmente, siga os passos abaixo.
     npm run dev
     ```
     Abra `http://localhost:5173` (ou a porta indicada no seu terminal) para ver o projeto no navegador.
+
+## 📚 Documentação Adicional
+
+- **[Fluxo de Cadastro com Questionários](FLUXO_CADASTRO.md)** - Documentação completa do fluxo de onboarding
+- **[Configuração com Docker](README_DOCKER.md)** - Como rodar o projeto com Docker
+- **[Setup de IA](backend/AI_SETUP.md)** - Configuração detalhada do Google Gemini
+- **[Autenticação](backend/AUTHENTICATION.md)** - Como funciona a autenticação com Supabase
+- **[Desenvolvimento Backend](backend/README_DEV.md)** - Guia para desenvolvedores do backend
+
+## 🤝 Contribuindo
+
+Este é um projeto em desenvolvimento ativo. Sinta-se à vontade para abrir issues ou enviar pull requests!
