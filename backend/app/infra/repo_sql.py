@@ -11,12 +11,16 @@ from datetime import datetime
 
 from sqlmodel import Session, select
 from sqlalchemy import func
+from backend.app.logging_config import get_logger
+import json
 
 import sys
 from pathlib import Path
 # Adiciona o diretório backend ao path para imports
 backend_path = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_path))
+
+logger = get_logger(__name__)
 
 
 # ✅ Importa a interface que vamos implementar
@@ -41,17 +45,33 @@ def _profile_out(p: Profile) -> dict:
 
 
 def _attributes_out(profile_id: uuid.UUID, a: Attributes) -> dict:
-    import json
-
     # Parse JSONB fields se eles vierem como string
     soft_skills = a.soft_skills or {}
     tech_skills = a.tech_skills or {}
+    strong_skills = a.strong_skills or {}
 
-    # Se vier como string, parseia
+    # Se vier como string, parseia com fallback seguro
     if isinstance(soft_skills, str):
-        soft_skills = json.loads(soft_skills)
+        try:
+            soft_skills = json.loads(soft_skills)
+        except Exception as e:
+            logger.warning("soft_skills não é JSON válido, retornando objeto vazio", extra={
+                           "profile_id": str(profile_id), "error": str(e)})
+            soft_skills = {}
     if isinstance(tech_skills, str):
-        tech_skills = json.loads(tech_skills)
+        try:
+            tech_skills = json.loads(tech_skills)
+        except Exception as e:
+            logger.warning("tech_skills não é JSON válido, retornando objeto vazio", extra={
+                           "profile_id": str(profile_id), "error": str(e)})
+            tech_skills = {}
+    if isinstance(strong_skills, str):
+        try:
+            strong_skills = json.loads(strong_skills)
+        except Exception as e:
+            logger.warning("strong_skills não é JSON válido, retornando objeto vazio", extra={
+                           "profile_id": str(profile_id), "error": str(e)})
+            strong_skills = {}
 
     # Skills devem ser dicionários, mas se vier como lista, mantém
     # (para compatibilidade com dados antigos)
@@ -59,12 +79,15 @@ def _attributes_out(profile_id: uuid.UUID, a: Attributes) -> dict:
         soft_skills = {}
     if not isinstance(tech_skills, (dict, list)):
         tech_skills = {}
+    if not isinstance(strong_skills, (dict, list)):
+        strong_skills = {}
 
     return {
         "profile_id": str(profile_id),
         "career_goal": a.career_goal,
         "soft_skills": soft_skills,
         "tech_skills": tech_skills,
+        "strong_skills": strong_skills,
         "updated_at": a.updated_at,
     }
 
@@ -205,7 +228,8 @@ class SqlRepo(IRepository):
                     user_id=pid,
                     career_goal=patch.get("career_goal"),
                     soft_skills=patch.get("soft_skills", {}),
-                    tech_skills=patch.get("tech_skills", {})
+                    tech_skills=patch.get("tech_skills", {}),
+                    strong_skills=patch.get("strong_skills", {})
                 )
                 s.add(a)
                 s.commit()
@@ -220,6 +244,9 @@ class SqlRepo(IRepository):
             if "tech_skills" in patch and patch["tech_skills"]:
                 a.tech_skills = {**(a.tech_skills or {}),
                                  **patch["tech_skills"]}
+            if "strong_skills" in patch and patch["strong_skills"]:
+                a.strong_skills = {**(a.strong_skills or {}),
+                                   **patch["strong_skills"]}
             a.updated_at = datetime.utcnow()
             s.add(a)
             s.commit()
@@ -505,7 +532,7 @@ class SqlRepo(IRepository):
                 select(ResumeAnalysis)
                 .where(ResumeAnalysis.resume_id == resume_id)
             ).first()
-            
+
             if analysis:
                 s.delete(analysis)
                 s.commit()
@@ -516,13 +543,13 @@ class SqlRepo(IRepository):
         """Deleta um currículo e sua análise associada"""
         with Session(self.engine) as s:
             resume = s.get(Resume, resume_id)
-            
+
             if not resume:
                 return False
-            
+
             # Primeiro deleta a análise (se existir) devido à FK
             self.delete_resume_analysis(resume_id)
-            
+
             # Depois deleta o currículo
             s.delete(resume)
             s.commit()

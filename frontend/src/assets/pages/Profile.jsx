@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Line } from "react-chartjs-2";
 import { supabase } from "../lib/supabaseClient";
-import { deleteAccount, fetchUser, fetchSubmissions } from "../lib/api";
+import { deleteAccount, fetchUser, fetchSubmissions, listResumes, analyzeResume, deleteResume } from "../lib/api";
 import PraxisLogo from "../components/PraxisLogo";
 import {
   Chart as ChartJS,
@@ -146,6 +146,11 @@ export default function Profile() {
   const [user, setUser] = useState(null);
   const [attributes, setAttributes] = useState(null);
   const [submissions, setSubmissions] = useState([]);
+  const [myResumes, setMyResumes] = useState([]);
+  const [expandedMyResumesCard, setExpandedMyResumesCard] = useState(false);
+  const [analyzingResume, setAnalyzingResume] = useState(false);
+  const [selectedResumeId, setSelectedResumeId] = useState(null);
+  const [deletingResumeId, setDeletingResumeId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -178,6 +183,15 @@ export default function Profile() {
           console.error("Erro ao buscar submissões:", error);
           setSubmissions([]);
         }
+
+        // Carrega currículos do usuário
+        try {
+          const resumes = await listResumes();
+          setMyResumes(resumes || []);
+        } catch (err) {
+          console.error("Erro ao carregar currículos:", err);
+          setMyResumes([]);
+        }
         
         console.log("📊 Dados do perfil carregados:", { fullName });
       } catch (error) {
@@ -193,6 +207,78 @@ export default function Profile() {
 
     loadData();
   }, []);
+
+  // Calcula porcentagens das soft skills com base nos attributes retornados
+  const computeSoftSkillPercentages = (softSkills) => {
+    // Definição das categorias e suas perguntas (deve refletir o questionario_soft)
+    const categorias = [
+      {
+        chave: 'Comunicação',
+        perguntas: [
+          'Consigo explicar problemas técnicos para pessoas não técnicas',
+          'Deixo comentários claros e úteis no código',
+          'Escrevo mensagens estruturadas em equipes de desenvolvimento',
+        ],
+      },
+      {
+        chave: 'Organização',
+        perguntas: [
+          'Divido tarefas em pequenas etapas e priorizo',
+          'Planejo minhas atividades semanalmente',
+          'Gerencio múltiplos projetos sem perder prazos',
+        ],
+      },
+      {
+        chave: 'Resolução de Problemas',
+        perguntas: [
+          'Identifico rapidamente a causa raiz dos problemas',
+          'Sei investigar e debugar erros de forma eficiente',
+          'Resolvo problemas complexos de lógica',
+        ],
+      },
+    ];
+
+    if (!softSkills) return {};
+
+    const results = {};
+
+    categorias.forEach((cat) => {
+      // Se o backend já armazenou a categoria como chave com percent (ex: {"Comunicação": 80})
+      if (typeof softSkills[cat.chave] === 'number') {
+        results[cat.chave] = Math.max(0, Math.min(100, Math.round(softSkills[cat.chave])));
+        return;
+      }
+
+      // Caso contrário, buscamos as perguntas individuais no objeto softSkills (que pode ter as perguntas como chaves)
+      const valores = cat.perguntas
+        .map((q) => softSkills[q])
+        .filter((v) => typeof v === 'number');
+
+      if (valores.length === 0) {
+        results[cat.chave] = 0;
+        return;
+      }
+
+      const media = valores.reduce((a, b) => a + b, 0) / valores.length;
+
+      // Detectar escala: se valores parecem estar em 0..5 ou 0..100
+      const maxVal = Math.max(...valores);
+
+      let percent = 0;
+      if (maxVal <= 5) {
+        // respostas 0-5: média * 10 (conforme solicitado)
+        percent = media * 10;
+      } else {
+        // respostas 0-100: converter para escala pedida
+        // assumimos que média 0-100 -> seguir média * 0.5 (equivalente a (media/20)*10)
+        percent = media * 0.5;
+      }
+
+      results[cat.chave] = Math.max(0, Math.min(100, Math.round(percent)));
+    });
+
+    return results;
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -222,6 +308,38 @@ export default function Profile() {
         error.message || "Não foi possível excluir sua conta. Por favor, tente novamente ou entre em contato com o suporte."
       );
       setDeleteLoading(false);
+    }
+  };
+
+  // Funções para currículos (moved from Home.jsx)
+  const loadResumes = async () => {
+    try {
+      const resumes = await listResumes();
+      setMyResumes(resumes || []);
+    } catch (error) {
+      console.error("❌ Erro ao carregar currículos:", error);
+    }
+  };
+
+  const handleAnalyzeResume = (resumeId) => {
+    // Redireciona para a Home e passa o id do currículo para que a Home abra a análise
+    navigate('/home', { state: { openResumeId: resumeId } });
+  };
+
+  const handleDeleteResume = async (resumeId) => {
+    setDeletingResumeId(resumeId);
+
+    try {
+      // Delay curto para animação
+      await new Promise(resolve => setTimeout(resolve, 200));
+      setMyResumes(prev => prev.filter(r => r.id !== resumeId));
+      await deleteResume(resumeId);
+    } catch (error) {
+      console.error("❌ Erro ao deletar currículo:", error);
+      alert("Erro ao deletar currículo: " + (error.message || ""));
+      await loadResumes();
+    } finally {
+      setDeletingResumeId(null);
     }
   };
 
@@ -266,7 +384,7 @@ export default function Profile() {
               {/* Coluna Principal (2/3) */}
               <div className="lg:col-span-2 space-y-8">
 
-                <Section title="Habilidades Técnicas" subtitle="Suas competências atualizadas com base nos desafios completados">
+                <Section title="Habilidades Técnicas" subtitle={null}>
                     <div className="space-y-6">
                         {attributes?.tech_skills && Object.keys(attributes.tech_skills).length > 0 ? (
                           Object.entries(attributes.tech_skills).map(([skillName, percentage]) => (
@@ -281,6 +399,30 @@ export default function Profile() {
                           <p className="text-zinc-500 text-center py-4">Nenhuma habilidade registrada ainda.</p>
                         )}
                     </div>
+                </Section>
+
+                {/* Nova seção: Habilidades Sociais (Soft Skills) */}
+                <Section title="Habilidades Sociais" subtitle={null}>
+                  <div className="space-y-6">
+                    {(() => {
+                      const softPercents = computeSoftSkillPercentages(attributes?.soft_skills || {});
+                      const keys = ['Comunicação', 'Organização', 'Resolução de Problemas'];
+
+                      const hasAny = keys.some(k => softPercents[k] && softPercents[k] > 0);
+
+                      if (!hasAny) {
+                        return <p className="text-zinc-500 text-center py-4">Nenhuma avaliação de soft skills disponível.</p>;
+                      }
+
+                      return (
+                        <div className="space-y-4">
+                          {keys.map(k => (
+                            <SkillBar key={k} skill={k} percentage={softPercents[k] || 0} date={attributes?.updated_at} />
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </Section>
 
                 <Section title="Histórico de Desafios" subtitle={`${submissions.length} desafios completados`}>
@@ -325,6 +467,79 @@ export default function Profile() {
                 <p className="text-sm text-zinc-600">Você está no caminho certo. Continue praticando regularmente.</p>
               </div>
             </Section>
+
+              {/* Nova área: Meus Currículos (movido da Home) */}
+              <Section title="Meus Currículos" subtitle={null}>
+                <div>
+                  <Card 
+                    role="button"
+                    aria-expanded={expandedMyResumesCard}
+                    className={
+                      "p-4 cursor-pointer transition-all duration-300 ease-in-out " +
+                      (expandedMyResumesCard ? "ring-2 ring-primary-300" : "hover:scale-[1.02]")
+                    }
+                    onClick={() => setExpandedMyResumesCard(prev => !prev)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="h-9 w-9 rounded-md bg-emerald-100 text-emerald-800 grid place-content-center border border-emerald-200 text-sm font-semibold">
+                          ✔
+                        </div>
+                        <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Análise Praxis</span>
+                      </div>
+                    </div>
+
+                    {!expandedMyResumesCard && (
+                      <div className="mt-3">
+                        <h3 className="text-lg font-semibold text-zinc-900">Análises</h3>
+                        <p className="mt-1.5 text-sm text-zinc-600">{myResumes.length === 0 ? 'Nenhum currículo enviado' : `${myResumes.length} currículo${myResumes.length > 1 ? 's' : ''}`}</p>
+                      </div>
+                    )}
+
+                    {expandedMyResumesCard && (
+                      <div className="pt-4 mt-4 border-t border-zinc-200" onClick={(e) => e.stopPropagation()}>
+                        <h3 className="text-lg font-semibold text-zinc-900 mb-3">Currículos Enviados</h3>
+
+                        {myResumes.length === 0 ? (
+                          <div className="text-center py-8 text-zinc-500">
+                            <p className="text-sm">Nenhum currículo enviado ainda.</p>
+                            <p className="text-xs mt-1">Envie seu primeiro currículo na área de Análise.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-3 max-h-72 overflow-y-auto">
+                            {myResumes.map((resume) => (
+                              <div key={resume.id} className={`border border-zinc-200 rounded-lg p-3 transition-all duration-300 ${deletingResumeId === resume.id ? 'opacity-0 scale-95 translate-x-4' : 'opacity-100 scale-100 translate-x-0'}`}>
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex-1">
+                                    <h4 className="font-semibold text-zinc-900 text-sm">{resume.title || 'Sem título'}</h4>
+                                    <p className="text-xs text-zinc-500 mt-1">Enviado em {new Date(resume.created_at).toLocaleDateString('pt-BR')}</p>
+                                  </div>
+                                  {resume.has_analysis && (
+                                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">✓ Analisado</span>
+                                  )}
+                                </div>
+
+                                <div className="flex gap-2 mt-2">
+                                  <button onClick={() => handleAnalyzeResume(resume.id)} disabled={analyzingResume && selectedResumeId === resume.id} className="flex-1 px-3 py-1.5 text-sm font-medium border border-primary-200 text-primary-700 rounded-md hover:bg-primary-50 transition disabled:opacity-50 cursor-pointer">
+                                    {analyzingResume && selectedResumeId === resume.id ? 'Analisando...' : (resume.has_analysis ? 'Ver Análise' : 'Analisar com IA')}
+                                  </button>
+                                  <button onClick={() => handleDeleteResume(resume.id)} disabled={deletingResumeId === resume.id} className="px-3 py-1.5 text-sm font-medium border border-red-200 text-red-600 rounded-md hover:bg-red-50 transition disabled:opacity-50 cursor-pointer" title="Excluir currículo">
+                                    {deletingResumeId === resume.id ? '...' : 'Excluir'}
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="mt-4 flex justify-end">
+                          <button onClick={(e) => { e.stopPropagation(); setExpandedMyResumesCard(false); }} className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50">Fechar</button>
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                </div>
+              </Section>
           </div>
         </div>
           </>
