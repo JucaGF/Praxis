@@ -728,9 +728,21 @@ export default function Home() {
         }
         
         // Busca submissões para determinar quais desafios foram concluídos
+        // 🚀 OTIMIZAÇÃO: Filtra apenas submissions dos desafios ativos (3)
         let submissions = [];
         try {
-          submissions = await fetchSubmissions();
+          const allSubmissions = await fetchSubmissions();
+          
+          // Filtra apenas submissions dos desafios ativos
+          const activeChallengeIds = challenges.map(c => c.id);
+          submissions = allSubmissions.filter(s => activeChallengeIds.includes(s.challenge_id));
+          
+          console.log("🚀 OTIMIZAÇÃO: Submissões filtradas para home:", {
+            totalSubmissions: allSubmissions.length,
+            activeChallenges: activeChallengeIds.length,
+            relevantSubmissions: submissions.length,
+            filtered: allSubmissions.length - submissions.length
+          });
         } catch (subError) {
           console.warn("⚠️ Erro ao buscar submissões (não crítico):", subError);
           submissions = []; // Continua sem submissões
@@ -1164,10 +1176,38 @@ export default function Home() {
           </div>
         )}
 
-        {/* Placeholders durante geração (skeleton cards) */}
-        {generatingChallenges && challengePlaceholders.length > 0 && (
-          <div className="grid md:grid-cols-6 gap-5 mb-5">
-            {challengePlaceholders.map((placeholder, index) => (
+        {/* Grid unificado: mostra placeholders OU desafios reais no mesmo lugar */}
+        <div className="grid md:grid-cols-6 gap-5">
+        {generatingChallenges && challengePlaceholders.length > 0 ? (
+          // Durante geração: mostra placeholders que vão sendo substituídos por desafios reais
+          challengePlaceholders.map((placeholder, index) => {
+            // Verifica se já existe um desafio real para este índice
+            const realChallenge = catalog[index];
+            
+            // Se o desafio real já existe e o placeholder está marcado como completo, mostra o desafio real
+            if (realChallenge && !placeholder.isLoading) {
+              const expanded = expandedId === realChallenge.id;
+              return (
+                <div
+                  key={realChallenge.id}
+                  style={{
+                    gridColumn: expanded ? 'span 6' : 'span 2'
+                  }}
+                  className={`transition-all duration-300 ${
+                    expandedId && !expanded ? "scale-95 opacity-90" : ""
+                  }`}
+                >
+                  <ChallengeCardHome 
+                    challenge={realChallenge}
+                    expanded={expanded}
+                    onToggle={() => toggleExpand(realChallenge.id)}
+                  />
+                </div>
+              );
+            }
+            
+            // Senão, mostra o placeholder
+            return (
               <Card
                 key={`placeholder-${placeholder.id}`}
                 style={{ gridColumn: 'span 2' }}
@@ -1221,53 +1261,52 @@ export default function Home() {
                   )}
                 </div>
               </Card>
-            ))}
-          </div>
-        )}
-
-        <div className="grid md:grid-cols-6 gap-5">
-        {/* Mostra todos os desafios (disponíveis + completados) */}
-        {recommended
-          .sort((a, b) => {
-            // Prioriza expandido primeiro
-            if (a.id === expandedId) return -1;
-            if (b.id === expandedId) return 1;
-            // Depois, prioriza disponíveis sobre completados
-            if (a.status === 'available' && b.status === 'completed') return -1;
-            if (a.status === 'completed' && b.status === 'available') return 1;
-            return 0;
-          })
-          .map((c, index) => {
-            const expanded = expandedId === c.id;
-            const isFirstCollapsed = !expanded && expandedId && index === 1;
-            const isSecondCollapsed = !expanded && expandedId && index === 2;
-            
-            return (
-              <div
-                key={c.id}
-                style={{
-                  gridColumn: expanded 
-                    ? 'span 6' 
-                    : isFirstCollapsed 
-                      ? '2 / span 2' 
-                      : isSecondCollapsed 
-                        ? '4 / span 2' 
-                        : 'span 2'
-                }}
-                className={
-                  expandedId && !expanded
-                    ? "scale-95 opacity-90"
-                    : ""
-                }
-              >
-                <ChallengeCardHome 
-                  challenge={c}
-                  expanded={expanded}
-                  onToggle={() => toggleExpand(c.id)}
-                />
-              </div>
             );
-        })}
+          })
+        ) : (
+          // Quando não está gerando: mostra desafios normais
+          recommended
+            .sort((a, b) => {
+              // Prioriza expandido primeiro
+              if (a.id === expandedId) return -1;
+              if (b.id === expandedId) return 1;
+              // Depois, prioriza disponíveis sobre completados
+              if (a.status === 'available' && b.status === 'completed') return -1;
+              if (a.status === 'completed' && b.status === 'available') return 1;
+              return 0;
+            })
+            .map((c, index) => {
+              const expanded = expandedId === c.id;
+              const isFirstCollapsed = !expanded && expandedId && index === 1;
+              const isSecondCollapsed = !expanded && expandedId && index === 2;
+              
+              return (
+                <div
+                  key={c.id}
+                  style={{
+                    gridColumn: expanded 
+                      ? 'span 6' 
+                      : isFirstCollapsed 
+                        ? '2 / span 2' 
+                        : isSecondCollapsed 
+                          ? '4 / span 2' 
+                          : 'span 2'
+                  }}
+                  className={
+                    expandedId && !expanded
+                      ? "scale-95 opacity-90"
+                      : ""
+                  }
+                >
+                  <ChallengeCardHome 
+                    challenge={c}
+                    expanded={expanded}
+                    onToggle={() => toggleExpand(c.id)}
+                  />
+                </div>
+              );
+          })
+        )}
         </div>
 
 
@@ -1443,7 +1482,7 @@ export default function Home() {
                     <div className="mt-5 flex justify-end">
                       <button
                         onClick={(e) => { e.stopPropagation(); setExpandedUploadCard(false); }}
-                        className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50"
+                        className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50 cursor-pointer"
                       >
                         Fechar
                       </button>

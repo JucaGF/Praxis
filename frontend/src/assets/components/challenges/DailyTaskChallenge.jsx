@@ -287,14 +287,14 @@ Carlos Silva`}
                 <em>I</em>
               </button>
               <div className="w-px h-6 bg-zinc-700 mx-1"></div>
-              <button className="p-2 hover:bg-zinc-700 rounded transition text-zinc-400 hover:text-white" title="Lista">
+              <button className="p-2 hover:bg-zinc-700 rounded transition text-zinc-400 hover:text-white cursor-pointer" title="Lista">
                 ≡
               </button>
-              <button className="p-2 hover:bg-zinc-700 rounded transition text-zinc-400 hover:text-white" title="Lista numerada">
+              <button className="p-2 hover:bg-zinc-700 rounded transition text-zinc-400 hover:text-white cursor-pointer" title="Lista numerada">
                 ≣
               </button>
               <div className="w-px h-6 bg-zinc-700 mx-1"></div>
-              <button className="p-2 hover:bg-zinc-700 rounded transition text-zinc-400 hover:text-white" title="Link">
+              <button className="p-2 hover:bg-zinc-700 rounded transition text-zinc-400 hover:text-white cursor-pointer" title="Link">
                 🔗
               </button>
             </div>

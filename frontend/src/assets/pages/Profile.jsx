@@ -114,7 +114,7 @@ function ChallengeHistoryItem({ id, title, score, points, date, tags }) {
           </div>
           <button
             onClick={handleToggle}
-            className="p-2 hover:bg-zinc-100 rounded-lg transition"
+            className="p-2 hover:bg-zinc-100 rounded-lg transition cursor-pointer"
             aria-label={expanded ? "Recolher" : "Expandir"}
           >
             {expanded ? <ChevronUp className="w-5 h-5 text-zinc-600" /> : <ChevronDown className="w-5 h-5 text-zinc-600" />}
@@ -802,7 +802,7 @@ export default function Profile() {
                         )}
 
                         <div className="mt-4 flex justify-end">
-                          <button onClick={(e) => { e.stopPropagation(); setExpandedMyResumesCard(false); }} className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50">Fechar</button>
+                          <button onClick={(e) => { e.stopPropagation(); setExpandedMyResumesCard(false); }} className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50 cursor-pointer">Fechar</button>
                         </div>
                       </div>
                     )}

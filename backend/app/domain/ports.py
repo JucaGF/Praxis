@@ -207,6 +207,31 @@ class IRepository(ABC):
             Lista de objetos Submission ordenados por submitted_at DESC
         """
         pass
+    
+    @abstractmethod
+    def get_submissions_with_details(
+        self, 
+        profile_id: str, 
+        challenge_id: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        🚀 OTIMIZADO: Busca submissões com challenges e feedbacks em uma única query.
+        
+        Evita N+1 queries usando JOINs para carregar tudo de uma vez.
+        
+        Args:
+            profile_id: ID do perfil
+            challenge_id: Opcional - filtra por challenge específico
+            
+        Returns:
+            Lista de dicts com estrutura:
+            {
+                'submission': Submission object,
+                'challenge': dict com dados do challenge,
+                'feedback': SubmissionFeedback object ou None
+            }
+        """
+        pass
 
     # -------------- FEEDBACK --------------
     @abstractmethod

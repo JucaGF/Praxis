@@ -247,7 +247,7 @@ export default function Login() {
             <div className="mb-6">
               <button
                 type="button"
-                className="w-full flex items-center justify-center py-3 px-4 rounded-lg shadow-sm text-base font-semibold text-white transition duration-150 ease-in-out bg-blue-600 hover:bg-blue-700"
+                className="w-full flex items-center justify-center py-3 px-4 rounded-lg shadow-sm text-base font-semibold text-white transition duration-150 ease-in-out bg-blue-600 hover:bg-blue-700 cursor-pointer"
               >
                 <LinkedInIcon />
                 Conecte-se com o LinkedIn
