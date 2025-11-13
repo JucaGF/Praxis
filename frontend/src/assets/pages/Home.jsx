@@ -1,6 +1,6 @@
 // src/pages/Home.jsx
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { fetchUser, fetchChallenges, fetchSubmissions, generateChallengesStreaming, uploadResume, uploadResumeFile, analyzeResume, listResumes, uploadAndAnalyzeResumeFileStreaming, analyzeResumeStreaming, deleteResume } from "../lib/api.js";
 import { Pill, Difficulty, Skill, Meta, Card, PrimaryButton } from "../components/ui.jsx";
 import { supabase } from "../lib/supabaseClient";
@@ -186,6 +186,18 @@ export default function Home() {
   
   // Ref para scroll automático até a análise
   const analysisResultRef = useRef(null);
+
+  const location = useLocation();
+
+  // Remove emojis e pictogramas simples de uma string para exibição limpa
+  const stripEmoji = (s) => {
+    if (!s) return s;
+    try {
+      return s.replace(/[\u2700-\u27BF\uE000-\uF8FF\u2600-\u26FF]|[\uD83C-\uDBFF][\uDC00-\uDFFF]/g, '').trim();
+    } catch (e) {
+      return s;
+    }
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -738,6 +750,12 @@ export default function Home() {
           }))
         });
         
+        // Debug CRÍTICO: Ver strong_skills exatamente como vem
+        console.log("🎯 STRONG_SKILLS BRUTO:", attributes?.strong_skills);
+        console.log("🎯 STRONG_SKILLS TYPE:", typeof attributes?.strong_skills);
+        console.log("🎯 STRONG_SKILLS KEYS:", attributes?.strong_skills ? Object.keys(attributes.strong_skills) : "NULO");
+        console.log("🎯 STRONG_SKILLS LENGTH:", attributes?.strong_skills ? Object.keys(attributes.strong_skills).length : 0);
+        
         // Debug: Ver estrutura exata dos attributes
         console.log("🔍 Attributes detalhado:", {
           attributes,
@@ -746,6 +764,11 @@ export default function Home() {
           tech_skills_is_array: Array.isArray(attributes?.tech_skills),
           tech_skills_length: attributes?.tech_skills?.length,
           tech_skills_keys: attributes?.tech_skills && typeof attributes.tech_skills === 'object' ? Object.keys(attributes.tech_skills) : null,
+          strong_skills: attributes?.strong_skills,
+          strong_skills_type: typeof attributes?.strong_skills,
+          strong_skills_is_array: Array.isArray(attributes?.strong_skills),
+          strong_skills_length: attributes?.strong_skills?.length,
+          strong_skills_keys: attributes?.strong_skills && typeof attributes.strong_skills === 'object' ? Object.keys(attributes.strong_skills) : null,
           soft_skills: attributes?.soft_skills,
           soft_skills_type: typeof attributes?.soft_skills,
           soft_skills_is_array: Array.isArray(attributes?.soft_skills),
@@ -760,17 +783,23 @@ export default function Home() {
           (typeof attributes.tech_skills === 'object' && !Array.isArray(attributes.tech_skills) && Object.keys(attributes.tech_skills).length > 0)
         );
         
+        const hasStrongSkills = attributes?.strong_skills && (
+          (Array.isArray(attributes.strong_skills) && attributes.strong_skills.length > 0) ||
+          (typeof attributes.strong_skills === 'object' && !Array.isArray(attributes.strong_skills) && Object.keys(attributes.strong_skills).length > 0)
+        );
+        
         const hasSoftSkills = attributes?.soft_skills && (
           (Array.isArray(attributes.soft_skills) && attributes.soft_skills.length > 0) ||
           (typeof attributes.soft_skills === 'object' && !Array.isArray(attributes.soft_skills) && Object.keys(attributes.soft_skills).length > 0)
         );
         
-        const hasRealData = attributes && hasTechSkills && hasSoftSkills;
+        const hasRealData = attributes && hasTechSkills && hasStrongSkills && hasSoftSkills;
         
         if (!hasRealData) {
           console.warn("⚠️ Atributos vazios ou mockados. Redirecionando para onboarding...");
           console.warn("Debug validação:", { 
             hasTechSkills, 
+            hasStrongSkills,
             hasSoftSkills, 
             hasRealData,
             tech_skills_check: {
@@ -779,6 +808,13 @@ export default function Home() {
               array_length: Array.isArray(attributes?.tech_skills) ? attributes.tech_skills.length : null,
               is_object: typeof attributes?.tech_skills === 'object' && !Array.isArray(attributes?.tech_skills),
               object_keys: typeof attributes?.tech_skills === 'object' && !Array.isArray(attributes?.tech_skills) ? Object.keys(attributes.tech_skills).length : null
+            },
+            strong_skills_check: {
+              exists: !!attributes?.strong_skills,
+              is_array: Array.isArray(attributes?.strong_skills),
+              array_length: Array.isArray(attributes?.strong_skills) ? attributes.strong_skills.length : null,
+              is_object: typeof attributes?.strong_skills === 'object' && !Array.isArray(attributes?.strong_skills),
+              object_keys: typeof attributes?.strong_skills === 'object' && !Array.isArray(attributes?.strong_skills) ? Object.keys(attributes.strong_skills).length : null
             }
           });
           isLoadingRef.current = false;
@@ -812,14 +848,14 @@ export default function Home() {
         // Transforma os dados da API no formato esperado pelo componente
         const userData = {
           name: fullName,
-          // Extrai nomes das tech_skills para usar como skills
-          // tech_skills agora é um objeto {skill_name: percentage}, então pegamos as chaves
-          skills: attributes.tech_skills ? Object.keys(attributes.tech_skills) : [],
+          // Extrai nomes das strong_skills (habilidades conhecidas/amarelas) para exibir como Pontos Fortes
+          // strong_skills é um objeto {skill_name: percentage}, então pegamos as chaves
+          skills: attributes.strong_skills ? Object.keys(attributes.strong_skills) : [],
           // Mapeia career_goal para interesses
           interests: getInterests(attributes.career_goal)
         };
         
-               console.log("✅ Dados transformados para o componente:", userData);
+        console.log("✅ Dados transformados para o componente:", userData);
                
                // Transforma os desafios da API para o formato esperado (incluindo status de conclusão)
                const transformedChallenges = transformChallenges(challenges || [], submissions || []);
@@ -917,6 +953,26 @@ export default function Home() {
     document.addEventListener("click", onDocClick);
     return () => document.removeEventListener("click", onDocClick);
   }, []);
+
+  // Se a rota foi aberta com { state: { openResumeId } }, abre a análise automaticamente
+  useEffect(() => {
+    const openId = location?.state?.openResumeId;
+    if (openId) {
+      try {
+        handleAnalyzeResume(openId);
+      } catch (e) {
+        console.error('Erro ao abrir análise via state:', e);
+      }
+
+      // limpa o state de navegação para evitar re-trigger em futuros mounts
+      try {
+        navigate(location.pathname, { replace: true, state: {} });
+      } catch (e) {
+        console.debug('Não foi possível limpar state da navegação');
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location?.state?.openResumeId]);
 
   // controla qual card está expandido
   const [expandedId, setExpandedId] = useState(null);
@@ -1091,7 +1147,7 @@ export default function Home() {
         {generatingChallenges && (
           <div className="mb-6 bg-white rounded-lg shadow-md p-4 border border-primary-200">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-zinc-700">{streamMessage}</span>
+              <span className="text-sm font-medium text-zinc-700">{stripEmoji(streamMessage)}</span>
               <span className="text-sm font-semibold text-primary-600">{Math.round(streamProgress)}%</span>
             </div>
             <div className="w-full bg-zinc-200 rounded-full h-2.5 overflow-hidden">
@@ -1128,7 +1184,7 @@ export default function Home() {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
                     <div className="h-9 w-9 rounded-md bg-zinc-200 grid place-content-center border border-zinc-300">
-                      {placeholder.category ? getChallengeIcon(placeholder.category) : '●'}
+                      {/* Ícone removido durante geração — apenas deixar a caixa vazia para manter layout */}
                     </div>
                     <span className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
                       {placeholder.category ? getChallengeCategoryName(placeholder.category) : 'Gerando...'}
@@ -1236,7 +1292,7 @@ export default function Home() {
                 role="button"
                 aria-expanded={expandedUploadCard}
                 className={
-                  "p-5 cursor-pointer transition-all duration-300 ease-in-out animate-fade-in " +
+                  "md:col-span-2 p-5 cursor-pointer transition-all duration-300 ease-in-out animate-fade-in " +
                   (expandedUploadCard 
                     ? "ring-2 ring-primary-300" 
                     : "hover:scale-[1.02]")
@@ -1275,7 +1331,7 @@ export default function Home() {
                             : "border-transparent text-zinc-600 hover:text-zinc-900"
                         }`}
                       >
-                        📎 Enviar Arquivo
+                        Enviar Arquivo
                       </button>
                       <button
                         onClick={() => setUploadType("text")}
@@ -1285,7 +1341,7 @@ export default function Home() {
                             : "border-transparent text-zinc-600 hover:text-zinc-900"
                         }`}
                       >
-                        ✏️ Colar Texto
+                        Colar Texto
                       </button>
                     </div>
                     
@@ -1404,113 +1460,7 @@ export default function Home() {
                 )}
               </Card>
 
-              {/* Coluna 2: Meus Currículos e Análise */}
-              <Card 
-                role="button"
-                aria-expanded={expandedMyResumesCard}
-                className={
-                  "p-5 cursor-pointer transition-all duration-300 ease-in-out animate-fade-in " +
-                  (expandedMyResumesCard 
-                    ? "ring-2 ring-primary-300" 
-                    : "hover:scale-[1.02]")
-                }
-                onClick={() => setExpandedMyResumesCard(prev => !prev)}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="h-9 w-9 rounded-md bg-emerald-100 text-emerald-800 grid place-content-center border border-emerald-200 text-sm font-semibold">
-                      ✔
-                    </div>
-                    <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                      Análise Praxis
-                    </span>
-                  </div>
-                </div>
-
-                {!expandedMyResumesCard && (
-                  <div className="mt-4">
-                    <h3 className="text-lg font-semibold text-zinc-900">Meus Currículos</h3>
-                    <p className="mt-1.5 text-sm text-zinc-600">
-                      {myResumes.length === 0 
-                        ? "Nenhum currículo enviado ainda" 
-                        : `${myResumes.length} currículo${myResumes.length > 1 ? 's' : ''} enviado${myResumes.length > 1 ? 's' : ''}`}
-                    </p>
-                  </div>
-                )}
-
-                {expandedMyResumesCard && (
-                  <div className="pt-4 mt-4 border-t border-zinc-200" onClick={(e) => e.stopPropagation()}>
-                    <h3 className="text-lg font-semibold text-zinc-900 mb-3">Meus Currículos</h3>
-                    
-                    {myResumes.length === 0 ? (
-                      <div className="text-center py-8 text-zinc-500">
-                        <p className="text-sm">Nenhum currículo enviado ainda.</p>
-                        <p className="text-xs mt-1">Envie seu primeiro currículo ao lado!</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3 max-h-96 overflow-y-auto">
-                        {myResumes.map((resume) => (
-                          <div 
-                            key={resume.id} 
-                            className={`border border-zinc-200 rounded-lg p-4 transition-all duration-300 ${
-                              deletingResumeId === resume.id 
-                                ? 'opacity-0 scale-95 translate-x-4' 
-                                : 'opacity-100 scale-100 translate-x-0'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex-1">
-                                <h4 className="font-semibold text-zinc-900 text-sm">{resume.title || "Sem título"}</h4>
-                                <p className="text-xs text-zinc-500 mt-1">
-                                  Enviado em {new Date(resume.created_at).toLocaleDateString('pt-BR')}
-                                </p>
-                              </div>
-                              {resume.has_analysis && (
-                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  ✓ Analisado
-                                </span>
-                              )}
-                            </div>
-                            
-                            <div className="flex gap-2 mt-2">
-                              <button
-                                onClick={() => handleAnalyzeResume(resume.id)}
-                                disabled={analyzingResume && selectedResumeId === resume.id}
-                                className="flex-1 px-3 py-1.5 text-sm font-medium border border-primary-200 text-primary-700 rounded-md hover:bg-primary-50 transition disabled:opacity-50 cursor-pointer"
-                              >
-                                {analyzingResume && selectedResumeId === resume.id
-                                  ? "Analisando..."
-                                  : resume.has_analysis
-                                  ? "Ver Análise"
-                                  : "Analisar com IA"}
-                              </button>
-                              
-                              <button
-                                onClick={() => handleDeleteResume(resume.id)}
-                                disabled={deletingResumeId === resume.id}
-                                className="px-3 py-1.5 text-sm font-medium border border-red-200 text-red-600 rounded-md hover:bg-red-50 transition disabled:opacity-50 cursor-pointer"
-                                title="Excluir currículo"
-                              >
-                                {deletingResumeId === resume.id ? "..." : "🗑️"}
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Botão Fechar (estilo dos desafios) */}
-                    <div className="mt-5 flex justify-end">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setExpandedMyResumesCard(false); }}
-                        className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50"
-                      >
-                        Fechar
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </Card>
+              {/* Meus Currículos movido para a página de Perfil */}
             </div>
 
           {/* Progresso e Análise em Tempo Real */}
@@ -1519,7 +1469,7 @@ export default function Home() {
               {/* Barra de progresso */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-zinc-700">{analysisMessage}</span>
+                  <span className="text-sm font-medium text-zinc-700">{stripEmoji(analysisMessage)}</span>
                   <span className="text-sm font-semibold text-primary-600">{Math.round(analysisProgress)}%</span>
                 </div>
                 <div className="w-full bg-zinc-200 rounded-full h-2.5 overflow-hidden">
