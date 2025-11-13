@@ -21,62 +21,65 @@ export default function Cadastro() {
     nome: "",
     email: "",
     senha: "",
-    career_goal: "",
   });
   
-  const [etapa, setEtapa] = useState("cadastro"); // "cadastro" | "questionario" | "finalizado"
+  const [cadastroRealizado, setCadastroRealizado] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-
-    // Se não houver trilha de carreira, abre o questionário
-    if (!formData.career_goal) {
-      setEtapa("questionario");
-      return;
-    }
-
     setLoading(true);
 
-    const { error: authError } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.senha,
-      options: {
-        data: {
-          full_name: formData.nome,
-          nome: formData.nome,
-          career_goal: formData.career_goal,
+    try {
+      const { error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.senha,
+        options: {
+          data: {
+            full_name: formData.nome,
+            nome: formData.nome,
+          },
         },
-      },
-    });
+      });
 
-    setLoading(false);
+      if (authError) {
+        throw authError;
+      }
 
-    if (authError) {
-      setError(`Erro ao criar conta: ${authError.message}`);
-      setEtapa("cadastro");
-    } else {
-      setEtapa("finalizado");
+      setCadastroRealizado(true);
+    } catch (err) {
+      setError(`Erro ao criar conta: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const selecionarCarreira = (trilhaEscolhida) => {
-    const novosDados = { ...formData, career_goal: trilhaEscolhida };
-    setFormData(novosDados);
+  // Função para reenviar email de confirmação
+  const reenviarEmail = async () => {
+    setLoading(true);
+    setError("");
     
-    // Simula o submit com a carreira escolhida
-    const mockEvent = { preventDefault: () => {} };
-    const tempFormData = formData;
-    formData.career_goal = trilhaEscolhida;
-    handleSubmit(mockEvent);
-    setFormData(tempFormData);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: formData.email,
+      });
+      
+      if (error) throw error;
+      
+      alert("Email de confirmação reenviado! Verifique sua caixa de entrada.");
+    } catch (err) {
+      setError(`Erro ao reenviar email: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Renderização do conteúdo baseado na etapa
+  // Renderização do conteúdo
   const renderContent = () => {
-    if (etapa === "finalizado") {
+    if (cadastroRealizado) {
       return (
         <div className="text-center">
           <div className="mb-6">
@@ -88,68 +91,28 @@ export default function Cadastro() {
           <p className="text-gray-600 mb-6">
             Verifique seu e-mail ({formData.email}) para confirmar sua conta e fazer login.
           </p>
-          <Link
-            to="/login"
-            className="inline-block px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold transition"
-          >
-            Ir para Login
-          </Link>
-        </div>
-      );
-    }
-
-    if (etapa === "questionario") {
-      return (
-        <div>
-          <div className="mb-8 text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Escolha sua trilha</h2>
-            <p className="text-sm text-gray-600">
-              Selecione a área que você deseja focar seus estudos
-            </p>
-          </div>
-
+          
           <div className="space-y-3">
-            {[
-              { value: "frontend", label: "Frontend Developer", icon: "💻", desc: "React, Vue, Angular" },
-              { value: "backend", label: "Backend Developer", icon: "⚙️", desc: "Node.js, Python, Java" },
-              { value: "fullstack", label: "Fullstack Developer", icon: "🚀", desc: "Frontend + Backend" },
-              { value: "mobile", label: "Mobile Developer", icon: "📱", desc: "React Native, Flutter" },
-              { value: "data", label: "Data Science", icon: "📊", desc: "Python, ML, Analytics" },
-              { value: "devops", label: "DevOps", icon: "🔧", desc: "CI/CD, Cloud, Docker" },
-            ].map((trilha) => (
-              <button
-                key={trilha.value}
-                onClick={() => selecionarCarreira(trilha.value)}
-                disabled={loading}
-                className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-yellow-500 hover:bg-yellow-50 transition text-left group disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-3xl">{trilha.icon}</span>
-                  <div className="flex-1">
-                    <div className="font-semibold text-gray-900 group-hover:text-yellow-600 transition">
-                      {trilha.label}
-                    </div>
-                    <div className="text-sm text-gray-500">{trilha.desc}</div>
-                  </div>
-                  <svg className="w-5 h-5 text-gray-400 group-hover:text-yellow-500 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </button>
-            ))}
+            <Link
+              to="/login"
+              className="inline-block px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold transition w-full"
+            >
+              Ir para Login
+            </Link>
+            
+            <button
+              onClick={reenviarEmail}
+              disabled={loading}
+              className="text-sm text-gray-600 hover:text-gray-900 underline cursor-pointer disabled:opacity-50"
+            >
+              {loading ? "Reenviando..." : "Não recebeu o email? Clique para reenviar"}
+            </button>
           </div>
-
-          <button
-            onClick={() => setEtapa("cadastro")}
-            className="mt-6 w-full text-center text-sm text-gray-600 hover:text-gray-900"
-          >
-            ← Voltar
-          </button>
         </div>
       );
     }
 
-    // Etapa de cadastro (formulário inicial)
+    // Formulário de cadastro
     return (
       <>
         <div className="mb-8 text-center">
@@ -246,7 +209,7 @@ export default function Cadastro() {
                   : "bg-yellow-500 hover:bg-yellow-600 shadow-sm text-white cursor-pointer"
               }`}
             >
-              {loading ? "Criando conta..." : "Continuar"}
+              {loading ? "Criando conta..." : "Criar Conta"}
             </button>
           </div>
 
@@ -274,7 +237,7 @@ export default function Cadastro() {
       {/* Botão Voltar */}
       <Link 
         to="/" 
-        className="absolute top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 transition"
+        className="absolute top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 transition cursor-pointer"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />

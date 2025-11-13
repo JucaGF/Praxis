@@ -5,6 +5,7 @@ import { fetchChallengeById } from "../lib/api.js";
 import CodeChallenge from "../components/challenges/CodeChallenge.jsx";
 import DailyTaskChallenge from "../components/challenges/DailyTaskChallenge.jsx";
 import OrganizationChallenge from "../components/challenges/OrganizationChallenge.jsx";
+import logger from "../utils/logger.js";
 
 export default function Challenge() {
   const { id } = useParams();
@@ -16,24 +17,24 @@ export default function Challenge() {
   useEffect(() => {
     const loadChallenge = async () => {
       try {
-        console.log(`📥 Carregando desafio ${id}...`);
+        logger.info("challenge:load:start", { challengeId: id });
         const data = await fetchChallengeById(id);
         
         if (!data) {
-          console.error("❌ Desafio não encontrado");
+          logger.warn("challenge:load:not-found", { challengeId: id });
           setError("Desafio não encontrado");
           return;
         }
         
-        console.log("✅ Desafio carregado:", data);
-        console.log("📋 Template Code:", data.template_code);
-        console.log("📋 FS:", data.fs);
-        console.log("📋 Description:", data.description);
-        console.log("📋 Category:", data.category);
+        logger.info("challenge:load:success", {
+          challengeId: id,
+          category: data.category,
+          difficulty: data.difficulty?.level,
+        });
         
         setChallenge(data);
       } catch (err) {
-        console.error("❌ Erro ao carregar desafio:", err);
+        logger.error("challenge:load:error", { challengeId: id, error: err });
         setError(err.message || "Erro ao carregar desafio");
       } finally {
         setLoading(false);

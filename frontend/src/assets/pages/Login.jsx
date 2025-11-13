@@ -29,21 +29,70 @@ export default function Login() {
     setError("");
     setLoading(true);
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    setLoading(false);
+      if (authError) {
+        setError(
+          `Erro ao entrar: ${authError.message}. Verifique seu e-mail e senha.`
+        );
+        setLoading(false);
+        return;
+      }
 
-    if (authError) {
-      setError(
-        `Erro ao entrar: ${authError.message}. Verifique seu e-mail e senha.`
-      );
-    }
-    // Redireciona para home após login bem-sucedido
-    if (!authError) {
-      navigate("/home");
+      // Verificar se o usuário completou o onboarding
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Tenta buscar os attributes do backend
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/attributes`, {
+          headers: {
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          }
+        });
+        
+        if (response.status === 404 || !response.ok) {
+          // Attributes não existem, redirecionar para onboarding
+          console.log("⚠️ Attributes não encontrados. Redirecionando para onboarding...");
+          navigate("/onboarding");
+          return;
+        }
+        
+        const attributes = await response.json();
+        
+        // Verificar se os attributes estão vazios ou são mockados
+        // tech_skills e soft_skills agora são objetos (Dict), não arrays
+        const hasRealData = attributes && 
+                           attributes.tech_skills && 
+                           typeof attributes.tech_skills === 'object' &&
+                           Object.keys(attributes.tech_skills).length > 0 &&
+                           attributes.soft_skills &&
+                           typeof attributes.soft_skills === 'object' &&
+                           Object.keys(attributes.soft_skills).length > 0;
+        
+        if (!hasRealData) {
+          console.log("⚠️ Attributes vazios ou mockados. Redirecionando para onboarding...");
+          navigate("/onboarding");
+          return;
+        }
+        
+        // Tudo OK, redireciona para home
+        navigate("/home");
+        
+      } catch (apiError) {
+        console.warn("⚠️ Erro ao verificar attributes:", apiError);
+        // Em caso de erro, assume que precisa de onboarding
+        navigate("/onboarding");
+      }
+      
+    } catch (error) {
+      console.error("❌ Erro ao fazer login:", error);
+      setError(`Erro inesperado: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 

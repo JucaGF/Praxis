@@ -22,10 +22,26 @@ logger = get_logger(__name__)
 try:
     import google.generativeai as genai
     from google.generativeai.types import HarmCategory, HarmBlockThreshold
+    try:
+        from google.api_core.exceptions import (
+            ResourceExhausted,
+            ServiceUnavailable,
+            InternalServerError,
+            TooManyRequests
+        )
+    except ImportError:
+        ResourceExhausted = None
+        ServiceUnavailable = None
+        InternalServerError = None
+        TooManyRequests = None
 except ImportError:
     logger.warning(
         "google-generativeai não instalado. Instale com: pip install google-generativeai")
     genai = None
+    ResourceExhausted = None
+    ServiceUnavailable = None
+    InternalServerError = None
+    TooManyRequests = None
 
 
 class GeminiAI(IAIService):
@@ -43,7 +59,7 @@ class GeminiAI(IAIService):
         self,
         api_key: str,
         model_name: str = "models/gemini-2.5-flash",
-        max_retries: int = 3,
+        max_retries: int = 5,  # Aumentado de 3 para 5
         timeout: int = 60
     ):
         """
@@ -209,7 +225,8 @@ ESTRUTURA DE CADA DESAFIO:
     "type": "codigo|texto_livre|planejamento",
     "language": "python|javascript|sql|markdown",
     "eval_criteria": ["critério1", "critério2", "critério3"],
-    "target_skill": "Skill do perfil",
+    "target_skill": "Skill principal do perfil",
+    "affected_skills": ["Skill1", "Skill2", "Skill3"],  // NOVO: 2-4 skills que o desafio avalia
     "hints": ["dica útil 1", "dica útil 2"],
     "enunciado": null  // NOVO: objeto estruturado (veja regras abaixo)
   },
@@ -232,11 +249,15 @@ ESTRUTURA DE CADA DESAFIO:
 
 REGRAS OBRIGATÓRIAS:
 1. Retorne array com exatamente 3 desafios
-2. target_skill DEVE existir nas skills do usuário
-3. Varie dificuldade: 1 easy, 1 medium, 1 hard
-4. description.text: Tom conversacional (chefe falando)
-5. SEMPRE adicione 2-4 hints úteis e práticas
-6. Para type="codigo" → category="code":
+2. target_skill DEVE existir nas skills do usuário (skill principal)
+3. affected_skills: array com 2-4 skills do perfil que o desafio avalia (DEVE incluir target_skill)
+   - Para code: skills técnicas relacionadas (ex: ["Python", "FastAPI", "SQL"])
+   - Para daily-task: soft skills (ex: ["Comunicação", "Empatia", "Resolução de Conflitos"])
+   - Para organization: skills de arquitetura (ex: ["Arquitetura", "Escalabilidade", "Trade-offs"])
+4. Varie dificuldade: 1 easy, 1 medium, 1 hard
+5. description.text: Tom conversacional (chefe falando)
+6. SEMPRE adicione 2-4 hints úteis e práticas
+7. Para type="codigo" → category="code":
    - fs é OBRIGATÓRIO (não null!)
    - fs.files: 2-4 caminhos realistas
    - fs.open: arquivo principal
@@ -244,12 +265,12 @@ REGRAS OBRIGATÓRIAS:
    - Código deve ser bugado, incompleto ou precisar refatoração
    - enunciado: null
    - template_code: null
-7. Para type="texto_livre" → category="daily-task":
+8. Para type="texto_livre" → category="daily-task":
    - fs: null
    - enunciado: OBRIGATÓRIO - simule um e-mail/ticket realista
      Formato: {"type": "email", "de": "nome@empresa.com", "assunto": "assunto do email", "data": "2024-11-15", "corpo": "texto do email (3-5 linhas)"}
    - template_code: null
-8. Para type="planejamento" → category="organization":
+9. Para type="planejamento" → category="organization":
    - fs: null
    - enunciado: OBRIGATÓRIO - requisitos estruturados
      Formato: {"type": "requisitos", "funcionais": ["req1", "req2", "req3"], "nao_funcionais": ["req1", "req2"]}
@@ -387,10 +408,11 @@ EXEMPLOS COMPLETOS:
         ch_diff = challenge.get("difficulty", {})
 
         # Extrai dados da submissão de acordo com o tipo
-        submission_type = submission.get("type", "codigo")
+        submission_type = (submission.get("type") or "codigo").lower()
         submitted_content = ""
+        template_code = challenge.get("template_code") or []
 
-        if submission_type == "codigo":
+        if submission_type in {"codigo", "code"}:
             # Para código: extrai arquivos
             files = submission.get("files", {})
             if files:
@@ -401,25 +423,64 @@ EXEMPLOS COMPLETOS:
             else:
                 submitted_content = submission.get("content", "")
 
-        elif submission_type == "texto_livre":
+        elif submission_type in {"texto_livre", "daily_task", "texto", "text"}:
             # Para texto livre: extrai o conteúdo textual
             submitted_content = submission.get("content", "")
 
-        elif submission_type == "organization":
-            # Para organization: extrai form_data (respostas do formulário)
-            form_data = submission.get("form_data", {})
-            if form_data:
-                # Formata as respostas do formulário de forma legível
+        elif submission_type in {"organization", "planejamento", "planning"}:
+            # Para planejamento/organization: agrupa respostas por seção com rótulos
+            sections_data = submission.get("sections") or submission.get("form_data") or {}
+            implementation_text = submission.get(
+                "implementation") or submission.get("content") or ""
+
+            if sections_data:
+                field_lookup: Dict[str, Dict[str, str]] = {}
+                if isinstance(template_code, list):
+                    for section in template_code:
+                        section_label = section.get(
+                            "label") or section.get("id") or "Seção"
+                        for field in section.get("fields", []):
+                            field_id = field.get("id")
+                            if not field_id:
+                                continue
+                            field_lookup[field_id] = {
+                                "section_label": section_label,
+                                "field_label": field.get("label") or field_id
+                            }
+
+                grouped: Dict[str, List[tuple[str, str]]] = {}
+                for field_id, answer in sections_data.items():
+                    if answer is None:
+                        continue
+                    answer_text = answer if isinstance(
+                        answer, str) else json.dumps(answer, ensure_ascii=False, indent=2)
+
+                    info = field_lookup.get(field_id)
+                    section_label = info["section_label"] if info else "Seção Geral"
+                    field_label = info["field_label"] if info else field_id
+
+                    grouped.setdefault(section_label, []).append(
+                        (field_label, answer_text))
+
                 parts = []
-                for section_id, fields in form_data.items():
-                    parts.append(f"=== {section_id.upper()} ===")
-                    if isinstance(fields, dict):
-                        for field_id, value in fields.items():
-                            parts.append(f"{field_id}: {value}")
+                for section_label, fields in grouped.items():
+                    parts.append(f"### {section_label}")
+                    for field_label, answer_text in fields:
+                        parts.append(f"- {field_label}: {answer_text}")
                     parts.append("")
-                submitted_content = "\n".join(parts)
-            else:
-                # Fallback para content se form_data não existir
+
+                submitted_content = "\n".join(parts).strip()
+
+            if implementation_text:
+                impl_block = implementation_text if isinstance(
+                    implementation_text, str) else json.dumps(implementation_text, ensure_ascii=False, indent=2)
+                if submitted_content:
+                    submitted_content = f"{submitted_content}\n\n=== PLANO DE IMPLEMENTAÇÃO ===\n{impl_block}"
+                else:
+                    submitted_content = f"=== PLANO DE IMPLEMENTAÇÃO ===\n{impl_block}"
+
+            if not submitted_content:
+                # Fallback se nada foi preenchido
                 submitted_content = submission.get("content", "")
 
         # Adiciona contexto do enunciado se existir
@@ -539,50 +600,53 @@ Para COMUNICAÇÃO:
 - Contexto: entende impacto em sistema?
 """
 
-        assessment_instructions = """
+        # Extrai affected_skills do desafio para avaliar múltiplas skills
+        affected_skills = (ch_desc.get("affected_skills") or [ch_desc.get("target_skill")] or [])
+        affected_skills_str = ", ".join(affected_skills) if affected_skills else "skill principal"
+        
+        assessment_instructions = f"""
 TAREFA DE AVALIAÇÃO:
 
 1. Analise a submissão profundamente considerando os critérios acima
 2. Atribua uma nota geral (0-100)
 3. Avalie métricas específicas por critério
-4. IMPORTANTE: Faça SKILL ASSESSMENT inteligente:
+4. IMPORTANTE: Faça SKILLS ASSESSMENT (MÚLTIPLAS SKILLS):
+   
+   O desafio avalia estas skills: {affected_skills_str}
+   
+   Para CADA skill, avalie:
    
    a) skill_level_demonstrated (0-100):
-      - NÃO é igual à nota!
-      - Considere: nota + qualidade + práticas + complexidade
-      - Exemplo: nota 88 mas código com más práticas → demonstrated=75
-      - Exemplo: nota 75 mas excelente arquitetura → demonstrated=82
+      - NÃO é igual à nota geral!
+      - Considere: nota + qualidade + práticas + complexidade ESPECÍFICOS dessa skill
+      - Exemplo: nota geral 85, mas Python=90 (excelente), SQL=70 (básico)
    
-   b) should_progress (true/false):
-      - true se demonstrated >= 70
-      - false caso contrário
-   
-   c) progression_intensity (-1.0 a +1.0):
-      - Positivo: submissão mostra evolução
+   b) progression_intensity (-1.0 a +1.0):
+      - Positivo: submissão mostra domínio/evolução nessa skill
         * +0.9: excelente, domínio claro
         * +0.7: muito bom, boas práticas
         * +0.5: bom, competente
         * +0.3: satisfatório, funcional
         * +0.1: mínimo aceitável
-      - Negativo: submissão mostra problemas
+      - Negativo: submissão mostra problemas/desconhecimento
         * -0.2: falhas leves, más práticas
         * -0.5: falhas significativas, desconhecimento
       
-   d) reasoning (string):
-      - Explique POR QUÊ a skill deve progredir/regredir
-      - Seja específico e construtivo
+   c) reasoning (string):
+      - Explique POR QUÊ essa skill específica deve progredir/regredir
+      - Seja específico sobre o uso DESSA skill na submissão
       - Mencione pontos fortes E fracos
 
 FORMATO DE SAÍDA (JSON ESTRITO):
 Retorne APENAS JSON neste formato:
 
-{
+{{
   "nota_geral": 85,
-  "metricas": {
+  "metricas": {{
     "criterio1": 90,
     "criterio2": 85,
     "criterio3": 80
-  },
+  }},
   "pontos_positivos": [
     "Ponto forte 1",
     "Ponto forte 2"
@@ -596,20 +660,28 @@ Retorne APENAS JSON neste formato:
     "Sugestão específica 2"
   ],
   "feedback_detalhado": "Análise detalhada em 2-4 linhas explicando a avaliação geral",
-  "skill_assessment": {
-    "skill_level_demonstrated": 88,
-    "should_progress": true,
-    "progression_intensity": 0.7,
-    "reasoning": "Demonstrou domínio sólido com boas práticas. Query otimizada com índices apropriados, mas poderia considerar particionamento para escalabilidade futura."
-  }
-}
+  "skills_assessment": {{
+    "{affected_skills[0] if affected_skills else 'SkillName1'}": {{
+      "skill_level_demonstrated": 90,
+      "progression_intensity": 0.8,
+      "reasoning": "Excelente uso de recursos avançados, código limpo e bem estruturado"
+    }},
+    "{affected_skills[1] if len(affected_skills) > 1 else 'SkillName2'}": {{
+      "skill_level_demonstrated": 75,
+      "progression_intensity": 0.5,
+      "reasoning": "Implementação funcional mas poderia ser mais robusta"
+    }}
+  }}
+}}
 
-REGRAS:
+REGRAS CRÍTICAS:
 - Retorne APENAS o JSON, sem texto antes ou depois
+- DEVE avaliar TODAS as skills em: {affected_skills_str}
+- Cada skill tem seu próprio assessment independente
 - Seja justo mas rigoroso
 - Valorize boas práticas mesmo que funcione
 - Penalize más práticas mesmo que funcione
-- skill_level_demonstrated deve ser calculado holisticamente
+- skill_level_demonstrated de cada skill deve ser calculado individualmente
 """
 
         return base_prompt + criteria + assessment_instructions
@@ -645,7 +717,10 @@ REGRAS:
 
                 response = model.generate_content(
                     prompt,
-                    request_options={"timeout": self.timeout}
+                    request_options={
+                        "timeout": self.timeout,
+                        "retry": None  # desativa retry automático do SDK
+                    }
                 )
 
                 # Log de uso (para monitorar custos)
@@ -663,16 +738,72 @@ REGRAS:
 
             except Exception as e:
                 last_error = e
+                error_str = str(e)
+                error_code = getattr(e, "code", None) or getattr(e, "status_code", None)
+                
+                # Detecta erro 503 (Service Unavailable / Model Overloaded)
+                is_503 = (
+                    "503" in error_str or
+                    "overloaded" in error_str.lower() or
+                    "service unavailable" in error_str.lower() or
+                    (ServiceUnavailable is not None and isinstance(e, ServiceUnavailable)) or
+                    error_code == 503
+                )
+                
                 logger.warning(
                     f"Gemini API error (tentativa {attempt}/{self.max_retries}): {e}",
-                    extra={"extra_data": {"error": str(e), "attempt": attempt}}
+                    extra={"extra_data": {
+                        "error": str(e),
+                        "error_code": error_code,
+                        "is_503": is_503,
+                        "attempt": attempt
+                    }}
                 )
 
                 # Backoff exponencial
                 if attempt < self.max_retries:
-                    wait_time = 2 ** attempt  # 2s, 4s, 8s
+                    # Para erros 503, usa backoff mais longo e com jitter
+                    if is_503:
+                        # Backoff mais agressivo com jitter: 15s, 20s, 30s, 40s, 40s
+                        # Adiciona jitter aleatório de 0-5s para evitar "thundering herd"
+                        import random
+                        base_wait = [15, 20, 30, 40, 40][min(attempt - 1, 4)]
+                        jitter = random.uniform(0, 5)
+                        wait_time = base_wait + jitter
+                    else:
+                        # Backoff padrão: 2s, 4s, 8s, 16s, 30s
+                        wait_time = min(2 ** attempt, 30)
+
+                    retry_delay_seconds = None
+                    # Tenta extrair retry_delay de ResourceExhausted (429) ou TooManyRequests
+                    if ResourceExhausted is not None and isinstance(e, ResourceExhausted):
+                        retry_delay = getattr(e, "retry_delay", None)
+                        if retry_delay:
+                            if hasattr(retry_delay, "total_seconds"):
+                                retry_delay_seconds = retry_delay.total_seconds()
+                            elif hasattr(retry_delay, "seconds"):
+                                retry_delay_seconds = retry_delay.seconds
+                    elif TooManyRequests is not None and isinstance(e, TooManyRequests):
+                        retry_delay = getattr(e, "retry_delay", None)
+                        if retry_delay:
+                            if hasattr(retry_delay, "total_seconds"):
+                                retry_delay_seconds = retry_delay.total_seconds()
+                            elif hasattr(retry_delay, "seconds"):
+                                retry_delay_seconds = retry_delay.seconds
+                    
+                    # Fallback: tenta extrair retry_delay diretamente do erro
+                    if not retry_delay_seconds and hasattr(e, "retry_delay") and e.retry_delay:
+                        retry_delay = e.retry_delay
+                        if hasattr(retry_delay, "total_seconds"):
+                            retry_delay_seconds = retry_delay.total_seconds()
+                        elif hasattr(retry_delay, "seconds"):
+                            retry_delay_seconds = retry_delay.seconds
+
+                    if retry_delay_seconds:
+                        wait_time = max(wait_time, float(retry_delay_seconds))
+
                     logger.info(
-                        f"Aguardando {wait_time}s antes de retentar...")
+                        f"Aguardando {wait_time:.1f}s antes de retentar... (erro 503: {is_503})")
                     time.sleep(wait_time)
 
         # Se chegou aqui, falhou todas as tentativas
@@ -998,10 +1129,16 @@ REGRAS:
             for chunk in response:
                 chunk_count += 1
                 elapsed = time.time() - start_time
-                if chunk.text:
-                    buffer += chunk.text
-                    logger.info(
-                        f"📦 Chunk {chunk_count} (+{elapsed:.2f}s): +{len(chunk.text)} chars (total: {len(buffer)})")
+                
+                # Verificar se o chunk tem texto antes de processar
+                # finish_reason: 1 (STOP) significa que a geração terminou normalmente
+                if not chunk.text:
+                    logger.info(f"📦 Chunk {chunk_count} sem texto (finish_reason: {chunk.candidates[0].finish_reason if chunk.candidates else 'unknown'})")
+                    continue
+                    
+                buffer += chunk.text
+                logger.info(
+                    f"📦 Chunk {chunk_count} (+{elapsed:.2f}s): +{len(chunk.text)} chars (total: {len(buffer)})")
 
                 # Atualizar progresso baseado no tamanho do buffer
                 # Estimativa: ~10k chars = 3 desafios completos
@@ -1606,10 +1743,15 @@ REGRAS:
             for chunk in response:
                 chunk_count += 1
                 elapsed = time.time() - start_time
-                if chunk.text:
-                    buffer += chunk.text
-                    logger.info(
-                        f"📦 Chunk {chunk_count} (+{elapsed:.2f}s): +{len(chunk.text)} chars (total: {len(buffer)})")
+                
+                # Verificar se o chunk tem texto antes de processar
+                if not chunk.text:
+                    logger.info(f"📦 Chunk {chunk_count} sem texto (finish_reason: {chunk.candidates[0].finish_reason if chunk.candidates else 'unknown'})")
+                    continue
+                    
+                buffer += chunk.text
+                logger.info(
+                    f"📦 Chunk {chunk_count} (+{elapsed:.2f}s): +{len(chunk.text)} chars (total: {len(buffer)})")
                 
                 # Atualizar progresso baseado no tamanho do buffer
                 estimated_progress = min(90, 40 + (len(buffer) / 5000) * 50)

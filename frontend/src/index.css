@@ -48,6 +48,19 @@
   animation: fade-in 0.4s ease-out forwards;
 }
 
+/* --- Shimmer effect para loading --- */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+
 /* --- Escada Lateral --- */
 @keyframes step-1 {
   0%,

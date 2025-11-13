@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import logger from "../utils/logger";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -56,10 +57,18 @@ async function fetchWithAuth(url, options = {}) {
     headers["Authorization"] = `Bearer ${token}`;
   }
   
+  const method = options.method || "GET";
+  logger.debug("API request start", { method, url, hasToken: Boolean(token) });
+  
   const response = await fetch(url, { ...options, headers });
   
   // Trata erros HTTP
   if (!response.ok) {
+    logger.warn("API request failed", {
+      method,
+      url,
+      status: response.status,
+    });
     const errorData = await response
       .json()
       .catch(() => ({ detail: "Erro desconhecido" }));
@@ -68,7 +77,7 @@ async function fetchWithAuth(url, options = {}) {
     
     // 401: Não autenticado - Redireciona para login
     if (response.status === 401) {
-      console.warn("Sessão expirada ou inválida. Redirecionando para login...");
+      console.warn("⚠️ Sessão expirada ou inválida. Redirecionando para login...");
       
       // Limpa sessão do Supabase
       await supabase.auth.signOut();
@@ -84,10 +93,58 @@ async function fetchWithAuth(url, options = {}) {
       throw new AuthorizationError(errorMessage);
     }
     
-    // Outros erros
+    // 404: Recurso não encontrado (pode ser usuário novo sem attributes)
+    if (response.status === 404) {
+      console.warn("⚠️ Recurso não encontrado (404):", errorMessage);
+      
+      // Cria erro customizado para 404
+      const notFoundError = new Error(errorMessage);
+      notFoundError.status = 404;
+      throw notFoundError;
+    }
+    
+    // 500: Erro interno do servidor
+    if (response.status === 500) {
+      logger.error("API request failed: Internal Server Error", {
+        method,
+        url,
+        status: response.status,
+        error: errorMessage
+      });
+      throw new Error(errorMessage);
+    }
+    
+    // 503: Serviço indisponível (ex: IA temporariamente indisponível)
+    if (response.status === 503) {
+      logger.error("API request failed: Service Unavailable", {
+        method,
+        url,
+        status: response.status,
+        error: errorMessage
+      });
+      const serviceError = new Error(
+        errorMessage || "Serviço temporariamente indisponível. Por favor, tente novamente em alguns instantes."
+      );
+      serviceError.status = 503;
+      serviceError.isServiceUnavailable = true;
+      throw serviceError;
+    }
+    
+    // Outros erros HTTP
+    logger.error("API request failed: Unknown error", {
+      method,
+      url,
+      status: response.status,
+      error: errorMessage
+    });
     throw new Error(errorMessage);
   }
   
+  logger.debug("API request success", {
+    method,
+    url,
+    status: response.status,
+  });
   return response.json();
 }
 
@@ -101,6 +158,10 @@ export async function fetchProfile() {
 
 export async function fetchSubmissions() {
   return await fetchWithAuth(`${API_URL}/submissions`);
+}
+
+export async function fetchSubmissionDetails(submissionId) {
+  return await fetchWithAuth(`${API_URL}/submissions/${submissionId}/details`);
 }
 
 export async function fetchChallenges(limit = 3) {
@@ -117,15 +178,37 @@ export async function fetchChallengeById(id) {
   return await fetchWithAuth(`${API_URL}/challenges/${id}`);
 }
 
+export async function fetchChallengeResult(challengeId) {
+  return await fetchWithAuth(`${API_URL}/submissions?challenge_id=${challengeId}`);
+}
+
 export async function submitSolution(submissionData) {
+  // Obter o user ID do Supabase
+  const { data: { session } } = await supabase.auth.getSession();
+  const userId = session?.user?.id;
+  
+  if (!userId) {
+    throw new Error("Usuário não autenticado");
+  }
+  
+  // Adicionar profile_id aos dados
+  const dataWithProfile = {
+    ...submissionData,
+    profile_id: userId
+  };
+  
+  logger.event("submission:send", {
+    challengeId: submissionData.challenge_id,
+    type: submissionData.submitted_code?.type,
+  });
   return await fetchWithAuth(`${API_URL}/submissions`, {
     method: "POST",
-    body: JSON.stringify(submissionData),
+    body: JSON.stringify(dataWithProfile),
   });
 }
 
-export async function updateAttributes(updates) {
-  return await fetchWithAuth(`${API_URL}/attributes`, {
+export async function updateAttributes(profileId, updates) {
+  return await fetchWithAuth(`${API_URL}/attributes/${profileId}`, {
     method: "PATCH",
     body: JSON.stringify(updates),
   });

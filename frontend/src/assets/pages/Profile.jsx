@@ -1,9 +1,10 @@
 // src/pages/Profile.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Line } from "react-chartjs-2";
+import { ChevronDown, ChevronUp, FileText, MessageSquare } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
-import { deleteAccount, fetchUser, fetchSubmissions } from "../lib/api";
+import { deleteAccount, fetchUser, fetchSubmissions, fetchSubmissionDetails, listResumes, analyzeResume, deleteResume } from "../lib/api";
 import PraxisLogo from "../components/PraxisLogo";
 import {
   Chart as ChartJS,
@@ -31,9 +32,9 @@ ChartJS.register(
 
 // --- Componentes específicos do Perfil ---
 
-function Section({ title, subtitle, children }) {
+function Section({ title, subtitle, children, id }) {
   return (
-    <Card className="p-6">
+    <Card id={id} className="p-6 scroll-mt-20">
       <h2 className="text-xl font-semibold text-zinc-900">{title}</h2>
       <p className="text-zinc-600 mt-1">{subtitle}</p>
       <div className="mt-6">{children}</div>
@@ -68,20 +69,191 @@ function SkillBar({ skill, percentage, date }) {
   );
 }
 
-function ChallengeHistoryItem({ title, score, points, date, tags }) {
+function ChallengeHistoryItem({ id, title, score, points, date, tags }) {
+  const [expanded, setExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState('challenge'); // 'challenge' ou 'feedback'
+  const [details, setDetails] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const loadDetails = async () => {
+    if (details) return; // Já carregou
+    
+    setLoading(true);
+    try {
+      const data = await fetchSubmissionDetails(id);
+      setDetails(data);
+    } catch (error) {
+      console.error("Erro ao carregar detalhes:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggle = () => {
+    if (!expanded && !details) {
+      loadDetails();
+    }
+    setExpanded(!expanded);
+  };
+
   return (
-    <div className="flex justify-between items-center py-3 border-b border-zinc-200 last:border-b-0">
-      <div>
-        <h4 className="font-semibold text-zinc-900">{title}</h4>
-        <div className="flex items-center gap-3 text-xs text-zinc-500 mt-1">
-          <span>📅 {date}</span>
-          <span>📈 +{points} pontos</span>
+    <div className="border-b border-zinc-200 last:border-b-0">
+      {/* Header compacto */}
+      <div className="flex justify-between items-center py-3">
+        <div className="flex-1">
+          <h4 className="font-semibold text-zinc-900">{title}</h4>
+          <div className="flex items-center gap-3 text-xs text-zinc-500 mt-1">
+            <span>📅 {date}</span>
+            <span>📈 +{points} pontos</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <p className="text-xl font-bold text-primary-600">{score}/100</p>
+            <p className="text-xs text-zinc-500">{tags}</p>
+          </div>
+          <button
+            onClick={handleToggle}
+            className="p-2 hover:bg-zinc-100 rounded-lg transition"
+            aria-label={expanded ? "Recolher" : "Expandir"}
+          >
+            {expanded ? <ChevronUp className="w-5 h-5 text-zinc-600" /> : <ChevronDown className="w-5 h-5 text-zinc-600" />}
+          </button>
         </div>
       </div>
-      <div className="text-right">
-        <p className="text-xl font-bold text-primary-600">{score}/100</p>
-        <p className="text-xs text-zinc-500">{tags}</p>
-      </div>
+
+      {/* Conteúdo expandido */}
+      {expanded && (
+        <div className="pb-4 px-2 space-y-3">
+          {loading && (
+            <div className="text-center py-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto"></div>
+              <p className="text-sm text-zinc-500 mt-2">Carregando detalhes...</p>
+            </div>
+          )}
+
+          {!loading && details && (
+            <>
+              {/* Tabs */}
+              <div className="flex gap-2 border-b border-zinc-200">
+                <button
+                  onClick={() => setActiveTab('challenge')}
+                  className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition ${
+                    activeTab === 'challenge'
+                      ? 'border-b-2 border-primary-500 text-primary-600'
+                      : 'text-zinc-600 hover:text-zinc-900'
+                  }`}
+                >
+                  <FileText className="w-4 h-4" />
+                  Detalhes do Desafio
+                </button>
+                <button
+                  onClick={() => setActiveTab('feedback')}
+                  className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition ${
+                    activeTab === 'feedback'
+                      ? 'border-b-2 border-primary-500 text-primary-600'
+                      : 'text-zinc-600 hover:text-zinc-900'
+                  }`}
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  Feedback da IA
+                </button>
+              </div>
+
+              {/* Conteúdo das tabs */}
+              <div className="bg-zinc-50 rounded-lg p-4">
+                {activeTab === 'challenge' && (
+                  <div className="space-y-3">
+                    <div>
+                      <h5 className="text-sm font-semibold text-zinc-700 mb-1">Descrição</h5>
+                      <p className="text-sm text-zinc-600">{details.challenge?.description?.text || "Sem descrição"}</p>
+                    </div>
+                    
+                    {/* Requisitos Funcionais (para desafios de planejamento/código) */}
+                    {details.challenge?.description?.enunciado?.funcionais && details.challenge.description.enunciado.funcionais.length > 0 && (
+                      <div>
+                        <h5 className="text-sm font-semibold text-zinc-700 mb-1">Requisitos Funcionais</h5>
+                        <ul className="list-disc list-inside text-sm text-zinc-600 space-y-1">
+                          {details.challenge.description.enunciado.funcionais.map((req, idx) => (
+                            <li key={idx}>{req}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {/* Requisitos Não Funcionais (para desafios de planejamento/código) */}
+                    {details.challenge?.description?.enunciado?.nao_funcionais && details.challenge.description.enunciado.nao_funcionais.length > 0 && (
+                      <div>
+                        <h5 className="text-sm font-semibold text-zinc-700 mb-1">Requisitos Não Funcionais</h5>
+                        <ul className="list-disc list-inside text-sm text-zinc-600 space-y-1">
+                          {details.challenge.description.enunciado.nao_funcionais.map((req, idx) => (
+                            <li key={idx}>{req}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {/* Skill alvo (para todos os tipos) */}
+                    {details.challenge?.description?.target_skill && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-zinc-600">Habilidade avaliada:</span>
+                        <span className="px-2 py-1 bg-primary-100 text-primary-700 rounded-full text-xs font-medium">
+                          {details.challenge.description.target_skill}
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="flex gap-4 text-xs text-zinc-500 pt-2 border-t border-zinc-200">
+                      <span>Dificuldade: <strong>{details.challenge?.difficulty?.level}</strong></span>
+                      <span>Tempo limite: <strong>{details.challenge?.difficulty?.time_limit}min</strong></span>
+                      {details.submission?.time_taken_sec && (
+                        <span>Tempo gasto: <strong>{Math.floor(details.submission.time_taken_sec / 60)}min</strong></span>
+                      )}
+                      <span>Tentativa: <strong>#{details.submission?.attempt_number}</strong></span>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'feedback' && (
+                  <div className="space-y-3">
+                    {details.feedback ? (
+                      <>
+                        <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-zinc-200">
+                          <span className="text-sm font-medium text-zinc-700">Nota Final</span>
+                          <span className="text-2xl font-bold text-primary-600">{details.feedback.score}/100</span>
+                        </div>
+                        
+                        {details.feedback.metrics && Object.keys(details.feedback.metrics).length > 0 && (
+                          <div>
+                            <h5 className="text-sm font-semibold text-zinc-700 mb-2">Métricas</h5>
+                            <div className="grid grid-cols-2 gap-2">
+                              {Object.entries(details.feedback.metrics).map(([key, value]) => (
+                                <div key={key} className="bg-white p-2 rounded border border-zinc-200">
+                                  <div className="text-xs text-zinc-500">{key}</div>
+                                  <div className="text-lg font-bold text-zinc-900">{value}/100</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {details.feedback.feedback && (
+                          <div>
+                            <h5 className="text-sm font-semibold text-zinc-700 mb-1">Comentários</h5>
+                            <p className="text-sm text-zinc-600 whitespace-pre-wrap">{details.feedback.feedback}</p>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-sm text-zinc-500 text-center py-4">Feedback não disponível</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -146,14 +318,56 @@ export default function Profile() {
   const [user, setUser] = useState(null);
   const [attributes, setAttributes] = useState(null);
   const [submissions, setSubmissions] = useState([]);
+  const [myResumes, setMyResumes] = useState([]);
+  const [expandedMyResumesCard, setExpandedMyResumesCard] = useState(false);
+  const [analyzingResume, setAnalyzingResume] = useState(false);
+  const [selectedResumeId, setSelectedResumeId] = useState(null);
+  const [deletingResumeId, setDeletingResumeId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
+  // Scroll para seção de histórico se houver hash na URL
+  useEffect(() => {
+    const scrollToHistory = () => {
+      if (window.location.hash === '#historico') {
+        const element = document.getElementById('historico');
+        if (element) {
+          // Aguarda um pouco para garantir que o conteúdo foi renderizado
+          setTimeout(() => {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 300);
+        }
+      }
+    };
+
+    // Executa quando o componente monta
+    scrollToHistory();
+
+    // Também escuta mudanças no hash (caso o usuário navegue sem recarregar)
+    const handleHashChange = () => {
+      scrollToHistory();
+    };
+    window.addEventListener('hashchange', handleHashChange);
+
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, [loading]); // Re-executa quando o loading termina
+
   // Busca dados reais do usuário
+  const isLoadingRef = useRef(false);
+  const hasLoadedRef = useRef(false);
+  
   useEffect(() => {
     const loadData = async () => {
+      // Evita múltiplas execuções simultâneas
+      if (isLoadingRef.current) {
+        return;
+      }
+      
+      isLoadingRef.current = true;
       try {
         // Pega o nome do Supabase Auth primeiro
         const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -168,15 +382,37 @@ export default function Profile() {
           setAttributes(attributesData);
         } catch (error) {
           console.error("Erro ao buscar atributos:", error);
-          setAttributes({ tech_skills: [], soft_skills: [], career_goal: "" });
+          setAttributes({ tech_skills: {}, soft_skills: {}, career_goal: "" });
         }
         
         try {
           const submissionsData = await fetchSubmissions();
-          setSubmissions(submissionsData || []);
+          // Filtra apenas submissões com status "scored" (avaliadas com sucesso)
+          // Backend já retorna ordenado por data mais recente primeiro
+          const completedSubmissions = (submissionsData || []).filter(
+            sub => sub.status === 'scored'
+          );
+          // Limita aos últimos 5 desafios
+          const last5Submissions = completedSubmissions.slice(0, 5);
+          console.log("📊 Submissões recebidas:", {
+            total: submissionsData?.length || 0,
+            scored: completedSubmissions.length,
+            last5: last5Submissions.length,
+            allStatuses: submissionsData?.map(s => ({ id: s.id, status: s.status, date: s.date, score: s.score, points: s.points })) || []
+          });
+          setSubmissions(last5Submissions);
         } catch (error) {
           console.error("Erro ao buscar submissões:", error);
           setSubmissions([]);
+        }
+
+        // Carrega currículos do usuário
+        try {
+          const resumes = await listResumes();
+          setMyResumes(resumes || []);
+        } catch (err) {
+          console.error("Erro ao carregar currículos:", err);
+          setMyResumes([]);
         }
         
         console.log("📊 Dados do perfil carregados:", { fullName });
@@ -184,15 +420,115 @@ export default function Profile() {
         console.error("Erro ao carregar dados do perfil:", error);
         // Seta valores padrão se tudo falhar
         setUser({ full_name: "Usuário" });
-        setAttributes({ tech_skills: [], soft_skills: [], career_goal: "" });
+        setAttributes({ tech_skills: {}, soft_skills: {}, career_goal: "" });
         setSubmissions([]);
       } finally {
         setLoading(false);
+        isLoadingRef.current = false;
+        hasLoadedRef.current = true;
       }
     };
 
-    loadData();
-  }, []);
+    // Só carrega dados na primeira vez ou quando explicitamente solicitado
+    if (!hasLoadedRef.current) {
+      loadData();
+    }
+    
+    // Listener para recarregar dados quando necessário (com debounce)
+    let reloadTimeout = null;
+    const handleReload = () => {
+      if (reloadTimeout) {
+        clearTimeout(reloadTimeout);
+      }
+      reloadTimeout = setTimeout(() => {
+        if (!isLoadingRef.current) {
+          hasLoadedRef.current = false; // Permite recarregar
+          loadData();
+        }
+      }, 500);
+    };
+    window.addEventListener('reloadProfileData', handleReload);
+    
+    return () => {
+      window.removeEventListener('reloadProfileData', handleReload);
+      if (reloadTimeout) {
+        clearTimeout(reloadTimeout);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Dependências vazias: carrega apenas uma vez
+
+  // Calcula porcentagens das soft skills com base nos attributes retornados
+  const computeSoftSkillPercentages = (softSkills) => {
+    // Definição das categorias e suas perguntas (deve refletir o questionario_soft)
+    const categorias = [
+      {
+        chave: 'Comunicação',
+        perguntas: [
+          'Consigo explicar problemas técnicos para pessoas não técnicas',
+          'Deixo comentários claros e úteis no código',
+          'Escrevo mensagens estruturadas em equipes de desenvolvimento',
+        ],
+      },
+      {
+        chave: 'Organização',
+        perguntas: [
+          'Divido tarefas em pequenas etapas e priorizo',
+          'Planejo minhas atividades semanalmente',
+          'Gerencio múltiplos projetos sem perder prazos',
+        ],
+      },
+      {
+        chave: 'Resolução de Problemas',
+        perguntas: [
+          'Identifico rapidamente a causa raiz dos problemas',
+          'Sei investigar e debugar erros de forma eficiente',
+          'Resolvo problemas complexos de lógica',
+        ],
+      },
+    ];
+
+    if (!softSkills) return {};
+
+    const results = {};
+
+    categorias.forEach((cat) => {
+      // Se o backend já armazenou a categoria como chave com percent (ex: {"Comunicação": 80})
+      if (typeof softSkills[cat.chave] === 'number') {
+        results[cat.chave] = Math.max(0, Math.min(100, Math.round(softSkills[cat.chave])));
+        return;
+      }
+
+      // Caso contrário, buscamos as perguntas individuais no objeto softSkills (que pode ter as perguntas como chaves)
+      const valores = cat.perguntas
+        .map((q) => softSkills[q])
+        .filter((v) => typeof v === 'number');
+
+      if (valores.length === 0) {
+        results[cat.chave] = 0;
+        return;
+      }
+
+      const media = valores.reduce((a, b) => a + b, 0) / valores.length;
+
+      // Detectar escala: se valores parecem estar em 0..5 ou 0..100
+      const maxVal = Math.max(...valores);
+
+      let percent = 0;
+      if (maxVal <= 5) {
+        // respostas 0-5: média * 10 (conforme solicitado)
+        percent = media * 10;
+      } else {
+        // respostas 0-100: converter para escala pedida
+        // assumimos que média 0-100 -> seguir média * 0.5 (equivalente a (media/20)*10)
+        percent = media * 0.5;
+      }
+
+      results[cat.chave] = Math.max(0, Math.min(100, Math.round(percent)));
+    });
+
+    return results;
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -222,6 +558,38 @@ export default function Profile() {
         error.message || "Não foi possível excluir sua conta. Por favor, tente novamente ou entre em contato com o suporte."
       );
       setDeleteLoading(false);
+    }
+  };
+
+  // Funções para currículos (moved from Home.jsx)
+  const loadResumes = async () => {
+    try {
+      const resumes = await listResumes();
+      setMyResumes(resumes || []);
+    } catch (error) {
+      console.error("❌ Erro ao carregar currículos:", error);
+    }
+  };
+
+  const handleAnalyzeResume = (resumeId) => {
+    // Redireciona para a Home e passa o id do currículo para que a Home abra a análise
+    navigate('/home', { state: { openResumeId: resumeId } });
+  };
+
+  const handleDeleteResume = async (resumeId) => {
+    setDeletingResumeId(resumeId);
+
+    try {
+      // Delay curto para animação
+      await new Promise(resolve => setTimeout(resolve, 200));
+      setMyResumes(prev => prev.filter(r => r.id !== resumeId));
+      await deleteResume(resumeId);
+    } catch (error) {
+      console.error("❌ Erro ao deletar currículo:", error);
+      alert("Erro ao deletar currículo: " + (error.message || ""));
+      await loadResumes();
+    } finally {
+      setDeletingResumeId(null);
     }
   };
 
@@ -266,17 +634,48 @@ export default function Profile() {
               {/* Coluna Principal (2/3) */}
               <div className="lg:col-span-2 space-y-8">
 
-                <Section title="Habilidades Técnicas" subtitle="Suas competências atualizadas com base nos desafios completados">
+                <Section title="Habilidades Técnicas" subtitle={null}>
                     <div className="space-y-6">
-                        {attributes?.tech_skills && attributes.tech_skills.length > 0 ? (
-                          attributes.tech_skills.map(skill => <SkillBar key={skill.name} skill={skill.name} percentage={skill.percentage} date={skill.last_updated} />)
+                        {attributes?.tech_skills && Object.keys(attributes.tech_skills).length > 0 ? (
+                          Object.entries(attributes.tech_skills).map(([skillName, percentage]) => (
+                            <SkillBar 
+                              key={skillName} 
+                              skill={skillName} 
+                              percentage={percentage} 
+                              date={attributes.updated_at} 
+                            />
+                          ))
                         ) : (
                           <p className="text-zinc-500 text-center py-4">Nenhuma habilidade registrada ainda.</p>
                         )}
                     </div>
                 </Section>
 
-                <Section title="Histórico de Desafios" subtitle={`${submissions.length} desafios completados`}>
+                {/* Nova seção: Habilidades Sociais (Soft Skills) */}
+                <Section title="Habilidades Sociais" subtitle={null}>
+                  <div className="space-y-6">
+                    {(() => {
+                      const softPercents = computeSoftSkillPercentages(attributes?.soft_skills || {});
+                      const keys = ['Comunicação', 'Organização', 'Resolução de Problemas'];
+
+                      const hasAny = keys.some(k => softPercents[k] && softPercents[k] > 0);
+
+                      if (!hasAny) {
+                        return <p className="text-zinc-500 text-center py-4">Nenhuma avaliação de soft skills disponível.</p>;
+                      }
+
+                      return (
+                        <div className="space-y-4">
+                          {keys.map(k => (
+                            <SkillBar key={k} skill={k} percentage={softPercents[k] || 0} date={attributes?.updated_at} />
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </Section>
+
+                <Section title="Histórico de Desafios" subtitle={`${submissions.length} desafios completados`} id="historico">
                     {submissions && submissions.length > 0 ? (
                       submissions.map(sub => <ChallengeHistoryItem key={sub.id} {...sub} />)
                     ) : (
@@ -286,7 +685,7 @@ export default function Profile() {
 
                 <div className="grid grid-cols-3 gap-4">
                     <StatCard value={submissions?.length || 0} label="Desafios Completados" />
-                    <StatCard value={attributes?.tech_skills?.length || 0} label="Habilidades Rastreadas" />
+                    <StatCard value={attributes?.tech_skills ? Object.keys(attributes.tech_skills).length : 0} label="Habilidades Rastreadas" />
                     <StatCard value="90" label="Score Médio" />
                 </div>
 
@@ -318,6 +717,79 @@ export default function Profile() {
                 <p className="text-sm text-zinc-600">Você está no caminho certo. Continue praticando regularmente.</p>
               </div>
             </Section>
+
+              {/* Nova área: Meus Currículos (movido da Home) */}
+              <Section title="Meus Currículos" subtitle={null}>
+                <div>
+                  <Card 
+                    role="button"
+                    aria-expanded={expandedMyResumesCard}
+                    className={
+                      "p-4 cursor-pointer transition-all duration-300 ease-in-out " +
+                      (expandedMyResumesCard ? "ring-2 ring-primary-300" : "hover:scale-[1.02]")
+                    }
+                    onClick={() => setExpandedMyResumesCard(prev => !prev)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="h-9 w-9 rounded-md bg-emerald-100 text-emerald-800 grid place-content-center border border-emerald-200 text-sm font-semibold">
+                          ✔
+                        </div>
+                        <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Análise Praxis</span>
+                      </div>
+                    </div>
+
+                    {!expandedMyResumesCard && (
+                      <div className="mt-3">
+                        <h3 className="text-lg font-semibold text-zinc-900">Análises</h3>
+                        <p className="mt-1.5 text-sm text-zinc-600">{myResumes.length === 0 ? 'Nenhum currículo enviado' : `${myResumes.length} currículo${myResumes.length > 1 ? 's' : ''}`}</p>
+                      </div>
+                    )}
+
+                    {expandedMyResumesCard && (
+                      <div className="pt-4 mt-4 border-t border-zinc-200" onClick={(e) => e.stopPropagation()}>
+                        <h3 className="text-lg font-semibold text-zinc-900 mb-3">Currículos Enviados</h3>
+
+                        {myResumes.length === 0 ? (
+                          <div className="text-center py-8 text-zinc-500">
+                            <p className="text-sm">Nenhum currículo enviado ainda.</p>
+                            <p className="text-xs mt-1">Envie seu primeiro currículo na área de Análise.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-3 max-h-72 overflow-y-auto">
+                            {myResumes.map((resume) => (
+                              <div key={resume.id} className={`border border-zinc-200 rounded-lg p-3 transition-all duration-300 ${deletingResumeId === resume.id ? 'opacity-0 scale-95 translate-x-4' : 'opacity-100 scale-100 translate-x-0'}`}>
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex-1">
+                                    <h4 className="font-semibold text-zinc-900 text-sm">{resume.title || 'Sem título'}</h4>
+                                    <p className="text-xs text-zinc-500 mt-1">Enviado em {new Date(resume.created_at).toLocaleDateString('pt-BR')}</p>
+                                  </div>
+                                  {resume.has_analysis && (
+                                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">✓ Analisado</span>
+                                  )}
+                                </div>
+
+                                <div className="flex gap-2 mt-2">
+                                  <button onClick={() => handleAnalyzeResume(resume.id)} disabled={analyzingResume && selectedResumeId === resume.id} className="flex-1 px-3 py-1.5 text-sm font-medium border border-primary-200 text-primary-700 rounded-md hover:bg-primary-50 transition disabled:opacity-50 cursor-pointer">
+                                    {analyzingResume && selectedResumeId === resume.id ? 'Analisando...' : (resume.has_analysis ? 'Ver Análise' : 'Analisar com IA')}
+                                  </button>
+                                  <button onClick={() => handleDeleteResume(resume.id)} disabled={deletingResumeId === resume.id} className="px-3 py-1.5 text-sm font-medium border border-red-200 text-red-600 rounded-md hover:bg-red-50 transition disabled:opacity-50 cursor-pointer" title="Excluir currículo">
+                                    {deletingResumeId === resume.id ? '...' : 'Excluir'}
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="mt-4 flex justify-end">
+                          <button onClick={(e) => { e.stopPropagation(); setExpandedMyResumesCard(false); }} className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50">Fechar</button>
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                </div>
+              </Section>
           </div>
         </div>
           </>

@@ -14,11 +14,9 @@ import Cadastro from "./assets/pages/Cadastro";
 import Home from "./assets/pages/Home";
 import Profile from "./assets/pages/Profile";
 import Challenge from "./assets/pages/Challenge";
-import QuestionarioSoft from "./assets/pages/Questionario_soft"; // ✅ Soft Skills
-import QuestionarioHardBack from "./assets/pages/Questionario_hard_back"; // ✅ Backend
-import QuestionarioHardFront from "./assets/pages/Questionario_hard_front"; // ✅ Frontend
-import QuestionarioHardDados from "./assets/pages/Questionario_hard_dados"; // ✅ Engenheiro de Dados
-import QuestionarioHardFullstack from "./assets/pages/Questionario_hard_fullstack"; // ✅ Full Stack
+import ChallengeResult from "./assets/pages/ChallengeResult";
+import Onboarding from "./assets/pages/Onboarding";
+import ForceLogout from "./assets/pages/ForceLogout";
 
 // --- Hook de autenticação ---
 import { useAuth } from "./assets/hooks/useAuth";
@@ -61,6 +59,9 @@ export default function App() {
       <Routes>
         {/* --- Rota pública (acessível a todos) --- */}
         <Route path="/" element={<Landing />} />
+        
+        {/* --- Rota de emergência para forçar logout (sempre acessível) --- */}
+        <Route path="/force-logout" element={<ForceLogout />} />
 
         {/* --- Rotas públicas --- */}
         <Route
@@ -80,26 +81,15 @@ export default function App() {
           }
         />
 
-        {/* ✅ Questionários */}
-        <Route path="/questionario-soft" element={<QuestionarioSoft />} />
-        <Route
-          path="/questionario-hard-back"
-          element={<QuestionarioHardBack />}
-        />
-        <Route
-          path="/questionario-hard-front"
-          element={<QuestionarioHardFront />}
-        />
-        <Route
-          path="/questionario-hard-dados"
-          element={<QuestionarioHardDados />}
-        />
-        <Route
-          path="/questionario-hard-fullstack"
-          element={<QuestionarioHardFullstack />}
-        />
-
         {/* --- Rotas protegidas (só para logados) --- */}
+        <Route
+          path="/onboarding"
+          element={
+            <PrivateRoute>
+              <Onboarding />
+            </PrivateRoute>
+          }
+        />
         <Route
           path="/home"
           element={
@@ -121,6 +111,14 @@ export default function App() {
           element={
             <PrivateRoute>
               <Challenge />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/challenge-result"
+          element={
+            <PrivateRoute>
+              <ChallengeResult />
             </PrivateRoute>
           }
         />

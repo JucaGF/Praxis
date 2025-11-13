@@ -20,7 +20,12 @@ class SubmissionResultOut(BaseModel):
     score: Optional[Score] = None
     metrics: Optional[Dict[str, Score]] = None
     feedback: Optional[str] = None
-    # progressão
+    # Novo formato: múltiplas skills
+    skills_progression: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Progressão de múltiplas skills: {skills_updated, deltas, new_values, skill_type}"
+    )
+    # Mantém formato antigo para compatibilidade com frontend antigo
     target_skill: Optional[str] = None
     delta_applied: Optional[int] = None
     updated_skill_value: Optional[int] = None

@@ -1,13 +1,74 @@
 // src/pages/Home.jsx
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { fetchUser, fetchChallenges, generateChallengesStreaming, uploadResume, uploadResumeFile, analyzeResume, listResumes, uploadAndAnalyzeResumeFileStreaming, analyzeResumeStreaming, deleteResume } from "../lib/api.js";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { fetchUser, fetchChallenges, fetchSubmissions, generateChallengesStreaming, uploadResume, uploadResumeFile, analyzeResume, listResumes, uploadAndAnalyzeResumeFileStreaming, analyzeResumeStreaming, deleteResume } from "../lib/api.js";
 import { Pill, Difficulty, Skill, Meta, Card, PrimaryButton } from "../components/ui.jsx";
 import { supabase } from "../lib/supabaseClient";
 import PraxisLogo from "../components/PraxisLogo";
+import ChallengeCardHome from "../components/challenges/ChallengeCardHome";
+import logger from "../utils/logger";
 
 /* ----- Função para transformar dados da API no formato esperado ----- */
-function transformChallenges(apiChallenges) {
+function transformChallenges(apiChallenges, submissions = []) {
+  console.log("🔄 transformChallenges chamada com:", {
+    challengesCount: apiChallenges.length,
+    submissionsCount: submissions.length,
+    allSubmissions: submissions.map(s => ({ id: s.id, challenge_id: s.challenge_id, status: s.status }))
+  });
+  
+  // Criar mapa de challenge_id -> submissão mais recente com status "scored" (avaliado com sucesso)
+  const completedChallenges = new Map();
+  const scoredSubmissions = submissions.filter(sub => sub.status === 'scored');
+  
+  console.log("✅ Submissões com status 'scored':", scoredSubmissions.map(s => ({ 
+    id: s.id, 
+    challenge_id: s.challenge_id, 
+    status: s.status,
+    score: s.score
+  })));
+  
+  scoredSubmissions.forEach(sub => {
+      const existing = completedChallenges.get(sub.challenge_id);
+      if (!existing) {
+        completedChallenges.set(sub.challenge_id, sub);
+      } else {
+        // Compara datas: pega a mais recente
+        // Backend retorna "date" como string formatada "DD/MM/YYYY"
+        const subDate = sub.date;
+        const existingDate = existing.date;
+        if (subDate && existingDate) {
+          try {
+            // Backend retorna "date" como "DD/MM/YYYY", precisa parsear
+            const parseDate = (dateStr) => {
+              if (!dateStr || dateStr === 'Data desconhecida') return null;
+              const parts = dateStr.split('/');
+              if (parts.length === 3) {
+                // DD/MM/YYYY -> YYYY-MM-DD para criar Date
+                return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+              }
+              return new Date(dateStr);
+            };
+            
+            const subDateObj = parseDate(subDate);
+            const existingDateObj = parseDate(existingDate);
+            
+            if (subDateObj && existingDateObj && subDateObj > existingDateObj) {
+              completedChallenges.set(sub.challenge_id, sub);
+            } else if (subDateObj && !existingDateObj) {
+              // Se só a nova tem data válida, usa ela
+              completedChallenges.set(sub.challenge_id, sub);
+            }
+          } catch (e) {
+            // Se falhar, mantém o existente
+            console.warn('Erro ao comparar datas:', e);
+          }
+        } else if (subDate && subDate !== 'Data desconhecida' && !existingDate) {
+          // Se só a nova tem data, usa ela
+          completedChallenges.set(sub.challenge_id, sub);
+        }
+      }
+    });
+
   return apiChallenges.map(challenge => {
     // Mapeia level de inglês para português
     const levelMap = {
@@ -31,6 +92,9 @@ function transformChallenges(apiChallenges) {
     const minutes = timeLimit % 60;
     const timeStr = hours > 0 ? `${hours}h${minutes > 0 ? ` ${minutes}min` : ''}` : `${minutes}min`;
     
+    const isCompleted = completedChallenges.has(challenge.id);
+    const submission = completedChallenges.get(challenge.id);
+    
     return {
       id: challenge.id,
       title: challenge.title,
@@ -38,11 +102,19 @@ function transformChallenges(apiChallenges) {
       long_desc: challenge.description?.text || "Sem descrição",
       difficulty: levelMap[challenge.difficulty?.level] || 'Médio',
       time: timeStr,
+      duration_minutes: timeLimit, // Mantém valor numérico para o timer
       skills: skills.slice(0, 3), // Limita a 3 skills
       tags: challenge.category ? [challenge.category] : [],
-      status: "available",
-      category: challenge.category // Adiciona category para os ícones
+      status: isCompleted ? "completed" : "available",
+      category: challenge.category, // Adiciona category para os ícones
+      submission: submission || null // Adiciona dados da submissão se existir
     };
+  });
+  
+  console.log("🔄 Challenges transformados:", {
+    total: apiChallenges.length,
+    completed: apiChallenges.filter(c => completedChallenges.has(c.id)).length,
+    completedIds: Array.from(completedChallenges.keys())
   });
 }
 
@@ -114,6 +186,18 @@ export default function Home() {
   
   // Ref para scroll automático até a análise
   const analysisResultRef = useRef(null);
+
+  const location = useLocation();
+
+  // Remove emojis e pictogramas simples de uma string para exibição limpa
+  const stripEmoji = (s) => {
+    if (!s) return s;
+    try {
+      return s.replace(/[\u2700-\u27BF\uE000-\uF8FF\u2600-\u26FF]|[\uD83C-\uDBFF][\uDC00-\uDFFF]/g, '').trim();
+    } catch (e) {
+      return s;
+    }
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -579,26 +663,167 @@ export default function Home() {
   };
 
   // carrega usuário + catálogo
+  // Usa useRef para evitar múltiplos listeners e recarregamentos
+  const isLoadingRef = useRef(false);
+  const hasLoadedRef = useRef(false);
+  const reloadTimeoutRef = useRef(null);
+
   useEffect(() => {
-    (async () => {
+    const loadData = async () => {
+      // Evita múltiplas execuções simultâneas
+      if (isLoadingRef.current) {
+        return;
+      }
+      
+      isLoadingRef.current = true;
       try {
-        // Busca apenas atributos e desafios (profile vem do Supabase)
-        const [attributes, challenges] = await Promise.all([
-          fetchUser(),
-          fetchChallenges()
-        ]);
-        
-        // Pega o nome do Supabase
+        // Primeiro, verifica se o usuário está autenticado
         const { data: { user: authUser } } = await supabase.auth.getUser();
+        
+        if (!authUser) {
+          console.warn("⚠️ Usuário não autenticado. Redirecionando para login...");
+          isLoadingRef.current = false;
+          navigate("/login");
+          return;
+        }
+        
         const fullName = authUser?.user_metadata?.full_name || authUser?.user_metadata?.nome || "Usuário";
         
-        console.log("📊 Dados recebidos da API:", { authUser, attributes, challenges });
+        // Tenta buscar atributos e desafios
+        let attributes = null;
+        let challenges = [];
         
-        // Verifica se os atributos existem
-        if (!attributes || !attributes.tech_skills || attributes.tech_skills.length === 0) {
-          console.warn("⚠️ Atributos não encontrados ou vazios. Usuário precisa criar dados mockados.");
-          throw new Error("Atributos não encontrados. Clique no botão para criar dados mockados.");
+        try {
+          // Busca atributos
+          attributes = await fetchUser();
+        } catch (attrError) {
+          console.log("⚠️ Erro ao buscar attributes:", attrError);
+          
+          // Se erro 404, significa que attributes não existe (usuário precisa fazer onboarding)
+          if (attrError.status === 404 || 
+              attrError.message?.includes("404") ||
+              attrError.message?.includes("não encontrado") ||
+              attrError.message?.includes("not found")) {
+            console.warn("⚠️ Attributes não encontrados (404). Redirecionando para onboarding...");
+            isLoadingRef.current = false;
+            navigate("/onboarding");
+            return;
+          }
+          
+          // Se erro de autenticação, já foi tratado (redirecionou para login)
+          if (attrError.name === "AuthenticationError") {
+            return; // Não precisa fazer nada, já redirecionou
+          }
+          
+          // Outros erros: re-throw
+          throw attrError;
         }
+        
+        // Busca desafios
+        try {
+          challenges = await fetchChallenges();
+        } catch (chalError) {
+          console.warn("⚠️ Erro ao buscar desafios (não crítico):", chalError);
+          challenges = []; // Continua sem desafios
+        }
+        
+        // Busca submissões para determinar quais desafios foram concluídos
+        let submissions = [];
+        try {
+          submissions = await fetchSubmissions();
+        } catch (subError) {
+          console.warn("⚠️ Erro ao buscar submissões (não crítico):", subError);
+          submissions = []; // Continua sem submissões
+        }
+        
+        console.log("📊 Dados recebidos da API:", { 
+          authUser, 
+          attributes, 
+          challengesCount: challenges.length,
+          submissionsCount: submissions.length,
+          submissions: submissions.map(s => ({ 
+            id: s.id, 
+            challenge_id: s.challenge_id, 
+            status: s.status,
+            score: s.score,
+            points: s.points 
+          }))
+        });
+        
+        // Debug CRÍTICO: Ver strong_skills exatamente como vem
+        console.log("🎯 STRONG_SKILLS BRUTO:", attributes?.strong_skills);
+        console.log("🎯 STRONG_SKILLS TYPE:", typeof attributes?.strong_skills);
+        console.log("🎯 STRONG_SKILLS KEYS:", attributes?.strong_skills ? Object.keys(attributes.strong_skills) : "NULO");
+        console.log("🎯 STRONG_SKILLS LENGTH:", attributes?.strong_skills ? Object.keys(attributes.strong_skills).length : 0);
+        
+        // Debug: Ver estrutura exata dos attributes
+        console.log("🔍 Attributes detalhado:", {
+          attributes,
+          tech_skills: attributes?.tech_skills,
+          tech_skills_type: typeof attributes?.tech_skills,
+          tech_skills_is_array: Array.isArray(attributes?.tech_skills),
+          tech_skills_length: attributes?.tech_skills?.length,
+          tech_skills_keys: attributes?.tech_skills && typeof attributes.tech_skills === 'object' ? Object.keys(attributes.tech_skills) : null,
+          strong_skills: attributes?.strong_skills,
+          strong_skills_type: typeof attributes?.strong_skills,
+          strong_skills_is_array: Array.isArray(attributes?.strong_skills),
+          strong_skills_length: attributes?.strong_skills?.length,
+          strong_skills_keys: attributes?.strong_skills && typeof attributes.strong_skills === 'object' ? Object.keys(attributes.strong_skills) : null,
+          soft_skills: attributes?.soft_skills,
+          soft_skills_type: typeof attributes?.soft_skills,
+          soft_skills_is_array: Array.isArray(attributes?.soft_skills),
+          soft_skills_length: attributes?.soft_skills?.length,
+          soft_skills_keys: attributes?.soft_skills && typeof attributes.soft_skills === 'object' ? Object.keys(attributes.soft_skills) : null,
+        });
+        
+        // Verifica se os atributos existem e são reais (não mockados)
+        // Attributes podem vir como objeto ou array, precisamos tratar ambos os casos
+        const hasTechSkills = attributes?.tech_skills && (
+          (Array.isArray(attributes.tech_skills) && attributes.tech_skills.length > 0) ||
+          (typeof attributes.tech_skills === 'object' && !Array.isArray(attributes.tech_skills) && Object.keys(attributes.tech_skills).length > 0)
+        );
+        
+        const hasStrongSkills = attributes?.strong_skills && (
+          (Array.isArray(attributes.strong_skills) && attributes.strong_skills.length > 0) ||
+          (typeof attributes.strong_skills === 'object' && !Array.isArray(attributes.strong_skills) && Object.keys(attributes.strong_skills).length > 0)
+        );
+        
+        const hasSoftSkills = attributes?.soft_skills && (
+          (Array.isArray(attributes.soft_skills) && attributes.soft_skills.length > 0) ||
+          (typeof attributes.soft_skills === 'object' && !Array.isArray(attributes.soft_skills) && Object.keys(attributes.soft_skills).length > 0)
+        );
+        
+        const hasRealData = attributes && hasTechSkills && hasStrongSkills && hasSoftSkills;
+        
+        if (!hasRealData) {
+          console.warn("⚠️ Atributos vazios ou mockados. Redirecionando para onboarding...");
+          console.warn("Debug validação:", { 
+            hasTechSkills, 
+            hasStrongSkills,
+            hasSoftSkills, 
+            hasRealData,
+            tech_skills_check: {
+              exists: !!attributes?.tech_skills,
+              is_array: Array.isArray(attributes?.tech_skills),
+              array_length: Array.isArray(attributes?.tech_skills) ? attributes.tech_skills.length : null,
+              is_object: typeof attributes?.tech_skills === 'object' && !Array.isArray(attributes?.tech_skills),
+              object_keys: typeof attributes?.tech_skills === 'object' && !Array.isArray(attributes?.tech_skills) ? Object.keys(attributes.tech_skills).length : null
+            },
+            strong_skills_check: {
+              exists: !!attributes?.strong_skills,
+              is_array: Array.isArray(attributes?.strong_skills),
+              array_length: Array.isArray(attributes?.strong_skills) ? attributes.strong_skills.length : null,
+              is_object: typeof attributes?.strong_skills === 'object' && !Array.isArray(attributes?.strong_skills),
+              object_keys: typeof attributes?.strong_skills === 'object' && !Array.isArray(attributes?.strong_skills) ? Object.keys(attributes.strong_skills).length : null
+            }
+          });
+          isLoadingRef.current = false;
+          navigate("/onboarding");
+          return;
+        }
+        
+        console.log("✅ Attributes válidos, continuando para Home...");
+        
         
         // Mapeia career_goal para interesses relevantes
         const getInterests = (careerGoal) => {
@@ -623,20 +848,38 @@ export default function Home() {
         // Transforma os dados da API no formato esperado pelo componente
         const userData = {
           name: fullName,
-          // Extrai nomes das tech_skills para usar como skills
-          skills: attributes.tech_skills.map(skill => skill.name),
+          // Extrai nomes das strong_skills (habilidades conhecidas/amarelas) para exibir como Pontos Fortes
+          // strong_skills é um objeto {skill_name: percentage}, então pegamos as chaves
+          skills: attributes.strong_skills ? Object.keys(attributes.strong_skills) : [],
           // Mapeia career_goal para interesses
           interests: getInterests(attributes.career_goal)
         };
         
-               console.log("✅ Dados transformados para o componente:", userData);
+        console.log("✅ Dados transformados para o componente:", userData);
                
-               // Transforma os desafios da API para o formato esperado
-               const transformedChallenges = transformChallenges(challenges || []);
-               console.log("🔄 Desafios carregados e transformados:", transformedChallenges);
+               // Transforma os desafios da API para o formato esperado (incluindo status de conclusão)
+               // Backend já retorna apenas os 3 mais recentes (ativos)
+               const transformedChallenges = transformChallenges(challenges || [], submissions || []);
+               console.log("🔄 Desafios ativos transformados:", transformedChallenges);
+               
+               const completedCount = transformedChallenges.filter(c => c.status === 'completed').length;
+               
+               console.log("✅ Desafios que serão exibidos na home:", {
+                 total: transformedChallenges.length,
+                 completed: completedCount,
+                 available: transformedChallenges.length - completedCount,
+                 challenges: transformedChallenges.map(c => ({ id: c.id, title: c.title, status: c.status }))
+               });
+               
+               logger.debug("home:data:loaded", {
+                 challengesCount: challenges.length,
+                 submissionsCount: submissions.length,
+                 completedCount: completedCount,
+                 submissionsWithScored: submissions.filter(s => s.status === 'scored').length
+               });
                
                setUser(userData);
-               setCatalog(transformedChallenges);
+               setCatalog(transformedChallenges); // Apenas os 3 ativos
                
                // Carrega currículos do usuário
                await loadResumes();
@@ -653,9 +896,43 @@ export default function Home() {
         setCatalog([]);
       } finally {
         setLoading(false);
+        isLoadingRef.current = false;
+        hasLoadedRef.current = true;
       }
-    })();
-  }, []);
+    };
+    
+    // Só carrega dados na primeira vez ou quando explicitamente solicitado
+    if (!hasLoadedRef.current) {
+      loadData();
+    }
+    
+    // Listener para recarregar dados quando necessário (com debounce)
+    const handleReload = () => {
+      // Debounce: aguarda 500ms antes de recarregar para evitar múltiplas requisições
+      if (reloadTimeoutRef.current) {
+        clearTimeout(reloadTimeoutRef.current);
+      }
+      reloadTimeoutRef.current = setTimeout(() => {
+        if (!isLoadingRef.current) {
+          hasLoadedRef.current = false; // Permite recarregar
+          loadData();
+        }
+      }, 500);
+    };
+    
+    window.addEventListener('reloadHomeData', handleReload);
+    
+    return () => {
+      window.removeEventListener('reloadHomeData', handleReload);
+      if (reloadTimeoutRef.current) {
+        clearTimeout(reloadTimeoutRef.current);
+        reloadTimeoutRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Dependências vazias: carrega apenas uma vez na montagem
+          // navigate é estável e não precisa estar nas dependências
+          // reloadHomeData é tratado via event listener
   useEffect(() => {
     const onDocClick = (e) => {
         // se o clique não veio de um Card (procura pelo atributo role="button")
@@ -666,6 +943,26 @@ export default function Home() {
     document.addEventListener("click", onDocClick);
     return () => document.removeEventListener("click", onDocClick);
   }, []);
+
+  // Se a rota foi aberta com { state: { openResumeId } }, abre a análise automaticamente
+  useEffect(() => {
+    const openId = location?.state?.openResumeId;
+    if (openId) {
+      try {
+        handleAnalyzeResume(openId);
+      } catch (e) {
+        console.error('Erro ao abrir análise via state:', e);
+      }
+
+      // limpa o state de navegação para evitar re-trigger em futuros mounts
+      try {
+        navigate(location.pathname, { replace: true, state: {} });
+      } catch (e) {
+        console.debug('Não foi possível limpar state da navegação');
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location?.state?.openResumeId]);
 
   // controla qual card está expandido
   const [expandedId, setExpandedId] = useState(null);
@@ -685,8 +982,27 @@ export default function Home() {
   }
 
   const recommended = useMemo(() => {
-    const avail = catalog.filter((c) => c.status === "available");
-    return avail.sort((a, b) => score(b, user) - score(a, user));
+    // Retorna todos do catalog (já são apenas os 3 ativos do backend)
+    // Ordena: disponíveis primeiro, depois completados
+    const result = [...catalog].sort((a, b) => {
+      // Disponíveis têm prioridade
+      if (a.status === 'available' && b.status === 'completed') return -1;
+      if (a.status === 'completed' && b.status === 'available') return 1;
+      // Se ambos são disponíveis, ordena por score
+      if (a.status === 'available' && b.status === 'available') {
+        return score(b, user) - score(a, user);
+      }
+      // Mantém ordem original para completados
+      return 0;
+    });
+    
+    console.log("📋 Recommended calculado:", {
+      catalogLength: catalog.length,
+      result: result.length,
+      resultIds: result.map(c => ({ id: c.id, title: c.title, status: c.status }))
+    });
+    
+    return result;
   }, [catalog, user]);
 
   if (loading) {
@@ -823,7 +1139,7 @@ export default function Home() {
         {generatingChallenges && (
           <div className="mb-6 bg-white rounded-lg shadow-md p-4 border border-primary-200">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-zinc-700">{streamMessage}</span>
+              <span className="text-sm font-medium text-zinc-700">{stripEmoji(streamMessage)}</span>
               <span className="text-sm font-semibold text-primary-600">{Math.round(streamProgress)}%</span>
             </div>
             <div className="w-full bg-zinc-200 rounded-full h-2.5 overflow-hidden">
@@ -860,7 +1176,7 @@ export default function Home() {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
                     <div className="h-9 w-9 rounded-md bg-zinc-200 grid place-content-center border border-zinc-300">
-                      {placeholder.category ? getChallengeIcon(placeholder.category) : '●'}
+                      {/* Ícone removido durante geração — apenas deixar a caixa vazia para manter layout */}
                     </div>
                     <span className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
                       {placeholder.category ? getChallengeCategoryName(placeholder.category) : 'Gerando...'}
@@ -910,11 +1226,15 @@ export default function Home() {
         )}
 
         <div className="grid md:grid-cols-6 gap-5">
-        {/* Reordena para colocar o expandido primeiro */}
-        {recommended.slice(0, 3)
+        {/* Mostra todos os desafios (disponíveis + completados) */}
+        {recommended
           .sort((a, b) => {
+            // Prioriza expandido primeiro
             if (a.id === expandedId) return -1;
             if (b.id === expandedId) return 1;
+            // Depois, prioriza disponíveis sobre completados
+            if (a.status === 'available' && b.status === 'completed') return -1;
+            if (a.status === 'completed' && b.status === 'available') return 1;
             return 0;
           })
           .map((c, index) => {
@@ -923,11 +1243,8 @@ export default function Home() {
             const isSecondCollapsed = !expanded && expandedId && index === 2;
             
             return (
-            <Card
+              <div
                 key={c.id}
-                role="button"
-                aria-expanded={expanded}
-                onClick={() => toggleExpand(c.id)}
                 style={{
                   gridColumn: expanded 
                     ? 'span 6' 
@@ -938,76 +1255,17 @@ export default function Home() {
                         : 'span 2'
                 }}
                 className={
-                "p-5 cursor-pointer transition-all duration-300 ease-in-out animate-fade-in " +
-                (expanded 
-                  ? "ring-2 ring-primary-300" 
-                  : expandedId
-                    ? "hover:scale-[1.02] scale-95 opacity-90"
-                    : "hover:scale-[1.02]")
+                  expandedId && !expanded
+                    ? "scale-95 opacity-90"
+                    : ""
                 }
-            >
-                <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="h-9 w-9 rounded-md bg-primary-100 text-primary-800 grid place-content-center border border-primary-200 text-sm font-semibold">
-                      {getChallengeIcon(c.category)}
-                  </div>
-                  <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                    {getChallengeCategoryName(c.category)}
-                  </span>
-                </div>
-                <Difficulty level={c.difficulty} />
-                </div>
-
-                <h3 className="mt-4 text-lg font-semibold text-zinc-900">{c.title}</h3>
-                <p className="mt-1.5 text-sm text-zinc-600">{c.desc}</p>
-
-                <div className="mt-4"><Meta icon="⏲️">{c.time}</Meta></div>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                {c.skills.map((s) => <Skill key={s}>{s}</Skill>)}
-                </div>
-
-                {/* Área extra que aparece quando expandido */}
-                {expanded && (
-                  <div className="pt-4 mt-4 border-t border-zinc-200">
-                    <p className="text-sm text-zinc-700">
-                      <span className="font-medium">Objetivo:</span> resolver o desafio aplicando as skills acima e
-                      registrando suas decisões técnicas.
-                    </p>
-
-                    <div className="mt-3 grid gap-2 text-sm text-zinc-700">
-                      <div>
-                        <span className="font-medium">Pré-requisitos:</span>{" "}
-                        {c.skills.join(", ")}
-                      </div>
-                      <div>
-                        <span className="font-medium">O que será avaliado:</span> clareza do código, testes básicos,
-                        comunicação (README) e performance quando aplicável.
-                      </div>
-                      <div>
-                        <span className="font-medium">Passos sugeridos:</span> entender o bug/feature, planejar,
-                        implementar, testar e documentar.
-                      </div>
-                    </div>
-
-                    {/* Ações extras quando expandido */}
-                    <div className="mt-5 flex flex-wrap gap-3">
-                      <Link to={`/desafio/${c.id}`} onClick={(e) => e.stopPropagation()}>
-                        <PrimaryButton>
-                          Começar desafio
-                        </PrimaryButton>
-                      </Link>
-
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setExpandedId(null); }}
-                        className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50"
-                      >
-                        Fechar
-                      </button>
-                    </div>
-                  </div>
-                )}
-            </Card>
+              >
+                <ChallengeCardHome 
+                  challenge={c}
+                  expanded={expanded}
+                  onToggle={() => toggleExpand(c.id)}
+                />
+              </div>
             );
         })}
         </div>
@@ -1026,7 +1284,7 @@ export default function Home() {
                 role="button"
                 aria-expanded={expandedUploadCard}
                 className={
-                  "p-5 cursor-pointer transition-all duration-300 ease-in-out animate-fade-in " +
+                  "md:col-span-2 p-5 cursor-pointer transition-all duration-300 ease-in-out animate-fade-in " +
                   (expandedUploadCard 
                     ? "ring-2 ring-primary-300" 
                     : "hover:scale-[1.02]")
@@ -1065,7 +1323,7 @@ export default function Home() {
                             : "border-transparent text-zinc-600 hover:text-zinc-900"
                         }`}
                       >
-                        📎 Enviar Arquivo
+                        Enviar Arquivo
                       </button>
                       <button
                         onClick={() => setUploadType("text")}
@@ -1075,7 +1333,7 @@ export default function Home() {
                             : "border-transparent text-zinc-600 hover:text-zinc-900"
                         }`}
                       >
-                        ✏️ Colar Texto
+                        Colar Texto
                       </button>
                     </div>
                     
@@ -1194,113 +1452,7 @@ export default function Home() {
                 )}
               </Card>
 
-              {/* Coluna 2: Meus Currículos e Análise */}
-              <Card 
-                role="button"
-                aria-expanded={expandedMyResumesCard}
-                className={
-                  "p-5 cursor-pointer transition-all duration-300 ease-in-out animate-fade-in " +
-                  (expandedMyResumesCard 
-                    ? "ring-2 ring-primary-300" 
-                    : "hover:scale-[1.02]")
-                }
-                onClick={() => setExpandedMyResumesCard(prev => !prev)}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="h-9 w-9 rounded-md bg-emerald-100 text-emerald-800 grid place-content-center border border-emerald-200 text-sm font-semibold">
-                      ✔
-                    </div>
-                    <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                      Análise Praxis
-                    </span>
-                  </div>
-                </div>
-
-                {!expandedMyResumesCard && (
-                  <div className="mt-4">
-                    <h3 className="text-lg font-semibold text-zinc-900">Meus Currículos</h3>
-                    <p className="mt-1.5 text-sm text-zinc-600">
-                      {myResumes.length === 0 
-                        ? "Nenhum currículo enviado ainda" 
-                        : `${myResumes.length} currículo${myResumes.length > 1 ? 's' : ''} enviado${myResumes.length > 1 ? 's' : ''}`}
-                    </p>
-                  </div>
-                )}
-
-                {expandedMyResumesCard && (
-                  <div className="pt-4 mt-4 border-t border-zinc-200" onClick={(e) => e.stopPropagation()}>
-                    <h3 className="text-lg font-semibold text-zinc-900 mb-3">Meus Currículos</h3>
-                    
-                    {myResumes.length === 0 ? (
-                      <div className="text-center py-8 text-zinc-500">
-                        <p className="text-sm">Nenhum currículo enviado ainda.</p>
-                        <p className="text-xs mt-1">Envie seu primeiro currículo ao lado!</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3 max-h-96 overflow-y-auto">
-                        {myResumes.map((resume) => (
-                          <div 
-                            key={resume.id} 
-                            className={`border border-zinc-200 rounded-lg p-4 transition-all duration-300 ${
-                              deletingResumeId === resume.id 
-                                ? 'opacity-0 scale-95 translate-x-4' 
-                                : 'opacity-100 scale-100 translate-x-0'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex-1">
-                                <h4 className="font-semibold text-zinc-900 text-sm">{resume.title || "Sem título"}</h4>
-                                <p className="text-xs text-zinc-500 mt-1">
-                                  Enviado em {new Date(resume.created_at).toLocaleDateString('pt-BR')}
-                                </p>
-                              </div>
-                              {resume.has_analysis && (
-                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  ✓ Analisado
-                                </span>
-                              )}
-                            </div>
-                            
-                            <div className="flex gap-2 mt-2">
-                              <button
-                                onClick={() => handleAnalyzeResume(resume.id)}
-                                disabled={analyzingResume && selectedResumeId === resume.id}
-                                className="flex-1 px-3 py-1.5 text-sm font-medium border border-primary-200 text-primary-700 rounded-md hover:bg-primary-50 transition disabled:opacity-50 cursor-pointer"
-                              >
-                                {analyzingResume && selectedResumeId === resume.id
-                                  ? "Analisando..."
-                                  : resume.has_analysis
-                                  ? "Ver Análise"
-                                  : "Analisar com IA"}
-                              </button>
-                              
-                              <button
-                                onClick={() => handleDeleteResume(resume.id)}
-                                disabled={deletingResumeId === resume.id}
-                                className="px-3 py-1.5 text-sm font-medium border border-red-200 text-red-600 rounded-md hover:bg-red-50 transition disabled:opacity-50 cursor-pointer"
-                                title="Excluir currículo"
-                              >
-                                {deletingResumeId === resume.id ? "..." : "🗑️"}
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Botão Fechar (estilo dos desafios) */}
-                    <div className="mt-5 flex justify-end">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setExpandedMyResumesCard(false); }}
-                        className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50"
-                      >
-                        Fechar
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </Card>
+              {/* Meus Currículos movido para a página de Perfil */}
             </div>
 
           {/* Progresso e Análise em Tempo Real */}
@@ -1309,7 +1461,7 @@ export default function Home() {
               {/* Barra de progresso */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-zinc-700">{analysisMessage}</span>
+                  <span className="text-sm font-medium text-zinc-700">{stripEmoji(analysisMessage)}</span>
                   <span className="text-sm font-semibold text-primary-600">{Math.round(analysisProgress)}%</span>
                 </div>
                 <div className="w-full bg-zinc-200 rounded-full h-2.5 overflow-hidden">

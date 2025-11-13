@@ -76,6 +76,8 @@ class Attributes(SQLModel, table=True):
     career_goal: Optional[str] = Field(default=None)
     soft_skills: Optional[JsonB] = Field(default=None, sa_column=Column(JSONB))
     tech_skills: Optional[JsonB] = Field(default=None, sa_column=Column(JSONB))
+    strong_skills: Optional[JsonB] = Field(
+        default=None, sa_column=Column(JSONB))
     updated_at: datetime = Field(
         sa_column=Column(DateTime(timezone=True),
                          server_default=func.now(), nullable=False)
