@@ -1,9 +1,10 @@
 // src/pages/Profile.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Line } from "react-chartjs-2";
+import { ChevronDown, ChevronUp, FileText, MessageSquare } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
-import { deleteAccount, fetchUser, fetchSubmissions, listResumes, analyzeResume, deleteResume } from "../lib/api";
+import { deleteAccount, fetchUser, fetchSubmissions, fetchSubmissionDetails, listResumes, analyzeResume, deleteResume } from "../lib/api";
 import PraxisLogo from "../components/PraxisLogo";
 import {
   Chart as ChartJS,
@@ -31,9 +32,9 @@ ChartJS.register(
 
 // --- Componentes específicos do Perfil ---
 
-function Section({ title, subtitle, children }) {
+function Section({ title, subtitle, children, id }) {
   return (
-    <Card className="p-6">
+    <Card id={id} className="p-6 scroll-mt-20">
       <h2 className="text-xl font-semibold text-zinc-900">{title}</h2>
       <p className="text-zinc-600 mt-1">{subtitle}</p>
       <div className="mt-6">{children}</div>
@@ -68,20 +69,191 @@ function SkillBar({ skill, percentage, date }) {
   );
 }
 
-function ChallengeHistoryItem({ title, score, points, date, tags }) {
+function ChallengeHistoryItem({ id, title, score, points, date, tags }) {
+  const [expanded, setExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState('challenge'); // 'challenge' ou 'feedback'
+  const [details, setDetails] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const loadDetails = async () => {
+    if (details) return; // Já carregou
+    
+    setLoading(true);
+    try {
+      const data = await fetchSubmissionDetails(id);
+      setDetails(data);
+    } catch (error) {
+      console.error("Erro ao carregar detalhes:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggle = () => {
+    if (!expanded && !details) {
+      loadDetails();
+    }
+    setExpanded(!expanded);
+  };
+
   return (
-    <div className="flex justify-between items-center py-3 border-b border-zinc-200 last:border-b-0">
-      <div>
-        <h4 className="font-semibold text-zinc-900">{title}</h4>
-        <div className="flex items-center gap-3 text-xs text-zinc-500 mt-1">
-          <span>📅 {date}</span>
-          <span>📈 +{points} pontos</span>
+    <div className="border-b border-zinc-200 last:border-b-0">
+      {/* Header compacto */}
+      <div className="flex justify-between items-center py-3">
+        <div className="flex-1">
+          <h4 className="font-semibold text-zinc-900">{title}</h4>
+          <div className="flex items-center gap-3 text-xs text-zinc-500 mt-1">
+            <span>📅 {date}</span>
+            <span>📈 +{points} pontos</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <p className="text-xl font-bold text-primary-600">{score}/100</p>
+            <p className="text-xs text-zinc-500">{tags}</p>
+          </div>
+          <button
+            onClick={handleToggle}
+            className="p-2 hover:bg-zinc-100 rounded-lg transition"
+            aria-label={expanded ? "Recolher" : "Expandir"}
+          >
+            {expanded ? <ChevronUp className="w-5 h-5 text-zinc-600" /> : <ChevronDown className="w-5 h-5 text-zinc-600" />}
+          </button>
         </div>
       </div>
-      <div className="text-right">
-        <p className="text-xl font-bold text-primary-600">{score}/100</p>
-        <p className="text-xs text-zinc-500">{tags}</p>
-      </div>
+
+      {/* Conteúdo expandido */}
+      {expanded && (
+        <div className="pb-4 px-2 space-y-3">
+          {loading && (
+            <div className="text-center py-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto"></div>
+              <p className="text-sm text-zinc-500 mt-2">Carregando detalhes...</p>
+            </div>
+          )}
+
+          {!loading && details && (
+            <>
+              {/* Tabs */}
+              <div className="flex gap-2 border-b border-zinc-200">
+                <button
+                  onClick={() => setActiveTab('challenge')}
+                  className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition ${
+                    activeTab === 'challenge'
+                      ? 'border-b-2 border-primary-500 text-primary-600'
+                      : 'text-zinc-600 hover:text-zinc-900'
+                  }`}
+                >
+                  <FileText className="w-4 h-4" />
+                  Detalhes do Desafio
+                </button>
+                <button
+                  onClick={() => setActiveTab('feedback')}
+                  className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition ${
+                    activeTab === 'feedback'
+                      ? 'border-b-2 border-primary-500 text-primary-600'
+                      : 'text-zinc-600 hover:text-zinc-900'
+                  }`}
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  Feedback da IA
+                </button>
+              </div>
+
+              {/* Conteúdo das tabs */}
+              <div className="bg-zinc-50 rounded-lg p-4">
+                {activeTab === 'challenge' && (
+                  <div className="space-y-3">
+                    <div>
+                      <h5 className="text-sm font-semibold text-zinc-700 mb-1">Descrição</h5>
+                      <p className="text-sm text-zinc-600">{details.challenge?.description?.text || "Sem descrição"}</p>
+                    </div>
+                    
+                    {/* Requisitos Funcionais (para desafios de planejamento/código) */}
+                    {details.challenge?.description?.enunciado?.funcionais && details.challenge.description.enunciado.funcionais.length > 0 && (
+                      <div>
+                        <h5 className="text-sm font-semibold text-zinc-700 mb-1">Requisitos Funcionais</h5>
+                        <ul className="list-disc list-inside text-sm text-zinc-600 space-y-1">
+                          {details.challenge.description.enunciado.funcionais.map((req, idx) => (
+                            <li key={idx}>{req}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {/* Requisitos Não Funcionais (para desafios de planejamento/código) */}
+                    {details.challenge?.description?.enunciado?.nao_funcionais && details.challenge.description.enunciado.nao_funcionais.length > 0 && (
+                      <div>
+                        <h5 className="text-sm font-semibold text-zinc-700 mb-1">Requisitos Não Funcionais</h5>
+                        <ul className="list-disc list-inside text-sm text-zinc-600 space-y-1">
+                          {details.challenge.description.enunciado.nao_funcionais.map((req, idx) => (
+                            <li key={idx}>{req}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {/* Skill alvo (para todos os tipos) */}
+                    {details.challenge?.description?.target_skill && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-zinc-600">Habilidade avaliada:</span>
+                        <span className="px-2 py-1 bg-primary-100 text-primary-700 rounded-full text-xs font-medium">
+                          {details.challenge.description.target_skill}
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="flex gap-4 text-xs text-zinc-500 pt-2 border-t border-zinc-200">
+                      <span>Dificuldade: <strong>{details.challenge?.difficulty?.level}</strong></span>
+                      <span>Tempo limite: <strong>{details.challenge?.difficulty?.time_limit}min</strong></span>
+                      {details.submission?.time_taken_sec && (
+                        <span>Tempo gasto: <strong>{Math.floor(details.submission.time_taken_sec / 60)}min</strong></span>
+                      )}
+                      <span>Tentativa: <strong>#{details.submission?.attempt_number}</strong></span>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'feedback' && (
+                  <div className="space-y-3">
+                    {details.feedback ? (
+                      <>
+                        <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-zinc-200">
+                          <span className="text-sm font-medium text-zinc-700">Nota Final</span>
+                          <span className="text-2xl font-bold text-primary-600">{details.feedback.score}/100</span>
+                        </div>
+                        
+                        {details.feedback.metrics && Object.keys(details.feedback.metrics).length > 0 && (
+                          <div>
+                            <h5 className="text-sm font-semibold text-zinc-700 mb-2">Métricas</h5>
+                            <div className="grid grid-cols-2 gap-2">
+                              {Object.entries(details.feedback.metrics).map(([key, value]) => (
+                                <div key={key} className="bg-white p-2 rounded border border-zinc-200">
+                                  <div className="text-xs text-zinc-500">{key}</div>
+                                  <div className="text-lg font-bold text-zinc-900">{value}/100</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {details.feedback.feedback && (
+                          <div>
+                            <h5 className="text-sm font-semibold text-zinc-700 mb-1">Comentários</h5>
+                            <p className="text-sm text-zinc-600 whitespace-pre-wrap">{details.feedback.feedback}</p>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-sm text-zinc-500 text-center py-4">Feedback não disponível</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -156,9 +328,46 @@ export default function Profile() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
+  // Scroll para seção de histórico se houver hash na URL
+  useEffect(() => {
+    const scrollToHistory = () => {
+      if (window.location.hash === '#historico') {
+        const element = document.getElementById('historico');
+        if (element) {
+          // Aguarda um pouco para garantir que o conteúdo foi renderizado
+          setTimeout(() => {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 300);
+        }
+      }
+    };
+
+    // Executa quando o componente monta
+    scrollToHistory();
+
+    // Também escuta mudanças no hash (caso o usuário navegue sem recarregar)
+    const handleHashChange = () => {
+      scrollToHistory();
+    };
+    window.addEventListener('hashchange', handleHashChange);
+
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, [loading]); // Re-executa quando o loading termina
+
   // Busca dados reais do usuário
+  const isLoadingRef = useRef(false);
+  const hasLoadedRef = useRef(false);
+  
   useEffect(() => {
     const loadData = async () => {
+      // Evita múltiplas execuções simultâneas
+      if (isLoadingRef.current) {
+        return;
+      }
+      
+      isLoadingRef.current = true;
       try {
         // Pega o nome do Supabase Auth primeiro
         const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -178,7 +387,20 @@ export default function Profile() {
         
         try {
           const submissionsData = await fetchSubmissions();
-          setSubmissions(submissionsData || []);
+          // Filtra apenas submissões com status "scored" (avaliadas com sucesso)
+          // Backend já retorna ordenado por data mais recente primeiro
+          const completedSubmissions = (submissionsData || []).filter(
+            sub => sub.status === 'scored'
+          );
+          // Limita aos últimos 5 desafios
+          const last5Submissions = completedSubmissions.slice(0, 5);
+          console.log("📊 Submissões recebidas:", {
+            total: submissionsData?.length || 0,
+            scored: completedSubmissions.length,
+            last5: last5Submissions.length,
+            allStatuses: submissionsData?.map(s => ({ id: s.id, status: s.status, date: s.date, score: s.score, points: s.points })) || []
+          });
+          setSubmissions(last5Submissions);
         } catch (error) {
           console.error("Erro ao buscar submissões:", error);
           setSubmissions([]);
@@ -202,11 +424,39 @@ export default function Profile() {
         setSubmissions([]);
       } finally {
         setLoading(false);
+        isLoadingRef.current = false;
+        hasLoadedRef.current = true;
       }
     };
 
-    loadData();
-  }, []);
+    // Só carrega dados na primeira vez ou quando explicitamente solicitado
+    if (!hasLoadedRef.current) {
+      loadData();
+    }
+    
+    // Listener para recarregar dados quando necessário (com debounce)
+    let reloadTimeout = null;
+    const handleReload = () => {
+      if (reloadTimeout) {
+        clearTimeout(reloadTimeout);
+      }
+      reloadTimeout = setTimeout(() => {
+        if (!isLoadingRef.current) {
+          hasLoadedRef.current = false; // Permite recarregar
+          loadData();
+        }
+      }, 500);
+    };
+    window.addEventListener('reloadProfileData', handleReload);
+    
+    return () => {
+      window.removeEventListener('reloadProfileData', handleReload);
+      if (reloadTimeout) {
+        clearTimeout(reloadTimeout);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Dependências vazias: carrega apenas uma vez
 
   // Calcula porcentagens das soft skills com base nos attributes retornados
   const computeSoftSkillPercentages = (softSkills) => {
@@ -425,7 +675,7 @@ export default function Profile() {
                   </div>
                 </Section>
 
-                <Section title="Histórico de Desafios" subtitle={`${submissions.length} desafios completados`}>
+                <Section title="Histórico de Desafios" subtitle={`${submissions.length} desafios completados`} id="historico">
                     {submissions && submissions.length > 0 ? (
                       submissions.map(sub => <ChallengeHistoryItem key={sub.id} {...sub} />)
                     ) : (

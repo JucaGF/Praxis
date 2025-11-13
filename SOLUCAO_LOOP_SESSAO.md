@@ -190,3 +190,7 @@ Se nada disso resolver:
 - Sempre use o botão "Excluir Conta" em `/perfil`
 - Nunca delete usuários diretamente do Supabase Dashboard
 
+
+
+
+

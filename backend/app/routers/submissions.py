@@ -13,6 +13,7 @@ Responsabilidade do Router (Garçom):
 ✅ FAZ: recebe → delega → retorna
 """
 
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from backend.app.deps import get_submission_service, get_current_user
 from backend.app.domain.services import SubmissionService
@@ -25,8 +26,78 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/submissions", tags=["submissions"])
 
 
+@router.get("/{submission_id}/details")
+def get_submission_details(
+    submission_id: int,
+    current_user: AuthUser = Depends(get_current_user),
+    service: SubmissionService = Depends(get_submission_service)
+):
+    """
+    Busca detalhes completos de uma submissão específica.
+    
+    🔒 ENDPOINT PROTEGIDO - Requer autenticação
+    
+    Retorna:
+    - Dados da submissão
+    - Challenge completo (descrição, requisitos, etc)
+    - Feedback completo da IA (score, métricas, comentários)
+    
+    ✅ Erros específicos:
+    - 401: Token inválido ou ausente
+    - 404: Submissão não encontrada
+    - 403: Submissão não pertence ao usuário
+    """
+    try:
+        # Busca submissão
+        submissions = service.repo.get_submissions_by_profile(current_user.id)
+        submission = next((s for s in submissions if s.id == submission_id), None)
+        
+        if not submission:
+            raise HTTPException(status_code=404, detail="Submissão não encontrada")
+        
+        # Verifica se pertence ao usuário
+        if str(submission.profile_id) != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Acesso negado")
+        
+        # Busca challenge
+        challenge = service.repo.get_challenge(submission.challenge_id)
+        
+        # Busca feedback
+        feedback = service.repo.get_feedback_by_submission(submission.id)
+        
+        return {
+            "submission": {
+                "id": submission.id,
+                "challenge_id": submission.challenge_id,
+                "submitted_code": submission.submitted_code,
+                "status": submission.status,
+                "attempt_number": submission.attempt_number,
+                "notes": submission.notes,
+                "time_taken_sec": submission.time_taken_sec,
+                "submitted_at": submission.submitted_at.strftime("%d/%m/%Y %H:%M") if submission.submitted_at else None
+            },
+            "challenge": challenge,
+            "feedback": {
+                "score": feedback.score if feedback else 0,
+                "feedback": feedback.feedback if feedback else None,
+                "metrics": feedback.metrics if feedback else {},
+                "raw_ai_response": feedback.raw_ai_response if feedback else {}
+            } if feedback else None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(
+            "Erro ao buscar detalhes da submissão",
+            extra={"extra_data": {"submission_id": submission_id, "user_id": current_user.id}}
+        )
+        raise HTTPException(status_code=500, detail="Erro ao buscar detalhes")
+
+
 @router.get("")
 def get_my_submissions(
+    challenge_id: Optional[int] = None,
     current_user: AuthUser = Depends(get_current_user),
     service: SubmissionService = Depends(get_submission_service)
 ):
@@ -34,6 +105,9 @@ def get_my_submissions(
     Busca todas as submissões do usuário autenticado.
     
     🔒 ENDPOINT PROTEGIDO - Requer autenticação
+    
+    Query params:
+    - challenge_id (opcional): filtra submissões de um desafio específico
     
     Retorna lista com todas as submissões do usuário logado,
     incluindo feedbacks e pontuações.
@@ -49,26 +123,47 @@ def get_my_submissions(
             # Se não houver submissões, retorna lista vazia
             return []
         
+        # Filtra por challenge_id se fornecido
+        if challenge_id is not None:
+            submissions = [s for s in submissions if s.challenge_id == challenge_id]
+        
         # Formata resposta
         result = []
         for sub in submissions:
+            feedback = None
+            challenge = None
+            
             try:
                 feedback = service.repo.get_feedback_by_submission(sub.id)
-            except:
+            except Exception as e:
+                logger.warning(
+                    f"Erro ao buscar feedback para submissão {sub.id}",
+                    extra={"extra_data": {"submission_id": sub.id, "error": str(e)}}
+                )
                 feedback = None
             
             try:
                 challenge = service.repo.get_challenge(sub.challenge_id)
-            except:
+            except Exception as e:
+                logger.warning(
+                    f"Erro ao buscar challenge {sub.challenge_id}",
+                    extra={"extra_data": {"challenge_id": sub.challenge_id, "error": str(e)}}
+                )
                 challenge = None
+            
+            # Extrai score do feedback (se existir)
+            score = 0
+            if feedback:
+                score = feedback.score if hasattr(feedback, 'score') and feedback.score is not None else 0
             
             result.append({
                 "id": sub.id,
-                "title": challenge.title if challenge else "Desafio Desconhecido",
-                "score": feedback.score if feedback else 0,
-                "points": feedback.score if feedback else 0,
+                "challenge_id": sub.challenge_id,
+                "title": challenge.get("title") if challenge else "Desafio Desconhecido",
+                "score": score,
+                "points": score,  # Points é o mesmo que score
                 "date": sub.submitted_at.strftime("%d/%m/%Y") if sub.submitted_at else "Data desconhecida",
-                "tags": challenge.category if challenge else "",
+                "tags": challenge.get("category") if challenge else "",
                 "status": sub.status
             })
         

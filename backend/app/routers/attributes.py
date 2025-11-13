@@ -47,13 +47,34 @@ def get_my_attributes(
         return repo.get_attributes(current_user.id)
     except PraxisError as e:
         status_code = get_http_status_code(e)
+        # Se for AttributesNotFound (404), retornar valores padrão para não quebrar o frontend
+        if status_code == 404:
+            logger.warning(
+                f"Atributos não encontrados para usuário {current_user.id}, retornando valores padrão"
+            )
+            from datetime import datetime
+            return {
+                "profile_id": current_user.id,
+                "career_goal": "Não definido",
+                "soft_skills": {},
+                "tech_skills": {},
+                "updated_at": datetime.utcnow()
+            }
         raise HTTPException(status_code=status_code, detail=str(e))
     except Exception as e:
-        logger.exception(
-            "Erro inesperado ao buscar atributos",
+        # Em caso de qualquer erro, retorna valores padrão ao invés de quebrar
+        logger.warning(
+            f"Erro ao buscar atributos para usuário {current_user.id}, retornando valores padrão: {e}",
             extra={"extra_data": {"user_id": current_user.id}}
         )
-        raise HTTPException(status_code=500, detail="Erro inesperado ao buscar atributos")
+        from datetime import datetime
+        return {
+            "profile_id": current_user.id,
+            "career_goal": "Não definido",
+            "soft_skills": {},
+            "tech_skills": {},
+            "updated_at": datetime.utcnow()
+        }
 
 
 @router.get("/{profile_id}", response_model=AttributesOut)

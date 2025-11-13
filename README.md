@@ -27,7 +27,7 @@ Este projeto é construído com tecnologias modernas, visando performance e uma 
 | **Estilização** | [TailwindCSS](https://tailwindcss.com/)                                                                    |
 | **Backend** | [Python 3.11+](https://www.python.org/) com [FastAPI](https://fastapi.tiangolo.com/)                         |
 | **Banco de Dados** | [PostgreSQL](https://www.postgresql.org/) com [SQLModel](https://sqlmodel.tiangolo.com/)                |
-| **IA** | [Google Gemini 1.5](https://ai.google.dev/) (Flash ou Pro)                                                 |
+| **IA** | [Google Gemini 2.5](https://ai.google.dev/) (Flash ou Pro)                                                 |
 | **Autenticação** | [Supabase Auth](https://supabase.com/docs/guides/auth)                                                    |
 | **Editor de Código** | [Monaco Editor](https://microsoft.github.io/monaco-editor/)                                          |
 

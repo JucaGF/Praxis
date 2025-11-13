@@ -252,14 +252,18 @@ class Settings(BaseSettings):
     Gemini 2.5 Flash é excelente: rápido, inteligente e gratuito!
     """
     
-    AI_MAX_RETRIES: int = 3
+    AI_MAX_RETRIES: int = 5
     """
     Número máximo de tentativas em caso de erro na API.
     
     Se uma chamada falhar (timeout, rate limit, erro temporário),
     o sistema retenta automaticamente com backoff exponencial.
     
-    Recomendado: 3 (2s, 4s, 8s de espera)
+    Para erros 503 (modelo sobrecarregado), usa backoff mais longo:
+    - Erros 503: 5s, 10s, 20s, 30s, 30s
+    - Outros erros: 2s, 4s, 8s, 16s, 30s
+    
+    Recomendado: 5 (melhor para lidar com sobrecarga temporária do Gemini)
     """
     
     AI_TIMEOUT: int = 60

@@ -1,13 +1,74 @@
 // src/pages/Home.jsx
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { fetchUser, fetchChallenges, generateChallengesStreaming, uploadResume, uploadResumeFile, analyzeResume, listResumes, uploadAndAnalyzeResumeFileStreaming, analyzeResumeStreaming, deleteResume } from "../lib/api.js";
+import { fetchUser, fetchChallenges, fetchSubmissions, generateChallengesStreaming, uploadResume, uploadResumeFile, analyzeResume, listResumes, uploadAndAnalyzeResumeFileStreaming, analyzeResumeStreaming, deleteResume } from "../lib/api.js";
 import { Pill, Difficulty, Skill, Meta, Card, PrimaryButton } from "../components/ui.jsx";
 import { supabase } from "../lib/supabaseClient";
 import PraxisLogo from "../components/PraxisLogo";
+import ChallengeCardHome from "../components/challenges/ChallengeCardHome";
+import logger from "../utils/logger";
 
 /* ----- Função para transformar dados da API no formato esperado ----- */
-function transformChallenges(apiChallenges) {
+function transformChallenges(apiChallenges, submissions = []) {
+  console.log("🔄 transformChallenges chamada com:", {
+    challengesCount: apiChallenges.length,
+    submissionsCount: submissions.length,
+    allSubmissions: submissions.map(s => ({ id: s.id, challenge_id: s.challenge_id, status: s.status }))
+  });
+  
+  // Criar mapa de challenge_id -> submissão mais recente com status "scored" (avaliado com sucesso)
+  const completedChallenges = new Map();
+  const scoredSubmissions = submissions.filter(sub => sub.status === 'scored');
+  
+  console.log("✅ Submissões com status 'scored':", scoredSubmissions.map(s => ({ 
+    id: s.id, 
+    challenge_id: s.challenge_id, 
+    status: s.status,
+    score: s.score
+  })));
+  
+  scoredSubmissions.forEach(sub => {
+      const existing = completedChallenges.get(sub.challenge_id);
+      if (!existing) {
+        completedChallenges.set(sub.challenge_id, sub);
+      } else {
+        // Compara datas: pega a mais recente
+        // Backend retorna "date" como string formatada "DD/MM/YYYY"
+        const subDate = sub.date;
+        const existingDate = existing.date;
+        if (subDate && existingDate) {
+          try {
+            // Backend retorna "date" como "DD/MM/YYYY", precisa parsear
+            const parseDate = (dateStr) => {
+              if (!dateStr || dateStr === 'Data desconhecida') return null;
+              const parts = dateStr.split('/');
+              if (parts.length === 3) {
+                // DD/MM/YYYY -> YYYY-MM-DD para criar Date
+                return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+              }
+              return new Date(dateStr);
+            };
+            
+            const subDateObj = parseDate(subDate);
+            const existingDateObj = parseDate(existingDate);
+            
+            if (subDateObj && existingDateObj && subDateObj > existingDateObj) {
+              completedChallenges.set(sub.challenge_id, sub);
+            } else if (subDateObj && !existingDateObj) {
+              // Se só a nova tem data válida, usa ela
+              completedChallenges.set(sub.challenge_id, sub);
+            }
+          } catch (e) {
+            // Se falhar, mantém o existente
+            console.warn('Erro ao comparar datas:', e);
+          }
+        } else if (subDate && subDate !== 'Data desconhecida' && !existingDate) {
+          // Se só a nova tem data, usa ela
+          completedChallenges.set(sub.challenge_id, sub);
+        }
+      }
+    });
+
   return apiChallenges.map(challenge => {
     // Mapeia level de inglês para português
     const levelMap = {
@@ -31,6 +92,9 @@ function transformChallenges(apiChallenges) {
     const minutes = timeLimit % 60;
     const timeStr = hours > 0 ? `${hours}h${minutes > 0 ? ` ${minutes}min` : ''}` : `${minutes}min`;
     
+    const isCompleted = completedChallenges.has(challenge.id);
+    const submission = completedChallenges.get(challenge.id);
+    
     return {
       id: challenge.id,
       title: challenge.title,
@@ -38,11 +102,19 @@ function transformChallenges(apiChallenges) {
       long_desc: challenge.description?.text || "Sem descrição",
       difficulty: levelMap[challenge.difficulty?.level] || 'Médio',
       time: timeStr,
+      duration_minutes: timeLimit, // Mantém valor numérico para o timer
       skills: skills.slice(0, 3), // Limita a 3 skills
       tags: challenge.category ? [challenge.category] : [],
-      status: "available",
-      category: challenge.category // Adiciona category para os ícones
+      status: isCompleted ? "completed" : "available",
+      category: challenge.category, // Adiciona category para os ícones
+      submission: submission || null // Adiciona dados da submissão se existir
     };
+  });
+  
+  console.log("🔄 Challenges transformados:", {
+    total: apiChallenges.length,
+    completed: apiChallenges.filter(c => completedChallenges.has(c.id)).length,
+    completedIds: Array.from(completedChallenges.keys())
   });
 }
 
@@ -591,14 +663,26 @@ export default function Home() {
   };
 
   // carrega usuário + catálogo
+  // Usa useRef para evitar múltiplos listeners e recarregamentos
+  const isLoadingRef = useRef(false);
+  const hasLoadedRef = useRef(false);
+  const reloadTimeoutRef = useRef(null);
+
   useEffect(() => {
-    (async () => {
+    const loadData = async () => {
+      // Evita múltiplas execuções simultâneas
+      if (isLoadingRef.current) {
+        return;
+      }
+      
+      isLoadingRef.current = true;
       try {
         // Primeiro, verifica se o usuário está autenticado
         const { data: { user: authUser } } = await supabase.auth.getUser();
         
         if (!authUser) {
           console.warn("⚠️ Usuário não autenticado. Redirecionando para login...");
+          isLoadingRef.current = false;
           navigate("/login");
           return;
         }
@@ -621,6 +705,7 @@ export default function Home() {
               attrError.message?.includes("não encontrado") ||
               attrError.message?.includes("not found")) {
             console.warn("⚠️ Attributes não encontrados (404). Redirecionando para onboarding...");
+            isLoadingRef.current = false;
             navigate("/onboarding");
             return;
           }
@@ -642,7 +727,28 @@ export default function Home() {
           challenges = []; // Continua sem desafios
         }
         
-        console.log("📊 Dados recebidos da API:", { authUser, attributes, challenges });
+        // Busca submissões para determinar quais desafios foram concluídos
+        let submissions = [];
+        try {
+          submissions = await fetchSubmissions();
+        } catch (subError) {
+          console.warn("⚠️ Erro ao buscar submissões (não crítico):", subError);
+          submissions = []; // Continua sem submissões
+        }
+        
+        console.log("📊 Dados recebidos da API:", { 
+          authUser, 
+          attributes, 
+          challengesCount: challenges.length,
+          submissionsCount: submissions.length,
+          submissions: submissions.map(s => ({ 
+            id: s.id, 
+            challenge_id: s.challenge_id, 
+            status: s.status,
+            score: s.score,
+            points: s.points 
+          }))
+        });
         
         // Debug CRÍTICO: Ver strong_skills exatamente como vem
         console.log("🎯 STRONG_SKILLS BRUTO:", attributes?.strong_skills);
@@ -711,6 +817,7 @@ export default function Home() {
               object_keys: typeof attributes?.strong_skills === 'object' && !Array.isArray(attributes?.strong_skills) ? Object.keys(attributes.strong_skills).length : null
             }
           });
+          isLoadingRef.current = false;
           navigate("/onboarding");
           return;
         }
@@ -750,12 +857,29 @@ export default function Home() {
         
         console.log("✅ Dados transformados para o componente:", userData);
                
-               // Transforma os desafios da API para o formato esperado
-               const transformedChallenges = transformChallenges(challenges || []);
-               console.log("🔄 Desafios carregados e transformados:", transformedChallenges);
+               // Transforma os desafios da API para o formato esperado (incluindo status de conclusão)
+               // Backend já retorna apenas os 3 mais recentes (ativos)
+               const transformedChallenges = transformChallenges(challenges || [], submissions || []);
+               console.log("🔄 Desafios ativos transformados:", transformedChallenges);
+               
+               const completedCount = transformedChallenges.filter(c => c.status === 'completed').length;
+               
+               console.log("✅ Desafios que serão exibidos na home:", {
+                 total: transformedChallenges.length,
+                 completed: completedCount,
+                 available: transformedChallenges.length - completedCount,
+                 challenges: transformedChallenges.map(c => ({ id: c.id, title: c.title, status: c.status }))
+               });
+               
+               logger.debug("home:data:loaded", {
+                 challengesCount: challenges.length,
+                 submissionsCount: submissions.length,
+                 completedCount: completedCount,
+                 submissionsWithScored: submissions.filter(s => s.status === 'scored').length
+               });
                
                setUser(userData);
-               setCatalog(transformedChallenges);
+               setCatalog(transformedChallenges); // Apenas os 3 ativos
                
                // Carrega currículos do usuário
                await loadResumes();
@@ -772,9 +896,43 @@ export default function Home() {
         setCatalog([]);
       } finally {
         setLoading(false);
+        isLoadingRef.current = false;
+        hasLoadedRef.current = true;
       }
-    })();
-  }, []);
+    };
+    
+    // Só carrega dados na primeira vez ou quando explicitamente solicitado
+    if (!hasLoadedRef.current) {
+      loadData();
+    }
+    
+    // Listener para recarregar dados quando necessário (com debounce)
+    const handleReload = () => {
+      // Debounce: aguarda 500ms antes de recarregar para evitar múltiplas requisições
+      if (reloadTimeoutRef.current) {
+        clearTimeout(reloadTimeoutRef.current);
+      }
+      reloadTimeoutRef.current = setTimeout(() => {
+        if (!isLoadingRef.current) {
+          hasLoadedRef.current = false; // Permite recarregar
+          loadData();
+        }
+      }, 500);
+    };
+    
+    window.addEventListener('reloadHomeData', handleReload);
+    
+    return () => {
+      window.removeEventListener('reloadHomeData', handleReload);
+      if (reloadTimeoutRef.current) {
+        clearTimeout(reloadTimeoutRef.current);
+        reloadTimeoutRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Dependências vazias: carrega apenas uma vez na montagem
+          // navigate é estável e não precisa estar nas dependências
+          // reloadHomeData é tratado via event listener
   useEffect(() => {
     const onDocClick = (e) => {
         // se o clique não veio de um Card (procura pelo atributo role="button")
@@ -824,8 +982,27 @@ export default function Home() {
   }
 
   const recommended = useMemo(() => {
-    const avail = catalog.filter((c) => c.status === "available");
-    return avail.sort((a, b) => score(b, user) - score(a, user));
+    // Retorna todos do catalog (já são apenas os 3 ativos do backend)
+    // Ordena: disponíveis primeiro, depois completados
+    const result = [...catalog].sort((a, b) => {
+      // Disponíveis têm prioridade
+      if (a.status === 'available' && b.status === 'completed') return -1;
+      if (a.status === 'completed' && b.status === 'available') return 1;
+      // Se ambos são disponíveis, ordena por score
+      if (a.status === 'available' && b.status === 'available') {
+        return score(b, user) - score(a, user);
+      }
+      // Mantém ordem original para completados
+      return 0;
+    });
+    
+    console.log("📋 Recommended calculado:", {
+      catalogLength: catalog.length,
+      result: result.length,
+      resultIds: result.map(c => ({ id: c.id, title: c.title, status: c.status }))
+    });
+    
+    return result;
   }, [catalog, user]);
 
   if (loading) {
@@ -1049,11 +1226,15 @@ export default function Home() {
         )}
 
         <div className="grid md:grid-cols-6 gap-5">
-        {/* Reordena para colocar o expandido primeiro */}
-        {recommended.slice(0, 3)
+        {/* Mostra todos os desafios (disponíveis + completados) */}
+        {recommended
           .sort((a, b) => {
+            // Prioriza expandido primeiro
             if (a.id === expandedId) return -1;
             if (b.id === expandedId) return 1;
+            // Depois, prioriza disponíveis sobre completados
+            if (a.status === 'available' && b.status === 'completed') return -1;
+            if (a.status === 'completed' && b.status === 'available') return 1;
             return 0;
           })
           .map((c, index) => {
@@ -1062,11 +1243,8 @@ export default function Home() {
             const isSecondCollapsed = !expanded && expandedId && index === 2;
             
             return (
-            <Card
+              <div
                 key={c.id}
-                role="button"
-                aria-expanded={expanded}
-                onClick={() => toggleExpand(c.id)}
                 style={{
                   gridColumn: expanded 
                     ? 'span 6' 
@@ -1077,76 +1255,17 @@ export default function Home() {
                         : 'span 2'
                 }}
                 className={
-                "p-5 cursor-pointer transition-all duration-300 ease-in-out animate-fade-in " +
-                (expanded 
-                  ? "ring-2 ring-primary-300" 
-                  : expandedId
-                    ? "hover:scale-[1.02] scale-95 opacity-90"
-                    : "hover:scale-[1.02]")
+                  expandedId && !expanded
+                    ? "scale-95 opacity-90"
+                    : ""
                 }
-            >
-                <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="h-9 w-9 rounded-md bg-primary-100 text-primary-800 grid place-content-center border border-primary-200 text-sm font-semibold">
-                      {getChallengeIcon(c.category)}
-                  </div>
-                  <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                    {getChallengeCategoryName(c.category)}
-                  </span>
-                </div>
-                <Difficulty level={c.difficulty} />
-                </div>
-
-                <h3 className="mt-4 text-lg font-semibold text-zinc-900">{c.title}</h3>
-                <p className="mt-1.5 text-sm text-zinc-600">{c.desc}</p>
-
-                <div className="mt-4"><Meta icon="⏲️">{c.time}</Meta></div>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                {c.skills.map((s) => <Skill key={s}>{s}</Skill>)}
-                </div>
-
-                {/* Área extra que aparece quando expandido */}
-                {expanded && (
-                  <div className="pt-4 mt-4 border-t border-zinc-200">
-                    <p className="text-sm text-zinc-700">
-                      <span className="font-medium">Objetivo:</span> resolver o desafio aplicando as skills acima e
-                      registrando suas decisões técnicas.
-                    </p>
-
-                    <div className="mt-3 grid gap-2 text-sm text-zinc-700">
-                      <div>
-                        <span className="font-medium">Pré-requisitos:</span>{" "}
-                        {c.skills.join(", ")}
-                      </div>
-                      <div>
-                        <span className="font-medium">O que será avaliado:</span> clareza do código, testes básicos,
-                        comunicação (README) e performance quando aplicável.
-                      </div>
-                      <div>
-                        <span className="font-medium">Passos sugeridos:</span> entender o bug/feature, planejar,
-                        implementar, testar e documentar.
-                      </div>
-                    </div>
-
-                    {/* Ações extras quando expandido */}
-                    <div className="mt-5 flex flex-wrap gap-3">
-                      <Link to={`/desafio/${c.id}`} onClick={(e) => e.stopPropagation()}>
-                        <PrimaryButton>
-                          Começar desafio
-                        </PrimaryButton>
-                      </Link>
-
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setExpandedId(null); }}
-                        className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50"
-                      >
-                        Fechar
-                      </button>
-                    </div>
-                  </div>
-                )}
-            </Card>
+              >
+                <ChallengeCardHome 
+                  challenge={c}
+                  expanded={expanded}
+                  onToggle={() => toggleExpand(c.id)}
+                />
+              </div>
             );
         })}
         </div>
