@@ -22,10 +22,26 @@ logger = get_logger(__name__)
 try:
     import google.generativeai as genai
     from google.generativeai.types import HarmCategory, HarmBlockThreshold
+    try:
+        from google.api_core.exceptions import (
+            ResourceExhausted,
+            ServiceUnavailable,
+            InternalServerError,
+            TooManyRequests
+        )
+    except ImportError:
+        ResourceExhausted = None
+        ServiceUnavailable = None
+        InternalServerError = None
+        TooManyRequests = None
 except ImportError:
     logger.warning(
         "google-generativeai não instalado. Instale com: pip install google-generativeai")
     genai = None
+    ResourceExhausted = None
+    ServiceUnavailable = None
+    InternalServerError = None
+    TooManyRequests = None
 
 
 class GeminiAI(IAIService):
@@ -43,7 +59,7 @@ class GeminiAI(IAIService):
         self,
         api_key: str,
         model_name: str = "models/gemini-2.5-flash",
-        max_retries: int = 3,
+        max_retries: int = 5,  # Aumentado de 3 para 5
         timeout: int = 60
     ):
         """
@@ -387,10 +403,11 @@ EXEMPLOS COMPLETOS:
         ch_diff = challenge.get("difficulty", {})
 
         # Extrai dados da submissão de acordo com o tipo
-        submission_type = submission.get("type", "codigo")
+        submission_type = (submission.get("type") or "codigo").lower()
         submitted_content = ""
+        template_code = challenge.get("template_code") or []
 
-        if submission_type == "codigo":
+        if submission_type in {"codigo", "code"}:
             # Para código: extrai arquivos
             files = submission.get("files", {})
             if files:
@@ -401,25 +418,64 @@ EXEMPLOS COMPLETOS:
             else:
                 submitted_content = submission.get("content", "")
 
-        elif submission_type == "texto_livre":
+        elif submission_type in {"texto_livre", "daily_task", "texto", "text"}:
             # Para texto livre: extrai o conteúdo textual
             submitted_content = submission.get("content", "")
 
-        elif submission_type == "organization":
-            # Para organization: extrai form_data (respostas do formulário)
-            form_data = submission.get("form_data", {})
-            if form_data:
-                # Formata as respostas do formulário de forma legível
+        elif submission_type in {"organization", "planejamento", "planning"}:
+            # Para planejamento/organization: agrupa respostas por seção com rótulos
+            sections_data = submission.get("sections") or submission.get("form_data") or {}
+            implementation_text = submission.get(
+                "implementation") or submission.get("content") or ""
+
+            if sections_data:
+                field_lookup: Dict[str, Dict[str, str]] = {}
+                if isinstance(template_code, list):
+                    for section in template_code:
+                        section_label = section.get(
+                            "label") or section.get("id") or "Seção"
+                        for field in section.get("fields", []):
+                            field_id = field.get("id")
+                            if not field_id:
+                                continue
+                            field_lookup[field_id] = {
+                                "section_label": section_label,
+                                "field_label": field.get("label") or field_id
+                            }
+
+                grouped: Dict[str, List[tuple[str, str]]] = {}
+                for field_id, answer in sections_data.items():
+                    if answer is None:
+                        continue
+                    answer_text = answer if isinstance(
+                        answer, str) else json.dumps(answer, ensure_ascii=False, indent=2)
+
+                    info = field_lookup.get(field_id)
+                    section_label = info["section_label"] if info else "Seção Geral"
+                    field_label = info["field_label"] if info else field_id
+
+                    grouped.setdefault(section_label, []).append(
+                        (field_label, answer_text))
+
                 parts = []
-                for section_id, fields in form_data.items():
-                    parts.append(f"=== {section_id.upper()} ===")
-                    if isinstance(fields, dict):
-                        for field_id, value in fields.items():
-                            parts.append(f"{field_id}: {value}")
+                for section_label, fields in grouped.items():
+                    parts.append(f"### {section_label}")
+                    for field_label, answer_text in fields:
+                        parts.append(f"- {field_label}: {answer_text}")
                     parts.append("")
-                submitted_content = "\n".join(parts)
-            else:
-                # Fallback para content se form_data não existir
+
+                submitted_content = "\n".join(parts).strip()
+
+            if implementation_text:
+                impl_block = implementation_text if isinstance(
+                    implementation_text, str) else json.dumps(implementation_text, ensure_ascii=False, indent=2)
+                if submitted_content:
+                    submitted_content = f"{submitted_content}\n\n=== PLANO DE IMPLEMENTAÇÃO ===\n{impl_block}"
+                else:
+                    submitted_content = f"=== PLANO DE IMPLEMENTAÇÃO ===\n{impl_block}"
+
+            if not submitted_content:
+                # Fallback se nada foi preenchido
                 submitted_content = submission.get("content", "")
 
         # Adiciona contexto do enunciado se existir
@@ -645,7 +701,10 @@ REGRAS:
 
                 response = model.generate_content(
                     prompt,
-                    request_options={"timeout": self.timeout}
+                    request_options={
+                        "timeout": self.timeout,
+                        "retry": None  # desativa retry automático do SDK
+                    }
                 )
 
                 # Log de uso (para monitorar custos)
@@ -663,16 +722,72 @@ REGRAS:
 
             except Exception as e:
                 last_error = e
+                error_str = str(e)
+                error_code = getattr(e, "code", None) or getattr(e, "status_code", None)
+                
+                # Detecta erro 503 (Service Unavailable / Model Overloaded)
+                is_503 = (
+                    "503" in error_str or
+                    "overloaded" in error_str.lower() or
+                    "service unavailable" in error_str.lower() or
+                    (ServiceUnavailable is not None and isinstance(e, ServiceUnavailable)) or
+                    error_code == 503
+                )
+                
                 logger.warning(
                     f"Gemini API error (tentativa {attempt}/{self.max_retries}): {e}",
-                    extra={"extra_data": {"error": str(e), "attempt": attempt}}
+                    extra={"extra_data": {
+                        "error": str(e),
+                        "error_code": error_code,
+                        "is_503": is_503,
+                        "attempt": attempt
+                    }}
                 )
 
                 # Backoff exponencial
                 if attempt < self.max_retries:
-                    wait_time = 2 ** attempt  # 2s, 4s, 8s
+                    # Para erros 503, usa backoff mais longo e com jitter
+                    if is_503:
+                        # Backoff mais agressivo com jitter: 15s, 20s, 30s, 40s, 40s
+                        # Adiciona jitter aleatório de 0-5s para evitar "thundering herd"
+                        import random
+                        base_wait = [15, 20, 30, 40, 40][min(attempt - 1, 4)]
+                        jitter = random.uniform(0, 5)
+                        wait_time = base_wait + jitter
+                    else:
+                        # Backoff padrão: 2s, 4s, 8s, 16s, 30s
+                        wait_time = min(2 ** attempt, 30)
+
+                    retry_delay_seconds = None
+                    # Tenta extrair retry_delay de ResourceExhausted (429) ou TooManyRequests
+                    if ResourceExhausted is not None and isinstance(e, ResourceExhausted):
+                        retry_delay = getattr(e, "retry_delay", None)
+                        if retry_delay:
+                            if hasattr(retry_delay, "total_seconds"):
+                                retry_delay_seconds = retry_delay.total_seconds()
+                            elif hasattr(retry_delay, "seconds"):
+                                retry_delay_seconds = retry_delay.seconds
+                    elif TooManyRequests is not None and isinstance(e, TooManyRequests):
+                        retry_delay = getattr(e, "retry_delay", None)
+                        if retry_delay:
+                            if hasattr(retry_delay, "total_seconds"):
+                                retry_delay_seconds = retry_delay.total_seconds()
+                            elif hasattr(retry_delay, "seconds"):
+                                retry_delay_seconds = retry_delay.seconds
+                    
+                    # Fallback: tenta extrair retry_delay diretamente do erro
+                    if not retry_delay_seconds and hasattr(e, "retry_delay") and e.retry_delay:
+                        retry_delay = e.retry_delay
+                        if hasattr(retry_delay, "total_seconds"):
+                            retry_delay_seconds = retry_delay.total_seconds()
+                        elif hasattr(retry_delay, "seconds"):
+                            retry_delay_seconds = retry_delay.seconds
+
+                    if retry_delay_seconds:
+                        wait_time = max(wait_time, float(retry_delay_seconds))
+
                     logger.info(
-                        f"Aguardando {wait_time}s antes de retentar...")
+                        f"Aguardando {wait_time:.1f}s antes de retentar... (erro 503: {is_503})")
                     time.sleep(wait_time)
 
         # Se chegou aqui, falhou todas as tentativas
@@ -998,10 +1113,16 @@ REGRAS:
             for chunk in response:
                 chunk_count += 1
                 elapsed = time.time() - start_time
-                if chunk.text:
-                    buffer += chunk.text
-                    logger.info(
-                        f"📦 Chunk {chunk_count} (+{elapsed:.2f}s): +{len(chunk.text)} chars (total: {len(buffer)})")
+                
+                # Verificar se o chunk tem texto antes de processar
+                # finish_reason: 1 (STOP) significa que a geração terminou normalmente
+                if not chunk.text:
+                    logger.info(f"📦 Chunk {chunk_count} sem texto (finish_reason: {chunk.candidates[0].finish_reason if chunk.candidates else 'unknown'})")
+                    continue
+                    
+                buffer += chunk.text
+                logger.info(
+                    f"📦 Chunk {chunk_count} (+{elapsed:.2f}s): +{len(chunk.text)} chars (total: {len(buffer)})")
 
                 # Atualizar progresso baseado no tamanho do buffer
                 # Estimativa: ~10k chars = 3 desafios completos
@@ -1606,10 +1727,15 @@ REGRAS:
             for chunk in response:
                 chunk_count += 1
                 elapsed = time.time() - start_time
-                if chunk.text:
-                    buffer += chunk.text
-                    logger.info(
-                        f"📦 Chunk {chunk_count} (+{elapsed:.2f}s): +{len(chunk.text)} chars (total: {len(buffer)})")
+                
+                # Verificar se o chunk tem texto antes de processar
+                if not chunk.text:
+                    logger.info(f"📦 Chunk {chunk_count} sem texto (finish_reason: {chunk.candidates[0].finish_reason if chunk.candidates else 'unknown'})")
+                    continue
+                    
+                buffer += chunk.text
+                logger.info(
+                    f"📦 Chunk {chunk_count} (+{elapsed:.2f}s): +{len(chunk.text)} chars (total: {len(buffer)})")
                 
                 # Atualizar progresso baseado no tamanho do buffer
                 estimated_progress = min(90, 40 + (len(buffer) / 5000) * 50)

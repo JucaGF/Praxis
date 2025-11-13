@@ -131,13 +131,14 @@ class IRepository(ABC):
     @abstractmethod
     def delete_challenges_for_profile(self, profile_id: str) -> int:
         """
-        Deleta todos os desafios de um perfil.
+        Deleta apenas os desafios de um perfil que NÃO têm submissões.
+        Mantém challenges com histórico de submissões para preservar os dados do usuário.
 
         Args:
             profile_id: ID do perfil
 
         Returns:
-            Número de desafios deletados
+            Número de desafios deletados (apenas os sem submissões)
         """
         pass
 
@@ -180,6 +181,16 @@ class IRepository(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_submissions_by_profile(self, profile_id: str) -> List[Any]:
+        """
+        Busca todas as submissões de um perfil, ordenadas por data mais recente primeiro.
+        
+        Returns:
+            Lista de objetos Submission ordenados por submitted_at DESC
+        """
+        pass
+
     # -------------- FEEDBACK --------------
     @abstractmethod
     def create_submission_feedback(self, payload: dict) -> dict:
@@ -188,6 +199,16 @@ class IRepository(ABC):
 
         Returns:
             dict com dados do feedback criado
+        """
+        pass
+
+    @abstractmethod
+    def get_feedback_by_submission(self, submission_id: int) -> Optional[Any]:
+        """
+        Busca feedback de uma submissão específica.
+        
+        Returns:
+            Objeto SubmissionFeedback ou None se não encontrado
         """
         pass
 

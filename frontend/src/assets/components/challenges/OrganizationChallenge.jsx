@@ -1,10 +1,25 @@
 // src/components/challenges/OrganizationChallenge.jsx
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useChallengeTimer } from "../../hooks/useChallengeTimer";
+import { submitSolution } from "../../lib/api";
+import { prepareOrganizationSubmission, validateSubmission, getValidationMessage } from "../../utils/submissionHelpers";
+import EvaluationLoading from "./EvaluationLoading";
+import logger from "../../utils/logger";
 
 export default function OrganizationChallenge({ challenge }) {
   const navigate = useNavigate();
-  const [timeLeft, setTimeLeft] = useState(challenge.difficulty.time_limit * 60);
+  
+  // Usar o hook de timer persistente
+  const durationMinutes = challenge.difficulty?.time_limit || 120;
+  const { 
+    remainingSeconds,
+    formattedTime,
+    isExpired,
+    isInProgress,
+    startChallenge,
+    completeChallenge
+  } = useChallengeTimer(challenge.id, durationMinutes);
   
   // Inicializa respostas baseado no template_code do desafio
   const initializeAnswers = () => {
@@ -23,20 +38,16 @@ export default function OrganizationChallenge({ challenge }) {
   const [implementation, setImplementation] = useState(""); // Nova seção fixa
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [notes, setNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEvaluating, setIsEvaluating] = useState(false);
+  const [error, setError] = useState(null);
 
+  // Inicia o desafio automaticamente se ainda não foi iniciado
   useEffect(() => {
-    if (timeLeft <= 0) return;
-    const timer = setInterval(() => {
-      setTimeLeft(prev => Math.max(0, prev - 1));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [timeLeft]);
-
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  };
+    if (!isInProgress && !isExpired) {
+      startChallenge();
+    }
+  }, [isInProgress, isExpired, startChallenge]);
 
   const handleFieldChange = (fieldId, value) => {
     setAnswers(prev => ({
@@ -57,19 +68,87 @@ export default function OrganizationChallenge({ challenge }) {
     setShowSubmitModal(true);
   };
 
-  const confirmSubmit = () => {
-    // TODO: enviar para o backend
-    console.log({
-      challenge_id: challenge.id,
-      submitted_content: {
-        ...answers,
-        implementation: implementation
-      },
-      notes,
-      time_taken_sec: (challenge.difficulty.time_limit * 60) - timeLeft
+  const confirmSubmit = async () => {
+    setError(null);
+    
+    // Validar submissão
+    const isValid = validateSubmission('organization', { 
+      sections: answers, 
+      implementation 
     });
-    alert("Design enviado! (mock)");
-    navigate("/home");
+    if (!isValid) {
+      setError(getValidationMessage('organization'));
+      return;
+    }
+    
+    setIsSubmitting(true);
+    setShowSubmitModal(false);
+    
+    try {
+      // Calcular tempo gasto
+      const timeTakenSeconds = (durationMinutes * 60) - remainingSeconds;
+      
+      // Preparar dados da submissão
+      const submissionData = prepareOrganizationSubmission({
+        challengeId: challenge.id,
+        sections: answers,
+        implementation,
+        timeTaken: timeTakenSeconds,
+        notes
+      });
+      
+      logger.info("organization:submission:start", {
+        challengeId: challenge.id,
+        sectionCount: Object.keys(answers).length,
+        implementationLength: submissionData.submitted_code?.implementation?.length || 0,
+        timeTakenSeconds,
+      });
+      
+      // Enviar para o backend
+      setIsEvaluating(true);
+      const result = await submitSolution(submissionData);
+      
+      logger.info("organization:submission:success", {
+        challengeId: challenge.id,
+        submissionId: result?.submission_id,
+        status: result?.status,
+      });
+      
+      // Marcar desafio como completado (resultado já está no banco)
+      completeChallenge();
+      
+      // Dispara evento para recarregar dados na home e no perfil
+      window.dispatchEvent(new Event('reloadHomeData'));
+      window.dispatchEvent(new Event('reloadProfileData'));
+      
+      // Navegar para a página de resultado com os dados
+      navigate('/challenge-result', { 
+        state: { 
+          result,
+          challenge,
+          timeTaken: timeTakenSeconds
+        } 
+      });
+      
+    } catch (err) {
+      logger.error("organization:submission:error", {
+        challengeId: challenge.id,
+        error: err,
+      });
+      
+      // Mensagens mais específicas baseadas no tipo de erro
+      let errorMessage = "Erro ao avaliar o desafio. Tente novamente.";
+      
+      if (err.isServiceUnavailable || err.status === 503) {
+        errorMessage = "O serviço de avaliação está temporariamente indisponível. Por favor, aguarde alguns instantes e tente novamente.";
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      setIsEvaluating(false);
+      setIsSubmitting(false);
+    }
   };
 
   // Extrai requisitos funcionais e não funcionais
@@ -98,15 +177,23 @@ export default function OrganizationChallenge({ challenge }) {
           <div className="flex items-center gap-4">
             <div className="text-right">
               <p className="text-xs text-zinc-500">Tempo restante</p>
-              <p className={`text-lg font-mono font-bold ${timeLeft < 300 ? 'text-red-400' : 'text-primary-400'}`}>
-                {formatTime(timeLeft)}
+              <p className={`text-lg font-mono font-bold ${remainingSeconds < 300 ? 'text-red-400' : isExpired ? 'text-red-500' : 'text-primary-400'}`}>
+                {formattedTime}
               </p>
+              {isExpired && (
+                <p className="text-xs text-red-400 mt-1">Tempo esgotado</p>
+              )}
             </div>
             <button
               onClick={handleSubmit}
-              className="px-4 py-2 bg-primary-500 text-zinc-900 rounded-lg font-semibold hover:bg-primary-600 transition"
+              disabled={isExpired}
+              className={`px-4 py-2 rounded-lg font-semibold transition ${
+                isExpired 
+                  ? 'bg-zinc-700 text-zinc-500 cursor-not-allowed' 
+                  : 'bg-primary-500 text-zinc-900 hover:bg-primary-600'
+              }`}
             >
-              Enviar Design
+              {isExpired ? 'Tempo Esgotado' : 'Enviar Design'}
             </button>
           </div>
         </div>
@@ -268,6 +355,12 @@ export default function OrganizationChallenge({ challenge }) {
               trade-offs e decisões técnicas.
             </p>
 
+            {error && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                <p className="text-sm text-red-400">{error}</p>
+              </div>
+            )}
+
             <div className="mb-6">
               <label className="block text-sm font-medium text-zinc-300 mb-1">Observações (opcional)</label>
               <textarea
@@ -281,21 +374,29 @@ export default function OrganizationChallenge({ challenge }) {
 
             <div className="flex gap-3">
               <button
-                onClick={() => setShowSubmitModal(false)}
-                className="flex-1 px-4 py-2 bg-zinc-800 text-zinc-300 rounded-lg hover:bg-zinc-700 transition"
+                onClick={() => {
+                  setShowSubmitModal(false);
+                  setError(null);
+                }}
+                disabled={isSubmitting}
+                className="flex-1 px-4 py-2 bg-zinc-800 text-zinc-300 rounded-lg hover:bg-zinc-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancelar
               </button>
               <button
                 onClick={confirmSubmit}
-                className="flex-1 px-4 py-2 bg-primary-500 text-zinc-900 font-semibold rounded-lg hover:bg-primary-600 transition"
+                disabled={isSubmitting}
+                className="flex-1 px-4 py-2 bg-primary-500 text-zinc-900 font-semibold rounded-lg hover:bg-primary-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Finalizar e Enviar
+                {isSubmitting ? "Enviando..." : "Finalizar e Enviar"}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Evaluation loading overlay */}
+      <EvaluationLoading isOpen={isEvaluating} />
     </div>
   );
 }

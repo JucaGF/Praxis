@@ -13,6 +13,7 @@ Responsabilidade do Router (Garçom):
 ✅ FAZ: recebe → delega → retorna
 """
 
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from backend.app.deps import get_submission_service, get_current_user
 from backend.app.domain.services import SubmissionService
@@ -27,6 +28,7 @@ router = APIRouter(prefix="/submissions", tags=["submissions"])
 
 @router.get("")
 def get_my_submissions(
+    challenge_id: Optional[int] = None,
     current_user: AuthUser = Depends(get_current_user),
     service: SubmissionService = Depends(get_submission_service)
 ):
@@ -34,6 +36,9 @@ def get_my_submissions(
     Busca todas as submissões do usuário autenticado.
     
     🔒 ENDPOINT PROTEGIDO - Requer autenticação
+    
+    Query params:
+    - challenge_id (opcional): filtra submissões de um desafio específico
     
     Retorna lista com todas as submissões do usuário logado,
     incluindo feedbacks e pontuações.
@@ -49,26 +54,47 @@ def get_my_submissions(
             # Se não houver submissões, retorna lista vazia
             return []
         
+        # Filtra por challenge_id se fornecido
+        if challenge_id is not None:
+            submissions = [s for s in submissions if s.challenge_id == challenge_id]
+        
         # Formata resposta
         result = []
         for sub in submissions:
+            feedback = None
+            challenge = None
+            
             try:
                 feedback = service.repo.get_feedback_by_submission(sub.id)
-            except:
+            except Exception as e:
+                logger.warning(
+                    f"Erro ao buscar feedback para submissão {sub.id}",
+                    extra={"extra_data": {"submission_id": sub.id, "error": str(e)}}
+                )
                 feedback = None
             
             try:
                 challenge = service.repo.get_challenge(sub.challenge_id)
-            except:
+            except Exception as e:
+                logger.warning(
+                    f"Erro ao buscar challenge {sub.challenge_id}",
+                    extra={"extra_data": {"challenge_id": sub.challenge_id, "error": str(e)}}
+                )
                 challenge = None
+            
+            # Extrai score do feedback (se existir)
+            score = 0
+            if feedback:
+                score = feedback.score if hasattr(feedback, 'score') and feedback.score is not None else 0
             
             result.append({
                 "id": sub.id,
-                "title": challenge.title if challenge else "Desafio Desconhecido",
-                "score": feedback.score if feedback else 0,
-                "points": feedback.score if feedback else 0,
+                "challenge_id": sub.challenge_id,
+                "title": challenge.get("title") if challenge else "Desafio Desconhecido",
+                "score": score,
+                "points": score,  # Points é o mesmo que score
                 "date": sub.submitted_at.strftime("%d/%m/%Y") if sub.submitted_at else "Data desconhecida",
-                "tags": challenge.category if challenge else "",
+                "tags": challenge.get("category") if challenge else "",
                 "status": sub.status
             })
         

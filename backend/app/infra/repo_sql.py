@@ -299,8 +299,8 @@ class SqlRepo(IRepository):
 
     def delete_challenges_for_profile(self, profile_id: str) -> int:
         """
-        Deleta todos os desafios de um perfil.
-        Também deleta submissions e feedbacks relacionados.
+        Deleta apenas os desafios de um perfil que NÃO têm submissões.
+        Mantém challenges com histórico de submissões para preservar os dados do usuário.
         """
         # Tenta converter para UUID, se falhar usa string diretamente
         try:
@@ -311,23 +311,44 @@ class SqlRepo(IRepository):
 
         with Session(self.engine) as s:
             # Busca todos os challenges do usuário
-            challenges = s.exec(
+            all_challenges = s.exec(
                 select(Challenge)
                 .where(Challenge.profile_id == pid)
             ).all()
 
-            count = len(challenges)
+            # Filtra apenas challenges sem submissões
+            challenges_to_delete = []
+            for ch in all_challenges:
+                # Verifica se o challenge tem submissões
+                has_submissions = s.exec(
+                    select(func.count(Submission.id))
+                    .where(Submission.challenge_id == ch.id)
+                ).one() > 0
+                
+                # Só deleta se não tiver submissões (preserva histórico)
+                if not has_submissions:
+                    challenges_to_delete.append(ch)
+
+            count = len(challenges_to_delete)
 
             if count > 0:
-                # SQLAlchemy vai deletar em cascata as submissions e feedbacks
-                # graças aos relacionamentos definidos nos models
-                for ch in challenges:
+                # Deleta apenas challenges sem submissões
+                for ch in challenges_to_delete:
                     s.delete(ch)
                 s.commit()
 
             return count
 
     def list_active_challenges(self, profile_id: str, limit: int = 3) -> List[dict]:
+        """
+        Lista desafios ativos de um perfil.
+        
+        Estratégia:
+        1. Busca TODOS os challenges do usuário (não limita)
+        2. Retorna todos para o frontend decidir o que mostrar
+        
+        Isso garante que desafios completados não desapareçam da home.
+        """
         with Session(self.engine) as s:
             # Tenta converter para UUID, se falhar usa string diretamente
             try:
@@ -340,7 +361,8 @@ class SqlRepo(IRepository):
                 select(Challenge)
                 .where(Challenge.profile_id == pid)
                 .order_by(Challenge.created_at.desc())
-                .limit(limit)
+                # Removido o .limit(limit) para retornar TODOS os challenges
+                # O frontend vai filtrar/limitar conforme necessário
             ).all()
             return [_challenge_out(r) for r in rows]
 
@@ -400,6 +422,26 @@ class SqlRepo(IRepository):
             s.add(sub)
             s.commit()
 
+    def get_submissions_by_profile(self, profile_id: str) -> List[Submission]:
+        """
+        Busca todas as submissões de um perfil, ordenadas por data mais recente primeiro.
+        """
+        with Session(self.engine) as s:
+            # Tenta converter para UUID, se falhar usa string diretamente
+            try:
+                pid = uuid.UUID(profile_id)
+            except ValueError:
+                pid = profile_id
+            
+            # Busca submissões ordenadas por data mais recente primeiro
+            submissions = s.exec(
+                select(Submission)
+                .where(Submission.profile_id == pid)
+                .order_by(Submission.submitted_at.desc())
+            ).all()
+            
+            return list(submissions) if submissions else []
+
     # -------------- FEEDBACK --------------
     def create_submission_feedback(self, payload: dict) -> dict:
         with Session(self.engine) as s:
@@ -415,6 +457,16 @@ class SqlRepo(IRepository):
             s.commit()
             s.refresh(fb)
             return {"id": fb.id, **payload}
+
+    def get_feedback_by_submission(self, submission_id: int) -> Optional[SubmissionFeedback]:
+        """
+        Busca feedback de uma submissão específica.
+        """
+        with Session(self.engine) as s:
+            feedback = s.exec(
+                select(SubmissionFeedback).where(SubmissionFeedback.submission_id == submission_id)
+            ).first()
+            return feedback
 
     # -------------- RESUME / CURRICULOS --------------
     def create_resume(

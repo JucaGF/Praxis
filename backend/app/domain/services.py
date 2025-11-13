@@ -196,11 +196,12 @@ class ChallengeService:
         # 2. Busca atributos
         attributes = self.repo.get_attributes(profile_id)
 
-        # 3. Deleta desafios antigos (sempre gera conjunto novo)
+        # 3. Deleta desafios antigos SEM submissões (preserva histórico)
+        # Challenges com submissões são mantidos para preservar o histórico do usuário
         deleted_count = self.repo.delete_challenges_for_profile(profile_id)
         if deleted_count > 0:
             logger.info(
-                f"Deletados {deleted_count} desafios antigos do perfil {profile_id}")
+                f"Deletados {deleted_count} desafios sem submissões do perfil {profile_id}")
 
         # 4. Gera desafios via IA
         generated = self.ai.generate_challenges(profile, attributes)
@@ -224,7 +225,7 @@ class ChallengeService:
         Fluxo:
         1. Busca dados do perfil
         2. Busca atributos (skills, career_goal)
-        3. **DELETA desafios antigos do usuário**
+        3. **DELETA desafios antigos SEM submissões (preserva histórico)**
         4. Chama IA streaming para gerar desafios progressivamente
         5. Salva cada desafio no banco assim que é gerado
         6. Yielda eventos SSE (start, progress, challenge, complete, error)
@@ -246,11 +247,12 @@ class ChallengeService:
         # 2. Busca atributos
         attributes = self.repo.get_attributes(profile_id)
 
-        # 3. Deleta desafios antigos
+        # 3. Deleta desafios antigos SEM submissões (preserva histórico)
+        # Challenges com submissões são mantidos para preservar o histórico do usuário
         deleted_count = self.repo.delete_challenges_for_profile(profile_id)
         if deleted_count > 0:
             logger.info(
-                f"🗑️ Deletados {deleted_count} desafios antigos do perfil {profile_id}")
+                f"🗑️ Deletados {deleted_count} desafios sem submissões do perfil {profile_id}")
 
         # 4. Streaming da IA
         async for event in self.ai.generate_challenges_streaming(profile, attributes):
@@ -436,24 +438,31 @@ class SubmissionService:
         skill_reasoning: Optional[str] = None
 
         if target_skill:
-            # Busca skills atuais
-            current_skills = self.repo.get_tech_skills(
-                submission_data["profile_id"])
-            skill_atual = int(current_skills.get(target_skill, 50))
+            try:
+                # Busca skills atuais
+                current_skills = self.repo.get_tech_skills(
+                    submission_data["profile_id"])
+                skill_atual = int(current_skills.get(target_skill, 50))
 
-            # Calcula quanto a skill deve mudar usando assessment da IA
-            delta = calculate_skill_delta(
-                skill_atual, skill_assessment, difficulty_level, attempts)
+                # Calcula quanto a skill deve mudar usando assessment da IA
+                delta = calculate_skill_delta(
+                    skill_atual, skill_assessment, difficulty_level, attempts)
 
-            # Aplica a mudança
-            new_skills = apply_skill_update(
-                current_skills, target_skill, delta)
-            self.repo.update_tech_skills(
-                submission_data["profile_id"], new_skills)
+                # Aplica a mudança
+                new_skills = apply_skill_update(
+                    current_skills, target_skill, delta)
+                self.repo.update_tech_skills(
+                    submission_data["profile_id"], new_skills)
 
-            delta_applied = int(delta)
-            updated_value = int(new_skills.get(target_skill, skill_atual))
-            skill_reasoning = skill_assessment.get("reasoning")
+                delta_applied = int(delta)
+                updated_value = int(new_skills.get(target_skill, skill_atual))
+                skill_reasoning = skill_assessment.get("reasoning")
+            except Exception as e:
+                # Se não conseguir atualizar skills (usuário sem attributes), continua sem progressão
+                logger.warning(
+                    f"Não foi possível atualizar skills: {e}",
+                    extra={"extra_data": ctx}
+                )
 
         # ===== PASSO 8: Marcar como 'scored' e retornar =====
         self.repo.update_submission(submission["id"], {"status": "scored"})

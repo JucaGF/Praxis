@@ -1,5 +1,5 @@
 // src/pages/Profile.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Line } from "react-chartjs-2";
 import { supabase } from "../lib/supabaseClient";
@@ -31,9 +31,9 @@ ChartJS.register(
 
 // --- Componentes específicos do Perfil ---
 
-function Section({ title, subtitle, children }) {
+function Section({ title, subtitle, children, id }) {
   return (
-    <Card className="p-6">
+    <Card id={id} className="p-6 scroll-mt-20">
       <h2 className="text-xl font-semibold text-zinc-900">{title}</h2>
       <p className="text-zinc-600 mt-1">{subtitle}</p>
       <div className="mt-6">{children}</div>
@@ -151,9 +151,46 @@ export default function Profile() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
+  // Scroll para seção de histórico se houver hash na URL
+  useEffect(() => {
+    const scrollToHistory = () => {
+      if (window.location.hash === '#historico') {
+        const element = document.getElementById('historico');
+        if (element) {
+          // Aguarda um pouco para garantir que o conteúdo foi renderizado
+          setTimeout(() => {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 300);
+        }
+      }
+    };
+
+    // Executa quando o componente monta
+    scrollToHistory();
+
+    // Também escuta mudanças no hash (caso o usuário navegue sem recarregar)
+    const handleHashChange = () => {
+      scrollToHistory();
+    };
+    window.addEventListener('hashchange', handleHashChange);
+
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, [loading]); // Re-executa quando o loading termina
+
   // Busca dados reais do usuário
+  const isLoadingRef = useRef(false);
+  const hasLoadedRef = useRef(false);
+  
   useEffect(() => {
     const loadData = async () => {
+      // Evita múltiplas execuções simultâneas
+      if (isLoadingRef.current) {
+        return;
+      }
+      
+      isLoadingRef.current = true;
       try {
         // Pega o nome do Supabase Auth primeiro
         const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -173,7 +210,20 @@ export default function Profile() {
         
         try {
           const submissionsData = await fetchSubmissions();
-          setSubmissions(submissionsData || []);
+          // Filtra apenas submissões com status "scored" (avaliadas com sucesso)
+          // Backend já retorna ordenado por data mais recente primeiro
+          const completedSubmissions = (submissionsData || []).filter(
+            sub => sub.status === 'scored'
+          );
+          // Limita aos últimos 5 desafios
+          const last5Submissions = completedSubmissions.slice(0, 5);
+          console.log("📊 Submissões recebidas:", {
+            total: submissionsData?.length || 0,
+            scored: completedSubmissions.length,
+            last5: last5Submissions.length,
+            allStatuses: submissionsData?.map(s => ({ id: s.id, status: s.status, date: s.date, score: s.score, points: s.points })) || []
+          });
+          setSubmissions(last5Submissions);
         } catch (error) {
           console.error("Erro ao buscar submissões:", error);
           setSubmissions([]);
@@ -188,11 +238,39 @@ export default function Profile() {
         setSubmissions([]);
       } finally {
         setLoading(false);
+        isLoadingRef.current = false;
+        hasLoadedRef.current = true;
       }
     };
 
-    loadData();
-  }, []);
+    // Só carrega dados na primeira vez ou quando explicitamente solicitado
+    if (!hasLoadedRef.current) {
+      loadData();
+    }
+    
+    // Listener para recarregar dados quando necessário (com debounce)
+    let reloadTimeout = null;
+    const handleReload = () => {
+      if (reloadTimeout) {
+        clearTimeout(reloadTimeout);
+      }
+      reloadTimeout = setTimeout(() => {
+        if (!isLoadingRef.current) {
+          hasLoadedRef.current = false; // Permite recarregar
+          loadData();
+        }
+      }, 500);
+    };
+    window.addEventListener('reloadProfileData', handleReload);
+    
+    return () => {
+      window.removeEventListener('reloadProfileData', handleReload);
+      if (reloadTimeout) {
+        clearTimeout(reloadTimeout);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Dependências vazias: carrega apenas uma vez
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -283,7 +361,7 @@ export default function Profile() {
                     </div>
                 </Section>
 
-                <Section title="Histórico de Desafios" subtitle={`${submissions.length} desafios completados`}>
+                <Section title="Histórico de Desafios" subtitle={`${submissions.length} desafios completados`} id="historico">
                     {submissions && submissions.length > 0 ? (
                       submissions.map(sub => <ChallengeHistoryItem key={sub.id} {...sub} />)
                     ) : (

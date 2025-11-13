@@ -14,6 +14,7 @@ import Cadastro from "./assets/pages/Cadastro";
 import Home from "./assets/pages/Home";
 import Profile from "./assets/pages/Profile";
 import Challenge from "./assets/pages/Challenge";
+import ChallengeResult from "./assets/pages/ChallengeResult";
 import Onboarding from "./assets/pages/Onboarding";
 import ForceLogout from "./assets/pages/ForceLogout";
 
@@ -110,6 +111,14 @@ export default function App() {
           element={
             <PrivateRoute>
               <Challenge />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/challenge-result"
+          element={
+            <PrivateRoute>
+              <ChallengeResult />
             </PrivateRoute>
           }
         />

@@ -2,6 +2,11 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Editor from "@monaco-editor/react";
+import { useChallengeTimer } from "../../hooks/useChallengeTimer";
+import { submitSolution } from "../../lib/api";
+import { prepareCodeSubmission, validateSubmission, getValidationMessage } from "../../utils/submissionHelpers";
+import EvaluationLoading from "./EvaluationLoading";
+import logger from "../../utils/logger";
 
 // Componente recursivo para renderizar a árvore de arquivos
 function FileTreeNode({ tree, level, parentPath, selectedFile, expandedFolders, onFileClick, onFolderToggle, getFileIcon }) {
@@ -82,34 +87,41 @@ export default function CodeChallenge({ challenge }) {
   // Arquivo inicial: usar fs.open se disponível, senão o primeiro da lista
   const initialFile = fs.open || defaultFileList[0] || "";
   
-  console.log("📁 Arquivos disponíveis:", defaultFileList);
-  console.log("📄 Conteúdo dos arquivos:", defaultFilesContent);
-  console.log("📂 Arquivo inicial:", initialFile);
+  logger.debug("code-challenge:init", {
+    challengeId: challenge.id,
+    fileCount: defaultFileList.length,
+    initialFile,
+  });
   
-  const [timeLeft, setTimeLeft] = useState(challenge.difficulty.time_limit * 60); // segundos
+  // Usar o hook de timer persistente
+  const durationMinutes = challenge.difficulty?.time_limit || 120;
+  const { 
+    remainingSeconds,
+    formattedTime,
+    isExpired,
+    isInProgress,
+    startChallenge,
+    completeChallenge
+  } = useChallengeTimer(challenge.id, durationMinutes);
+  
   const [selectedFile, setSelectedFile] = useState(initialFile);
   const [codeFiles, setCodeFiles] = useState(defaultFilesContent);
   const [commitMessage, setCommitMessage] = useState("");
   const [notes, setNotes] = useState("");
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEvaluating, setIsEvaluating] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Timer countdown
+  // Inicia o desafio automaticamente se ainda não foi iniciado
   useEffect(() => {
-    if (timeLeft <= 0) return;
-    const timer = setInterval(() => {
-      setTimeLeft(prev => Math.max(0, prev - 1));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [timeLeft]);
-
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  };
+    if (!isInProgress && !isExpired) {
+      startChallenge();
+    }
+  }, [isInProgress, isExpired, startChallenge]);
 
   const handleFileChange = (fileName) => {
-    console.log("📄 Mudando para arquivo:", fileName);
+    logger.debug("code-challenge:file:select", { challengeId: challenge.id, fileName });
     setSelectedFile(fileName);
   };
 
@@ -124,17 +136,84 @@ export default function CodeChallenge({ challenge }) {
     setShowSubmitModal(true);
   };
 
-  const confirmSubmit = () => {
-    // TODO: enviar para o backend
-    console.log({
-      challenge_id: challenge.id,
-      submitted_code: codeFiles,
-      commit_message: commitMessage,
-      notes,
-      time_taken_sec: (challenge.difficulty.time_limit * 60) - timeLeft
-    });
-    alert("Submissão enviada! (mock)");
-    navigate("/home");
+  const confirmSubmit = async () => {
+    setError(null);
+    
+    // Validar submissão
+    const isValid = validateSubmission('code', { files: codeFiles });
+    if (!isValid) {
+      setError(getValidationMessage('code'));
+      return;
+    }
+    
+    setIsSubmitting(true);
+    setShowSubmitModal(false);
+    
+    try {
+      // Calcular tempo gasto
+      const timeTakenSeconds = (durationMinutes * 60) - remainingSeconds;
+      
+      // Preparar dados da submissão
+      const submissionData = prepareCodeSubmission({
+        challengeId: challenge.id,
+        files: codeFiles,
+        mainFile: challenge.fs?.main || selectedFile,
+        timeTaken: timeTakenSeconds,
+        commitMessage,
+        notes
+      });
+      
+      logger.info("code-challenge:submission:start", {
+        challengeId: challenge.id,
+        files: Object.keys(submissionData.submitted_code?.files || {}),
+        timeTakenSeconds,
+      });
+      
+      // Enviar para o backend
+      setIsEvaluating(true);
+      const result = await submitSolution(submissionData);
+      
+      logger.info("code-challenge:submission:success", {
+        challengeId: challenge.id,
+        submissionId: result?.submission_id,
+        status: result?.status,
+      });
+      
+      // Marcar desafio como completado (resultado já está no banco)
+      completeChallenge();
+      
+      // Dispara evento para recarregar dados na home e no perfil
+      window.dispatchEvent(new Event('reloadHomeData'));
+      window.dispatchEvent(new Event('reloadProfileData'));
+      
+      // Navegar para a página de resultado com os dados
+      navigate('/challenge-result', { 
+        state: { 
+          result,
+          challenge,
+          timeTaken: timeTakenSeconds
+        } 
+      });
+      
+    } catch (err) {
+      logger.error("code-challenge:submission:error", {
+        challengeId: challenge.id,
+        error: err,
+      });
+      
+      // Mensagens mais específicas baseadas no tipo de erro
+      let errorMessage = "Erro ao avaliar o desafio. Tente novamente.";
+      
+      if (err.isServiceUnavailable || err.status === 503) {
+        errorMessage = "O serviço de avaliação está temporariamente indisponível. Por favor, aguarde alguns instantes e tente novamente.";
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      setIsEvaluating(false);
+      setIsSubmitting(false);
+    }
   };
 
   // Detecta a linguagem do arquivo baseado na extensão
@@ -232,15 +311,23 @@ export default function CodeChallenge({ challenge }) {
         <div className="flex items-center gap-4">
           <div className="text-right">
             <p className="text-xs text-zinc-500">Tempo restante</p>
-            <p className={`text-xl font-mono font-bold ${timeLeft < 300 ? 'text-red-400' : 'text-primary-400'}`}>
-              {formatTime(timeLeft)}
+            <p className={`text-xl font-mono font-bold ${remainingSeconds < 300 ? 'text-red-400' : isExpired ? 'text-red-500' : 'text-primary-400'}`}>
+              {formattedTime}
             </p>
+            {isExpired && (
+              <p className="text-xs text-red-400 mt-1">Tempo esgotado</p>
+            )}
           </div>
           <button
             onClick={handleSubmit}
-            className="px-4 py-2 bg-primary-500 text-zinc-900 rounded-lg font-semibold hover:bg-primary-600 transition"
+            disabled={isExpired}
+            className={`px-4 py-2 rounded-lg font-semibold transition ${
+              isExpired 
+                ? 'bg-zinc-700 text-zinc-500 cursor-not-allowed' 
+                : 'bg-primary-500 text-zinc-900 hover:bg-primary-600'
+            }`}
           >
-            Enviar para Revisão
+            {isExpired ? 'Tempo Esgotado' : 'Enviar para Revisão'}
           </button>
         </div>
       </header>
@@ -335,6 +422,12 @@ export default function CodeChallenge({ challenge }) {
               Escreva uma mensagem de commit clara e adicione observações sobre sua solução.
             </p>
 
+            {error && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                <p className="text-sm text-red-400">{error}</p>
+              </div>
+            )}
+
             <div className="mb-4">
               <label className="block text-sm font-medium text-zinc-300 mb-1">Mensagem de Commit</label>
               <input
@@ -359,21 +452,29 @@ export default function CodeChallenge({ challenge }) {
 
             <div className="flex gap-3">
               <button
-                onClick={() => setShowSubmitModal(false)}
-                className="flex-1 px-4 py-2 bg-zinc-800 text-zinc-300 rounded-lg hover:bg-zinc-700 transition"
+                onClick={() => {
+                  setShowSubmitModal(false);
+                  setError(null);
+                }}
+                disabled={isSubmitting}
+                className="flex-1 px-4 py-2 bg-zinc-800 text-zinc-300 rounded-lg hover:bg-zinc-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancelar
               </button>
               <button
                 onClick={confirmSubmit}
-                className="flex-1 px-4 py-2 bg-primary-500 text-zinc-900 font-semibold rounded-lg hover:bg-primary-600 transition"
+                disabled={isSubmitting}
+                className="flex-1 px-4 py-2 bg-primary-500 text-zinc-900 font-semibold rounded-lg hover:bg-primary-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Finalizar e Enviar para Revisão
+                {isSubmitting ? "Enviando..." : "Finalizar e Enviar para Revisão"}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Evaluation loading overlay */}
+      <EvaluationLoading isOpen={isEvaluating} />
     </div>
   );
 }
