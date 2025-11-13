@@ -101,9 +101,9 @@ class GeminiAI(IAIService):
 
         # Configuração de geração
         self.generation_config = {
-            "temperature": 0.7,  # Criatividade moderada
-            "top_p": 0.9,
-            "top_k": 40,
+            "temperature": 0.9,  # Aumentado para forçar mais variação nas dificuldades
+            "top_p": 0.95,
+            "top_k": 50,
             "max_output_tokens": 8192,  # Aumentado para permitir respostas maiores
         }
 
@@ -159,27 +159,39 @@ class GeminiAI(IAIService):
         Returns:
             Prompt formatado
         """
-        tech_skills = attributes.get("tech_skills", [])
+        tech_skills = attributes.get("tech_skills", {})
+        soft_skills = attributes.get("soft_skills", {})
         career_goal = attributes.get(
             "career_goal", "Desenvolver habilidades técnicas")
 
-        # Skills formatadas
-        # tech_skills agora é uma lista de objetos com 'name' e 'percentage'
+        # Tech Skills formatadas
         if isinstance(tech_skills, list):
-            skills_text = "\n".join(
+            tech_skills_text = "\n".join(
                 [f"  - {skill['name']}: {skill['percentage']}/100" for skill in tech_skills])
         else:
-            # Fallback para formato antigo (dict)
-            skills_text = "\n".join(
+            # Formato dict (atual)
+            tech_skills_text = "\n".join(
                 [f"  - {skill}: {level}/100" for skill, level in tech_skills.items()])
 
-        # Prompt base simplificado
+        # Soft Skills formatadas
+        if isinstance(soft_skills, dict):
+            soft_skills_text = "\n".join(
+                [f"  - {skill}: {level}/100" for skill, level in soft_skills.items()])
+        else:
+            soft_skills_text = "Não avaliado"
+
+        # Prompt base com TODAS as skills
         base_prompt = f"""Você é um AI Career Coach. Gere 3 desafios personalizados.
 
-PERFIL:
+PERFIL DO USUÁRIO:
 - Track: {track.upper()}
 - Objetivo: {career_goal}
-- Skills: {skills_text or "Iniciante"}
+
+TECH SKILLS (use para desafios de code/organization):
+{tech_skills_text or "  - Iniciante"}
+
+SOFT SKILLS (use para desafios de daily-task):
+{soft_skills_text}
 
 """
 
@@ -254,7 +266,16 @@ REGRAS OBRIGATÓRIAS:
    - Para code: skills técnicas relacionadas (ex: ["Python", "FastAPI", "SQL"])
    - Para daily-task: soft skills (ex: ["Comunicação", "Empatia", "Resolução de Conflitos"])
    - Para organization: skills de arquitetura (ex: ["Arquitetura", "Escalabilidade", "Trade-offs"])
-4. Varie dificuldade: 1 easy, 1 medium, 1 hard
+4. ⚠️ DIFICULDADE DOS DESAFIOS (REGRA CRÍTICA):
+   - Gere exatamente 1 desafio EASY, 1 MEDIUM e 1 HARD
+   - ❌ PROIBIDO: organization=hard, daily-task=medium, code=easy (padrão fixo)
+   - ✅ OBRIGATÓRIO: Varie a distribuição a cada geração
+   - Exemplos de distribuições VÁLIDAS:
+     * code=hard, daily-task=easy, organization=medium
+     * organization=easy, code=medium, daily-task=hard
+     * daily-task=medium, organization=easy, code=hard
+     * code=easy, organization=hard, daily-task=medium
+   - Se você gerar organization=hard, daily-task=medium, code=easy, a resposta será REJEITADA
 5. description.text: Tom conversacional (chefe falando)
 6. SEMPRE adicione 2-4 hints úteis e práticas
 7. Para type="codigo" → category="code":
@@ -1263,8 +1284,8 @@ REGRAS CRÍTICAS:
 
         prompt = self._build_challenge_prompt(profile, attributes, track)
 
-        # Tenta até 2 vezes em caso de JSON inválido
-        max_attempts = 2
+        # Tenta até 5 vezes para evitar padrão fixo
+        max_attempts = 5
         for attempt in range(max_attempts):
             try:
                 response_text = self._call_gemini(
@@ -1300,6 +1321,37 @@ REGRAS CRÍTICAS:
 
                 # Limita a 3 desafios
                 valid_challenges = valid_challenges[:3]
+                
+                # ⚠️ VALIDAÇÃO ANTI-PADRÃO FIXO
+                if len(valid_challenges) == 3:
+                    # Extrai dificuldades por categoria
+                    difficulty_map = {}
+                    for ch in valid_challenges:
+                        category = ch.get("category", "")
+                        difficulty = ch.get("difficulty", {}).get("level", "")
+                        difficulty_map[category] = difficulty
+                    
+                    # Verifica se é o padrão fixo proibido
+                    is_fixed_pattern = (
+                        difficulty_map.get("organization") == "hard" and
+                        difficulty_map.get("daily-task") == "medium" and
+                        difficulty_map.get("code") == "easy"
+                    )
+                    
+                    if is_fixed_pattern:
+                        logger.warning(
+                            f"⚠️ PADRÃO FIXO DETECTADO (organization=hard, daily-task=medium, code=easy) "
+                            f"na tentativa {attempt + 1}. Rejeitando e regenerando..."
+                        )
+                        if attempt < max_attempts - 1:
+                            continue
+                        else:
+                            logger.error("❌ Padrão fixo persistiu após todas as tentativas!")
+                            # Continua mesmo assim para não bloquear o usuário
+                    else:
+                        logger.info(
+                            f"✅ Distribuição de dificuldades válida: {difficulty_map}"
+                        )
 
                 logger.info(
                     f"Gerados {len(valid_challenges)} desafios válidos (de {len(challenges)} retornados) na tentativa {attempt + 1}")
