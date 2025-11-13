@@ -858,38 +858,28 @@ export default function Home() {
         console.log("✅ Dados transformados para o componente:", userData);
                
                // Transforma os desafios da API para o formato esperado (incluindo status de conclusão)
+               // Backend já retorna apenas os 3 mais recentes (ativos)
                const transformedChallenges = transformChallenges(challenges || [], submissions || []);
-               console.log("🔄 Desafios carregados e transformados:", transformedChallenges);
+               console.log("🔄 Desafios ativos transformados:", transformedChallenges);
                
-               // Separa desafios por status
-               const notCompleted = transformedChallenges.filter(c => c.status !== 'completed');
-               const completed = transformedChallenges.filter(c => c.status === 'completed');
-               
-               // Prioriza desafios não completados, mas mostra também os completados
-               // Estratégia: até 3 não completados + todos os completados (para o usuário ver seu progresso)
-               const displayChallenges = [
-                 ...notCompleted.slice(0, 3),  // Até 3 não completados
-                 ...completed                   // Todos os completados (para ver histórico)
-               ];
+               const completedCount = transformedChallenges.filter(c => c.status === 'completed').length;
                
                console.log("✅ Desafios que serão exibidos na home:", {
-                 total: displayChallenges.length,
-                 notCompleted: notCompleted.length,
-                 completed: completed.length,
-                 completedChallenges: completed.map(c => ({ id: c.id, title: c.title, status: c.status }))
+                 total: transformedChallenges.length,
+                 completed: completedCount,
+                 available: transformedChallenges.length - completedCount,
+                 challenges: transformedChallenges.map(c => ({ id: c.id, title: c.title, status: c.status }))
                });
                
                logger.debug("home:data:loaded", {
                  challengesCount: challenges.length,
                  submissionsCount: submissions.length,
-                 displayCount: displayChallenges.length,
-                 completedCount: completed.length,
-                 submissionsWithScored: submissions.filter(s => s.status === 'scored').length,
-                 allSubmissions: submissions.map(s => ({ id: s.id, challenge_id: s.challenge_id, status: s.status, date: s.date }))
+                 completedCount: completedCount,
+                 submissionsWithScored: submissions.filter(s => s.status === 'scored').length
                });
                
                setUser(userData);
-               setCatalog(displayChallenges);
+               setCatalog(transformedChallenges); // Apenas os 3 ativos
                
                // Carrega currículos do usuário
                await loadResumes();
@@ -992,20 +982,22 @@ export default function Home() {
   }
 
   const recommended = useMemo(() => {
-    // Separa por status
-    const available = catalog.filter((c) => c.status === "available");
-    const completed = catalog.filter((c) => c.status === "completed");
-    
-    // Ordena apenas os disponíveis por score
-    const sortedAvailable = available.sort((a, b) => score(b, user) - score(a, user));
-    
-    // Retorna: desafios disponíveis ordenados + desafios completados (para mostrar progresso)
-    const result = [...sortedAvailable, ...completed];
+    // Retorna todos do catalog (já são apenas os 3 ativos do backend)
+    // Ordena: disponíveis primeiro, depois completados
+    const result = [...catalog].sort((a, b) => {
+      // Disponíveis têm prioridade
+      if (a.status === 'available' && b.status === 'completed') return -1;
+      if (a.status === 'completed' && b.status === 'available') return 1;
+      // Se ambos são disponíveis, ordena por score
+      if (a.status === 'available' && b.status === 'available') {
+        return score(b, user) - score(a, user);
+      }
+      // Mantém ordem original para completados
+      return 0;
+    });
     
     console.log("📋 Recommended calculado:", {
       catalogLength: catalog.length,
-      available: available.length,
-      completed: completed.length,
       result: result.length,
       resultIds: result.map(c => ({ id: c.id, title: c.title, status: c.status }))
     });

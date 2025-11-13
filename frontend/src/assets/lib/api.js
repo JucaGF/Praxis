@@ -160,6 +160,10 @@ export async function fetchSubmissions() {
   return await fetchWithAuth(`${API_URL}/submissions`);
 }
 
+export async function fetchSubmissionDetails(submissionId) {
+  return await fetchWithAuth(`${API_URL}/submissions/${submissionId}/details`);
+}
+
 export async function fetchChallenges(limit = 3) {
   return await fetchWithAuth(`${API_URL}/challenges/active?limit=${limit}`);
 }

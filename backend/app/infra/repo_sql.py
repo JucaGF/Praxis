@@ -368,13 +368,10 @@ class SqlRepo(IRepository):
 
     def list_active_challenges(self, profile_id: str, limit: int = 3) -> List[dict]:
         """
-        Lista desafios ativos de um perfil.
+        Lista apenas os N desafios mais recentes (ativos) de um perfil.
         
-        Estratégia:
-        1. Busca TODOS os challenges do usuário (não limita)
-        2. Retorna todos para o frontend decidir o que mostrar
-        
-        Isso garante que desafios completados não desapareçam da home.
+        "Ativos" = os 3 mais recentes por created_at, independente de estarem completados ou não.
+        Desafios mais antigos ficam disponíveis apenas no histórico.
         """
         with Session(self.engine) as s:
             # Tenta converter para UUID, se falhar usa string diretamente
@@ -388,8 +385,7 @@ class SqlRepo(IRepository):
                 select(Challenge)
                 .where(Challenge.profile_id == pid)
                 .order_by(Challenge.created_at.desc())
-                # Removido o .limit(limit) para retornar TODOS os challenges
-                # O frontend vai filtrar/limitar conforme necessário
+                .limit(limit)  # Limita aos N mais recentes
             ).all()
             return [_challenge_out(r) for r in rows]
 

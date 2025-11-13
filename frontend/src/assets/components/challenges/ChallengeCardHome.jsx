@@ -159,8 +159,12 @@ export default function ChallengeCardHome({ challenge, expanded, onToggle }) {
     );
   };
 
-  // Timer progress bar (se estiver em progresso)
+  // Timer progress bar (se estiver em progresso ou expirado, mas NÃO completado)
   const getTimerProgressBar = () => {
+    // Não mostra barra se o desafio foi completado
+    if (isCompleted) return null;
+    
+    // Mostra apenas se estiver em progresso ou expirado
     if (!isInProgress && !isExpired) return null;
 
     return (

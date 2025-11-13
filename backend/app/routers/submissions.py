@@ -26,6 +26,75 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/submissions", tags=["submissions"])
 
 
+@router.get("/{submission_id}/details")
+def get_submission_details(
+    submission_id: int,
+    current_user: AuthUser = Depends(get_current_user),
+    service: SubmissionService = Depends(get_submission_service)
+):
+    """
+    Busca detalhes completos de uma submissão específica.
+    
+    🔒 ENDPOINT PROTEGIDO - Requer autenticação
+    
+    Retorna:
+    - Dados da submissão
+    - Challenge completo (descrição, requisitos, etc)
+    - Feedback completo da IA (score, métricas, comentários)
+    
+    ✅ Erros específicos:
+    - 401: Token inválido ou ausente
+    - 404: Submissão não encontrada
+    - 403: Submissão não pertence ao usuário
+    """
+    try:
+        # Busca submissão
+        submissions = service.repo.get_submissions_by_profile(current_user.id)
+        submission = next((s for s in submissions if s.id == submission_id), None)
+        
+        if not submission:
+            raise HTTPException(status_code=404, detail="Submissão não encontrada")
+        
+        # Verifica se pertence ao usuário
+        if str(submission.profile_id) != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Acesso negado")
+        
+        # Busca challenge
+        challenge = service.repo.get_challenge(submission.challenge_id)
+        
+        # Busca feedback
+        feedback = service.repo.get_feedback_by_submission(submission.id)
+        
+        return {
+            "submission": {
+                "id": submission.id,
+                "challenge_id": submission.challenge_id,
+                "submitted_code": submission.submitted_code,
+                "status": submission.status,
+                "attempt_number": submission.attempt_number,
+                "notes": submission.notes,
+                "time_taken_sec": submission.time_taken_sec,
+                "submitted_at": submission.submitted_at.strftime("%d/%m/%Y %H:%M") if submission.submitted_at else None
+            },
+            "challenge": challenge,
+            "feedback": {
+                "score": feedback.score if feedback else 0,
+                "feedback": feedback.feedback if feedback else None,
+                "metrics": feedback.metrics if feedback else {},
+                "raw_ai_response": feedback.raw_ai_response if feedback else {}
+            } if feedback else None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(
+            "Erro ao buscar detalhes da submissão",
+            extra={"extra_data": {"submission_id": submission_id, "user_id": current_user.id}}
+        )
+        raise HTTPException(status_code=500, detail="Erro ao buscar detalhes")
+
+
 @router.get("")
 def get_my_submissions(
     challenge_id: Optional[int] = None,
