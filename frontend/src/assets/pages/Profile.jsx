@@ -4,7 +4,15 @@ import { Link, useNavigate } from "react-router-dom";
 import { Line } from "react-chartjs-2";
 import { ChevronDown, ChevronUp, FileText, MessageSquare } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
-import { deleteAccount, fetchUser, fetchSubmissions, fetchSubmissionDetails, listResumes, analyzeResume, deleteResume } from "../lib/api";
+import {
+  deleteAccount,
+  fetchUser,
+  fetchSubmissions,
+  fetchSubmissionDetails,
+  listResumes,
+  analyzeResume,
+  deleteResume,
+} from "../lib/api";
 import PraxisLogo from "../components/PraxisLogo";
 import {
   Chart as ChartJS,
@@ -15,7 +23,7 @@ import {
   Title,
   Tooltip,
   Legend,
-} from 'chart.js';
+} from "chart.js";
 
 import { Card } from "../components/ui.jsx";
 // Importes de API removidos: a página usa dados simulados por enquanto.
@@ -46,7 +54,7 @@ function SkillBar({ skill, percentage, date }) {
   // Formata a data para formato brasileiro
   const formatDate = (dateStr) => {
     if (!dateStr) return "Data desconhecida";
-    
+
     try {
       const dateObj = new Date(dateStr);
       return dateObj.toLocaleDateString("pt-BR");
@@ -54,30 +62,37 @@ function SkillBar({ skill, percentage, date }) {
       return "Data desconhecida";
     }
   };
-  
+
   return (
     <div>
       <div className="flex justify-between items-end mb-1">
         <h3 className="font-medium text-zinc-900">{skill}</h3>
-        <span className="text-lg font-bold text-primary-600">{percentage}%</span>
+        <span className="text-lg font-bold text-primary-600">
+          {percentage}%
+        </span>
       </div>
       <div className="w-full bg-zinc-100 rounded-full h-2.5">
-        <div className="bg-primary-500 h-2.5 rounded-full" style={{ width: `${percentage}%` }}></div>
+        <div
+          className="bg-primary-500 h-2.5 rounded-full"
+          style={{ width: `${percentage}%` }}
+        ></div>
       </div>
-      <p className="text-right text-xs text-zinc-500 mt-1">Atualizado em {formatDate(date)}</p>
+      <p className="text-right text-xs text-zinc-500 mt-1">
+        Atualizado em {formatDate(date)}
+      </p>
     </div>
   );
 }
 
 function ChallengeHistoryItem({ id, title, score, points, date, tags }) {
   const [expanded, setExpanded] = useState(false);
-  const [activeTab, setActiveTab] = useState('challenge'); // 'challenge' ou 'feedback'
+  const [activeTab, setActiveTab] = useState("challenge"); // 'challenge' ou 'feedback'
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const loadDetails = async () => {
     if (details) return; // Já carregou
-    
+
     setLoading(true);
     try {
       const data = await fetchSubmissionDetails(id);
@@ -117,7 +132,11 @@ function ChallengeHistoryItem({ id, title, score, points, date, tags }) {
             className="p-2 hover:bg-zinc-100 rounded-lg transition"
             aria-label={expanded ? "Recolher" : "Expandir"}
           >
-            {expanded ? <ChevronUp className="w-5 h-5 text-zinc-600" /> : <ChevronDown className="w-5 h-5 text-zinc-600" />}
+            {expanded ? (
+              <ChevronUp className="w-5 h-5 text-zinc-600" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-zinc-600" />
+            )}
           </button>
         </div>
       </div>
@@ -128,7 +147,9 @@ function ChallengeHistoryItem({ id, title, score, points, date, tags }) {
           {loading && (
             <div className="text-center py-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto"></div>
-              <p className="text-sm text-zinc-500 mt-2">Carregando detalhes...</p>
+              <p className="text-sm text-zinc-500 mt-2">
+                Carregando detalhes...
+              </p>
             </div>
           )}
 
@@ -137,22 +158,22 @@ function ChallengeHistoryItem({ id, title, score, points, date, tags }) {
               {/* Tabs */}
               <div className="flex gap-2 border-b border-zinc-200">
                 <button
-                  onClick={() => setActiveTab('challenge')}
+                  onClick={() => setActiveTab("challenge")}
                   className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition ${
-                    activeTab === 'challenge'
-                      ? 'border-b-2 border-primary-500 text-primary-600'
-                      : 'text-zinc-600 hover:text-zinc-900'
+                    activeTab === "challenge"
+                      ? "border-b-2 border-primary-500 text-primary-600"
+                      : "text-zinc-600 hover:text-zinc-900"
                   }`}
                 >
                   <FileText className="w-4 h-4" />
                   Detalhes do Desafio
                 </button>
                 <button
-                  onClick={() => setActiveTab('feedback')}
+                  onClick={() => setActiveTab("feedback")}
                   className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition ${
-                    activeTab === 'feedback'
-                      ? 'border-b-2 border-primary-500 text-primary-600'
-                      : 'text-zinc-600 hover:text-zinc-900'
+                    activeTab === "feedback"
+                      ? "border-b-2 border-primary-500 text-primary-600"
+                      : "text-zinc-600 hover:text-zinc-900"
                   }`}
                 >
                   <MessageSquare className="w-4 h-4" />
@@ -162,90 +183,149 @@ function ChallengeHistoryItem({ id, title, score, points, date, tags }) {
 
               {/* Conteúdo das tabs */}
               <div className="bg-zinc-50 rounded-lg p-4">
-                {activeTab === 'challenge' && (
+                {activeTab === "challenge" && (
                   <div className="space-y-3">
                     <div>
-                      <h5 className="text-sm font-semibold text-zinc-700 mb-1">Descrição</h5>
-                      <p className="text-sm text-zinc-600">{details.challenge?.description?.text || "Sem descrição"}</p>
+                      <h5 className="text-sm font-semibold text-zinc-700 mb-1">
+                        Descrição
+                      </h5>
+                      <p className="text-sm text-zinc-600">
+                        {details.challenge?.description?.text ||
+                          "Sem descrição"}
+                      </p>
                     </div>
-                    
+
                     {/* Requisitos Funcionais (para desafios de planejamento/código) */}
-                    {details.challenge?.description?.enunciado?.funcionais && details.challenge.description.enunciado.funcionais.length > 0 && (
-                      <div>
-                        <h5 className="text-sm font-semibold text-zinc-700 mb-1">Requisitos Funcionais</h5>
-                        <ul className="list-disc list-inside text-sm text-zinc-600 space-y-1">
-                          {details.challenge.description.enunciado.funcionais.map((req, idx) => (
-                            <li key={idx}>{req}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    
+                    {details.challenge?.description?.enunciado?.funcionais &&
+                      details.challenge.description.enunciado.funcionais
+                        .length > 0 && (
+                        <div>
+                          <h5 className="text-sm font-semibold text-zinc-700 mb-1">
+                            Requisitos Funcionais
+                          </h5>
+                          <ul className="list-disc list-inside text-sm text-zinc-600 space-y-1">
+                            {details.challenge.description.enunciado.funcionais.map(
+                              (req, idx) => (
+                                <li key={idx}>{req}</li>
+                              )
+                            )}
+                          </ul>
+                        </div>
+                      )}
+
                     {/* Requisitos Não Funcionais (para desafios de planejamento/código) */}
-                    {details.challenge?.description?.enunciado?.nao_funcionais && details.challenge.description.enunciado.nao_funcionais.length > 0 && (
-                      <div>
-                        <h5 className="text-sm font-semibold text-zinc-700 mb-1">Requisitos Não Funcionais</h5>
-                        <ul className="list-disc list-inside text-sm text-zinc-600 space-y-1">
-                          {details.challenge.description.enunciado.nao_funcionais.map((req, idx) => (
-                            <li key={idx}>{req}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    
+                    {details.challenge?.description?.enunciado
+                      ?.nao_funcionais &&
+                      details.challenge.description.enunciado.nao_funcionais
+                        .length > 0 && (
+                        <div>
+                          <h5 className="text-sm font-semibold text-zinc-700 mb-1">
+                            Requisitos Não Funcionais
+                          </h5>
+                          <ul className="list-disc list-inside text-sm text-zinc-600 space-y-1">
+                            {details.challenge.description.enunciado.nao_funcionais.map(
+                              (req, idx) => (
+                                <li key={idx}>{req}</li>
+                              )
+                            )}
+                          </ul>
+                        </div>
+                      )}
+
                     {/* Skill alvo (para todos os tipos) */}
                     {details.challenge?.description?.target_skill && (
                       <div className="flex items-center gap-2 text-sm">
-                        <span className="text-zinc-600">Habilidade avaliada:</span>
+                        <span className="text-zinc-600">
+                          Habilidade avaliada:
+                        </span>
                         <span className="px-2 py-1 bg-primary-100 text-primary-700 rounded-full text-xs font-medium">
                           {details.challenge.description.target_skill}
                         </span>
                       </div>
                     )}
-                    
+
                     <div className="flex gap-4 text-xs text-zinc-500 pt-2 border-t border-zinc-200">
-                      <span>Dificuldade: <strong>{details.challenge?.difficulty?.level}</strong></span>
-                      <span>Tempo limite: <strong>{details.challenge?.difficulty?.time_limit}min</strong></span>
+                      <span>
+                        Dificuldade:{" "}
+                        <strong>{details.challenge?.difficulty?.level}</strong>
+                      </span>
+                      <span>
+                        Tempo limite:{" "}
+                        <strong>
+                          {details.challenge?.difficulty?.time_limit}min
+                        </strong>
+                      </span>
                       {details.submission?.time_taken_sec && (
-                        <span>Tempo gasto: <strong>{Math.floor(details.submission.time_taken_sec / 60)}min</strong></span>
+                        <span>
+                          Tempo gasto:{" "}
+                          <strong>
+                            {Math.floor(details.submission.time_taken_sec / 60)}
+                            min
+                          </strong>
+                        </span>
                       )}
-                      <span>Tentativa: <strong>#{details.submission?.attempt_number}</strong></span>
+                      <span>
+                        Tentativa:{" "}
+                        <strong>#{details.submission?.attempt_number}</strong>
+                      </span>
                     </div>
                   </div>
                 )}
 
-                {activeTab === 'feedback' && (
+                {activeTab === "feedback" && (
                   <div className="space-y-3">
                     {details.feedback ? (
                       <>
                         <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-zinc-200">
-                          <span className="text-sm font-medium text-zinc-700">Nota Final</span>
-                          <span className="text-2xl font-bold text-primary-600">{details.feedback.score}/100</span>
+                          <span className="text-sm font-medium text-zinc-700">
+                            Nota Final
+                          </span>
+                          <span className="text-2xl font-bold text-primary-600">
+                            {details.feedback.score}/100
+                          </span>
                         </div>
-                        
-                        {details.feedback.metrics && Object.keys(details.feedback.metrics).length > 0 && (
-                          <div>
-                            <h5 className="text-sm font-semibold text-zinc-700 mb-2">Métricas</h5>
-                            <div className="grid grid-cols-2 gap-2">
-                              {Object.entries(details.feedback.metrics).map(([key, value]) => (
-                                <div key={key} className="bg-white p-2 rounded border border-zinc-200">
-                                  <div className="text-xs text-zinc-500">{key}</div>
-                                  <div className="text-lg font-bold text-zinc-900">{value}/100</div>
-                                </div>
-                              ))}
+
+                        {details.feedback.metrics &&
+                          Object.keys(details.feedback.metrics).length > 0 && (
+                            <div>
+                              <h5 className="text-sm font-semibold text-zinc-700 mb-2">
+                                Métricas
+                              </h5>
+                              <div className="grid grid-cols-2 gap-2">
+                                {Object.entries(details.feedback.metrics).map(
+                                  ([key, value]) => (
+                                    <div
+                                      key={key}
+                                      className="bg-white p-2 rounded border border-zinc-200"
+                                    >
+                                      <div className="text-xs text-zinc-500">
+                                        {key}
+                                      </div>
+                                      <div className="text-lg font-bold text-zinc-900">
+                                        {value}/100
+                                      </div>
+                                    </div>
+                                  )
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        )}
-                        
+                          )}
+
                         {details.feedback.feedback && (
                           <div>
-                            <h5 className="text-sm font-semibold text-zinc-700 mb-1">Comentários</h5>
-                            <p className="text-sm text-zinc-600 whitespace-pre-wrap">{details.feedback.feedback}</p>
+                            <h5 className="text-sm font-semibold text-zinc-700 mb-1">
+                              Comentários
+                            </h5>
+                            <p className="text-sm text-zinc-600 whitespace-pre-wrap">
+                              {details.feedback.feedback}
+                            </p>
                           </div>
                         )}
                       </>
                     ) : (
-                      <p className="text-sm text-zinc-500 text-center py-4">Feedback não disponível</p>
+                      <p className="text-sm text-zinc-500 text-center py-4">
+                        Feedback não disponível
+                      </p>
                     )}
                   </div>
                 )}
@@ -268,20 +348,20 @@ function StatCard({ value, label }) {
 }
 
 const evolutionData = {
-  labels: ['Jun', 'Jul', 'Ago', 'Set', 'Out'],
+  labels: ["Jun", "Jul", "Ago", "Set", "Out"],
   datasets: [
     {
-      label: 'Pontuação',
+      label: "Pontuação",
       data: [50, 58, 65, 68, 72],
-      borderColor: '#eab308', // primary-500
-      backgroundColor: '#eab308',
+      borderColor: "#eab308", // primary-500
+      backgroundColor: "#eab308",
       tension: 0.1,
     },
     {
-      label: 'Atividades',
+      label: "Atividades",
       data: [10, 15, 18, 20, 25],
-      borderColor: '#10b981', // emerald-500
-      backgroundColor: '#10b981',
+      borderColor: "#10b981", // emerald-500
+      backgroundColor: "#10b981",
       tension: 0.1,
     },
   ],
@@ -292,25 +372,24 @@ const evolutionOptions = {
   maintainAspectRatio: false,
   plugins: {
     legend: {
-      position: 'bottom',
+      position: "bottom",
       labels: {
-        color: '#3f3f46' // zinc-700
-      }
+        color: "#3f3f46", // zinc-700
+      },
     },
     title: { display: false },
   },
   scales: {
     x: {
-      ticks: { color: '#52525b' }, // zinc-600
-      grid: { color: '#e4e4e7' }   // zinc-200
+      ticks: { color: "#52525b" }, // zinc-600
+      grid: { color: "#e4e4e7" }, // zinc-200
     },
     y: {
-      ticks: { color: '#52525b' },
-      grid: { color: '#e4e4e7' }
-    }
-  }
+      ticks: { color: "#52525b" },
+      grid: { color: "#e4e4e7" },
+    },
+  },
 };
-
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -327,16 +406,18 @@ export default function Profile() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [resumeAnalysis, setResumeAnalysis] = useState(null);
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false);
 
   // Scroll para seção de histórico se houver hash na URL
   useEffect(() => {
     const scrollToHistory = () => {
-      if (window.location.hash === '#historico') {
-        const element = document.getElementById('historico');
+      if (window.location.hash === "#historico") {
+        const element = document.getElementById("historico");
         if (element) {
           // Aguarda um pouco para garantir que o conteúdo foi renderizado
           setTimeout(() => {
-            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            element.scrollIntoView({ behavior: "smooth", block: "start" });
           }, 300);
         }
       }
@@ -349,33 +430,52 @@ export default function Profile() {
     const handleHashChange = () => {
       scrollToHistory();
     };
-    window.addEventListener('hashchange', handleHashChange);
+    window.addEventListener("hashchange", handleHashChange);
 
     return () => {
-      window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener("hashchange", handleHashChange);
     };
   }, [loading]); // Re-executa quando o loading termina
 
   // Busca dados reais do usuário
   const isLoadingRef = useRef(false);
   const hasLoadedRef = useRef(false);
-  
+
   useEffect(() => {
     const loadData = async () => {
       // Evita múltiplas execuções simultâneas
       if (isLoadingRef.current) {
         return;
       }
-      
+
       isLoadingRef.current = true;
       try {
         // Pega o nome do Supabase Auth primeiro
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        const fullName = authUser?.user_metadata?.full_name || authUser?.user_metadata?.nome || "Usuário";
-        
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser();
+
+        // *** ALTERAÇÃO AQUI: Extrai nome do usuário - prioriza cadastro normal ***
+        const fullName =
+          authUser?.user_metadata?.full_name || // Nome do cadastro normal (prioridade)
+          authUser?.user_metadata?.nome || // Nome em português do cadastro normal
+          authUser?.user_metadata?.user_name || // Nome do GitHub
+          authUser?.user_metadata?.name || // Nome alternativo
+          authUser?.email?.split("@")[0] || // Parte do email antes do @
+          "Usuário"; // Fallback
+
+        console.log("👤 Dados do usuário Profile:", {
+          full_name: authUser?.user_metadata?.full_name, // Cadastro normal
+          nome: authUser?.user_metadata?.nome, // Cadastro normal (pt)
+          user_name: authUser?.user_metadata?.user_name, // GitHub
+          name: authUser?.user_metadata?.name, // Alternativo
+          email: authUser?.email,
+          final_name: fullName,
+        });
+
         // Formata o usuário com o nome real
         setUser({ full_name: fullName });
-        
+
         // Busca dados da API (com fallback se falhar)
         try {
           const attributesData = await fetchUser();
@@ -384,13 +484,13 @@ export default function Profile() {
           console.error("Erro ao buscar atributos:", error);
           setAttributes({ tech_skills: {}, soft_skills: {}, career_goal: "" });
         }
-        
+
         try {
           const submissionsData = await fetchSubmissions();
           // Filtra apenas submissões com status "scored" (avaliadas com sucesso)
           // Backend já retorna ordenado por data mais recente primeiro
           const completedSubmissions = (submissionsData || []).filter(
-            sub => sub.status === 'scored'
+            (sub) => sub.status === "scored"
           );
           // Limita aos últimos 5 desafios
           const last5Submissions = completedSubmissions.slice(0, 5);
@@ -398,7 +498,14 @@ export default function Profile() {
             total: submissionsData?.length || 0,
             scored: completedSubmissions.length,
             last5: last5Submissions.length,
-            allStatuses: submissionsData?.map(s => ({ id: s.id, status: s.status, date: s.date, score: s.score, points: s.points })) || []
+            allStatuses:
+              submissionsData?.map((s) => ({
+                id: s.id,
+                status: s.status,
+                date: s.date,
+                score: s.score,
+                points: s.points,
+              })) || [],
           });
           setSubmissions(last5Submissions);
         } catch (error) {
@@ -414,7 +521,7 @@ export default function Profile() {
           console.error("Erro ao carregar currículos:", err);
           setMyResumes([]);
         }
-        
+
         console.log("📊 Dados do perfil carregados:", { fullName });
       } catch (error) {
         console.error("Erro ao carregar dados do perfil:", error);
@@ -433,7 +540,7 @@ export default function Profile() {
     if (!hasLoadedRef.current) {
       loadData();
     }
-    
+
     // Listener para recarregar dados quando necessário (com debounce)
     let reloadTimeout = null;
     const handleReload = () => {
@@ -447,10 +554,10 @@ export default function Profile() {
         }
       }, 500);
     };
-    window.addEventListener('reloadProfileData', handleReload);
-    
+    window.addEventListener("reloadProfileData", handleReload);
+
     return () => {
-      window.removeEventListener('reloadProfileData', handleReload);
+      window.removeEventListener("reloadProfileData", handleReload);
       if (reloadTimeout) {
         clearTimeout(reloadTimeout);
       }
@@ -463,27 +570,27 @@ export default function Profile() {
     // Definição das categorias e suas perguntas (deve refletir o questionario_soft)
     const categorias = [
       {
-        chave: 'Comunicação',
+        chave: "Comunicação",
         perguntas: [
-          'Consigo explicar problemas técnicos para pessoas não técnicas',
-          'Deixo comentários claros e úteis no código',
-          'Escrevo mensagens estruturadas em equipes de desenvolvimento',
+          "Consigo explicar problemas técnicos para pessoas não técnicas",
+          "Deixo comentários claros e úteis no código",
+          "Escrevo mensagens estruturadas em equipes de desenvolvimento",
         ],
       },
       {
-        chave: 'Organização',
+        chave: "Organização",
         perguntas: [
-          'Divido tarefas em pequenas etapas e priorizo',
-          'Planejo minhas atividades semanalmente',
-          'Gerencio múltiplos projetos sem perder prazos',
+          "Divido tarefas em pequenas etapas e priorizo",
+          "Planejo minhas atividades semanalmente",
+          "Gerencio múltiplos projetos sem perder prazos",
         ],
       },
       {
-        chave: 'Resolução de Problemas',
+        chave: "Resolução de Problemas",
         perguntas: [
-          'Identifico rapidamente a causa raiz dos problemas',
-          'Sei investigar e debugar erros de forma eficiente',
-          'Resolvo problemas complexos de lógica',
+          "Identifico rapidamente a causa raiz dos problemas",
+          "Sei investigar e debugar erros de forma eficiente",
+          "Resolvo problemas complexos de lógica",
         ],
       },
     ];
@@ -494,15 +601,18 @@ export default function Profile() {
 
     categorias.forEach((cat) => {
       // Se o backend já armazenou a categoria como chave com percent (ex: {"Comunicação": 80})
-      if (typeof softSkills[cat.chave] === 'number') {
-        results[cat.chave] = Math.max(0, Math.min(100, Math.round(softSkills[cat.chave])));
+      if (typeof softSkills[cat.chave] === "number") {
+        results[cat.chave] = Math.max(
+          0,
+          Math.min(100, Math.round(softSkills[cat.chave]))
+        );
         return;
       }
 
       // Caso contrário, buscamos as perguntas individuais no objeto softSkills (que pode ter as perguntas como chaves)
       const valores = cat.perguntas
         .map((q) => softSkills[q])
-        .filter((v) => typeof v === 'number');
+        .filter((v) => typeof v === "number");
 
       if (valores.length === 0) {
         results[cat.chave] = 0;
@@ -544,18 +654,19 @@ export default function Profile() {
       // 1. Deleta o perfil (trigger limpa dados relacionados)
       // 2. Deleta o usuário de auth.users via Admin API
       await deleteAccount();
-      
+
       console.log("Conta deletada com sucesso");
-      
+
       // Faz logout local
       await supabase.auth.signOut();
-      
+
       // Redireciona para a landing page
       navigate("/");
     } catch (error) {
       console.error("Erro ao excluir conta:", error);
       setDeleteError(
-        error.message || "Não foi possível excluir sua conta. Por favor, tente novamente ou entre em contato com o suporte."
+        error.message ||
+          "Não foi possível excluir sua conta. Por favor, tente novamente ou entre em contato com o suporte."
       );
       setDeleteLoading(false);
     }
@@ -571,9 +682,26 @@ export default function Profile() {
     }
   };
 
-  const handleAnalyzeResume = (resumeId) => {
-    // Redireciona para a Home e passa o id do currículo para que a Home abra a análise
-    navigate('/home', { state: { openResumeId: resumeId } });
+  const handleAnalyzeResume = async (resumeId) => {
+    try {
+      setAnalyzingResume(true);
+      setSelectedResumeId(resumeId);
+
+      const result = await analyzeResume(resumeId);
+      setResumeAnalysis(result);
+      setShowAnalysisModal(true);
+    } catch (error) {
+      console.error("❌ Erro ao analisar currículo:", error);
+      alert("Erro ao analisar currículo: " + (error.message || ""));
+    } finally {
+      setAnalyzingResume(false);
+      setSelectedResumeId(null);
+    }
+  };
+
+  const handleCloseAnalysis = () => {
+    setShowAnalysisModal(false);
+    setResumeAnalysis(null);
   };
 
   const handleDeleteResume = async (resumeId) => {
@@ -581,8 +709,8 @@ export default function Profile() {
 
     try {
       // Delay curto para animação
-      await new Promise(resolve => setTimeout(resolve, 200));
-      setMyResumes(prev => prev.filter(r => r.id !== resumeId));
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      setMyResumes((prev) => prev.filter((r) => r.id !== resumeId));
       await deleteResume(resumeId);
     } catch (error) {
       console.error("❌ Erro ao deletar currículo:", error);
@@ -598,12 +726,26 @@ export default function Profile() {
       {/* Header no mesmo estilo da Home */}
       <header className="sticky top-0 z-40 bg-white/70 backdrop-blur border-b border-zinc-100">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 group" aria-label="Início">
+          <Link
+            to="/"
+            className="flex items-center gap-2 group"
+            aria-label="Início"
+          >
             <PraxisLogo className="h-12" />
           </Link>
           <nav className="flex items-center gap-2">
-            <Link to="/home" className="px-3 py-1.5 rounded-md hover:bg-zinc-50 border border-zinc-200 text-sm">Home</Link>
-            <Link to="/perfil" className="px-3 py-1.5 rounded-md bg-primary-100 text-primary-800 border border-primary-200 text-sm">Perfil</Link>
+            <Link
+              to="/home"
+              className="px-3 py-1.5 rounded-md hover:bg-zinc-50 border border-zinc-200 text-sm"
+            >
+              Home
+            </Link>
+            <Link
+              to="/perfil"
+              className="px-3 py-1.5 rounded-md bg-primary-100 text-primary-800 border border-primary-200 text-sm"
+            >
+              Perfil
+            </Link>
             <button
               onClick={handleLogout}
               className="px-3 py-1.5 rounded-md hover:bg-red-50 border border-red-200 text-red-600 text-sm font-medium transition cursor-pointer"
@@ -626,48 +768,73 @@ export default function Profile() {
         ) : (
           <>
             <div className="mb-8">
-              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Olá, {user?.full_name || 'Usuário'}</h1>
-              <p className="text-zinc-600 text-lg">Acompanhe seu progresso e desenvolvimento profissional.</p>
+              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">
+                Olá, {user?.full_name || "Usuário"}
+              </h1>
+              <p className="text-zinc-600 text-lg">
+                Acompanhe seu progresso e desenvolvimento profissional.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Coluna Principal (2/3) */}
               <div className="lg:col-span-2 space-y-8">
-
                 <Section title="Habilidades Técnicas" subtitle={null}>
-                    <div className="space-y-6">
-                        {attributes?.tech_skills && Object.keys(attributes.tech_skills).length > 0 ? (
-                          Object.entries(attributes.tech_skills).map(([skillName, percentage]) => (
-                            <SkillBar 
-                              key={skillName} 
-                              skill={skillName} 
-                              percentage={percentage} 
-                              date={attributes.updated_at} 
-                            />
-                          ))
-                        ) : (
-                          <p className="text-zinc-500 text-center py-4">Nenhuma habilidade registrada ainda.</p>
-                        )}
-                    </div>
+                  <div className="space-y-6">
+                    {attributes?.tech_skills &&
+                    Object.keys(attributes.tech_skills).length > 0 ? (
+                      Object.entries(attributes.tech_skills).map(
+                        ([skillName, percentage]) => (
+                          <SkillBar
+                            key={skillName}
+                            skill={skillName}
+                            percentage={percentage}
+                            date={attributes.updated_at}
+                          />
+                        )
+                      )
+                    ) : (
+                      <p className="text-zinc-500 text-center py-4">
+                        Nenhuma habilidade registrada ainda.
+                      </p>
+                    )}
+                  </div>
                 </Section>
 
                 {/* Nova seção: Habilidades Sociais (Soft Skills) */}
                 <Section title="Habilidades Sociais" subtitle={null}>
                   <div className="space-y-6">
                     {(() => {
-                      const softPercents = computeSoftSkillPercentages(attributes?.soft_skills || {});
-                      const keys = ['Comunicação', 'Organização', 'Resolução de Problemas'];
+                      const softPercents = computeSoftSkillPercentages(
+                        attributes?.soft_skills || {}
+                      );
+                      const keys = [
+                        "Comunicação",
+                        "Organização",
+                        "Resolução de Problemas",
+                      ];
 
-                      const hasAny = keys.some(k => softPercents[k] && softPercents[k] > 0);
+                      const hasAny = keys.some(
+                        (k) => softPercents[k] && softPercents[k] > 0
+                      );
 
                       if (!hasAny) {
-                        return <p className="text-zinc-500 text-center py-4">Nenhuma avaliação de soft skills disponível.</p>;
+                        return (
+                          <p className="text-zinc-500 text-center py-4">
+                            Nenhuma avaliação de soft skills disponível.
+                          </p>
+                        );
                       }
 
                       return (
                         <div className="space-y-4">
-                          {keys.map(k => (
-                            <SkillBar key={k} skill={k} percentage={softPercents[k] || 0} date={attributes?.updated_at} />
+                          {keys.map((k) => (
+                            <SkillBar
+                              key={k}
+                              skill={k}
+                              percentage={softPercents[k] || 0}
+                              date={attributes?.updated_at}
+                            />
                           ))}
                         </div>
                       );
@@ -675,126 +842,448 @@ export default function Profile() {
                   </div>
                 </Section>
 
-                <Section title="Histórico de Desafios" subtitle={`${submissions.length} desafios completados`} id="historico">
-                    {submissions && submissions.length > 0 ? (
-                      submissions.map(sub => <ChallengeHistoryItem key={sub.id} {...sub} />)
-                    ) : (
-                      <p className="text-zinc-500 text-center py-4">Nenhum desafio completado ainda.</p>
-                    )}
+                <Section
+                  title="Histórico de Desafios"
+                  subtitle={`${submissions.length} desafios completados`}
+                  id="historico"
+                >
+                  {submissions && submissions.length > 0 ? (
+                    submissions.map((sub) => (
+                      <ChallengeHistoryItem key={sub.id} {...sub} />
+                    ))
+                  ) : (
+                    <p className="text-zinc-500 text-center py-4">
+                      Nenhum desafio completado ainda.
+                    </p>
+                  )}
                 </Section>
 
                 <div className="grid grid-cols-3 gap-4">
-                    <StatCard value={submissions?.length || 0} label="Desafios Completados" />
-                    <StatCard value={attributes?.tech_skills ? Object.keys(attributes.tech_skills).length : 0} label="Habilidades Rastreadas" />
-                    <StatCard value="90" label="Score Médio" />
-                </div>
-
-            {/* Seção de Exclusão de Conta */}
-            <Section title="Zona de Perigo" subtitle="Ações irreversíveis">
-              <div className="p-4 border border-red-200 rounded-lg bg-red-50">
-                <h4 className="font-semibold text-red-900 mb-2">Excluir Conta</h4>
-                <p className="text-sm text-red-700 mb-4">
-                  Uma vez excluída, sua conta não poderá ser recuperada. Todos os seus dados, desafios e progresso serão perdidos permanentemente.
-                </p>
-                <button
-                  onClick={() => setShowDeleteModal(true)}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium text-sm cursor-pointer"
-                >
-                  Excluir Minha Conta
-                </button>
-              </div>
-            </Section>
-          </div>
-
-          {/* Coluna Lateral (1/3) */}
-          <div className="space-y-8">
-            <Section title="Evolução da Pontuação" subtitle="Seu progresso nos últimos 5 meses">
-              <div className="h-64">
-                <Line options={evolutionOptions} data={evolutionData} />
-              </div>
-              <div className="mt-4 text-center p-3 rounded-lg bg-emerald-50 border border-emerald-200">
-                <p className="font-semibold text-emerald-700">📈 Crescimento de +44% em 5 meses!</p>
-                <p className="text-sm text-zinc-600">Você está no caminho certo. Continue praticando regularmente.</p>
-              </div>
-            </Section>
-
-              {/* Nova área: Meus Currículos (movido da Home) */}
-              <Section title="Meus Currículos" subtitle={null}>
-                <div>
-                  <Card 
-                    role="button"
-                    aria-expanded={expandedMyResumesCard}
-                    className={
-                      "p-4 cursor-pointer transition-all duration-300 ease-in-out " +
-                      (expandedMyResumesCard ? "ring-2 ring-primary-300" : "hover:scale-[1.02]")
+                  <StatCard
+                    value={submissions?.length || 0}
+                    label="Desafios Completados"
+                  />
+                  <StatCard
+                    value={
+                      attributes?.tech_skills
+                        ? Object.keys(attributes.tech_skills).length
+                        : 0
                     }
-                    onClick={() => setExpandedMyResumesCard(prev => !prev)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="h-9 w-9 rounded-md bg-emerald-100 text-emerald-800 grid place-content-center border border-emerald-200 text-sm font-semibold">
-                          ✔
-                        </div>
-                        <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Análise Praxis</span>
-                      </div>
-                    </div>
-
-                    {!expandedMyResumesCard && (
-                      <div className="mt-3">
-                        <h3 className="text-lg font-semibold text-zinc-900">Análises</h3>
-                        <p className="mt-1.5 text-sm text-zinc-600">{myResumes.length === 0 ? 'Nenhum currículo enviado' : `${myResumes.length} currículo${myResumes.length > 1 ? 's' : ''}`}</p>
-                      </div>
-                    )}
-
-                    {expandedMyResumesCard && (
-                      <div className="pt-4 mt-4 border-t border-zinc-200" onClick={(e) => e.stopPropagation()}>
-                        <h3 className="text-lg font-semibold text-zinc-900 mb-3">Currículos Enviados</h3>
-
-                        {myResumes.length === 0 ? (
-                          <div className="text-center py-8 text-zinc-500">
-                            <p className="text-sm">Nenhum currículo enviado ainda.</p>
-                            <p className="text-xs mt-1">Envie seu primeiro currículo na área de Análise.</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-3 max-h-72 overflow-y-auto">
-                            {myResumes.map((resume) => (
-                              <div key={resume.id} className={`border border-zinc-200 rounded-lg p-3 transition-all duration-300 ${deletingResumeId === resume.id ? 'opacity-0 scale-95 translate-x-4' : 'opacity-100 scale-100 translate-x-0'}`}>
-                                <div className="flex items-start justify-between mb-2">
-                                  <div className="flex-1">
-                                    <h4 className="font-semibold text-zinc-900 text-sm">{resume.title || 'Sem título'}</h4>
-                                    <p className="text-xs text-zinc-500 mt-1">Enviado em {new Date(resume.created_at).toLocaleDateString('pt-BR')}</p>
-                                  </div>
-                                  {resume.has_analysis && (
-                                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">✓ Analisado</span>
-                                  )}
-                                </div>
-
-                                <div className="flex gap-2 mt-2">
-                                  <button onClick={() => handleAnalyzeResume(resume.id)} disabled={analyzingResume && selectedResumeId === resume.id} className="flex-1 px-3 py-1.5 text-sm font-medium border border-primary-200 text-primary-700 rounded-md hover:bg-primary-50 transition disabled:opacity-50 cursor-pointer">
-                                    {analyzingResume && selectedResumeId === resume.id ? 'Analisando...' : (resume.has_analysis ? 'Ver Análise' : 'Analisar com IA')}
-                                  </button>
-                                  <button onClick={() => handleDeleteResume(resume.id)} disabled={deletingResumeId === resume.id} className="px-3 py-1.5 text-sm font-medium border border-red-200 text-red-600 rounded-md hover:bg-red-50 transition disabled:opacity-50 cursor-pointer" title="Excluir currículo">
-                                    {deletingResumeId === resume.id ? '...' : 'Excluir'}
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        <div className="mt-4 flex justify-end">
-                          <button onClick={(e) => { e.stopPropagation(); setExpandedMyResumesCard(false); }} className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50">Fechar</button>
-                        </div>
-                      </div>
-                    )}
-                  </Card>
+                    label="Habilidades Rastreadas"
+                  />
+                  <StatCard value="90" label="Score Médio" />
                 </div>
-              </Section>
-          </div>
-        </div>
+
+                {/* Seção de Exclusão de Conta */}
+                <Section title="Zona de Perigo" subtitle="Ações irreversíveis">
+                  <div className="p-4 border border-red-200 rounded-lg bg-red-50">
+                    <h4 className="font-semibold text-red-900 mb-2">
+                      Excluir Conta
+                    </h4>
+                    <p className="text-sm text-red-700 mb-4">
+                      Uma vez excluída, sua conta não poderá ser recuperada.
+                      Todos os seus dados, desafios e progresso serão perdidos
+                      permanentemente.
+                    </p>
+                    <button
+                      onClick={() => setShowDeleteModal(true)}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium text-sm cursor-pointer"
+                    >
+                      Excluir Minha Conta
+                    </button>
+                  </div>
+                </Section>
+              </div>
+
+              {/* Coluna Lateral (1/3) */}
+              <div className="space-y-8">
+                <Section
+                  title="Evolução da Pontuação"
+                  subtitle="Seu progresso nos últimos 5 meses"
+                >
+                  <div className="h-64">
+                    <Line options={evolutionOptions} data={evolutionData} />
+                  </div>
+                  <div className="mt-4 text-center p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+                    <p className="font-semibold text-emerald-700">
+                      📈 Crescimento de +44% em 5 meses!
+                    </p>
+                    <p className="text-sm text-zinc-600">
+                      Você está no caminho certo. Continue praticando
+                      regularmente.
+                    </p>
+                  </div>
+                </Section>
+
+                {/* Nova área: Meus Currículos (movido da Home) */}
+                <Section title="Meus Currículos" subtitle={null}>
+                  <div>
+                    <Card
+                      role="button"
+                      aria-expanded={expandedMyResumesCard}
+                      className={
+                        "p-4 cursor-pointer transition-all duration-300 ease-in-out " +
+                        (expandedMyResumesCard
+                          ? "ring-2 ring-primary-300"
+                          : "hover:scale-[1.02]")
+                      }
+                      onClick={() => setExpandedMyResumesCard((prev) => !prev)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="h-9 w-9 rounded-md bg-emerald-100 text-emerald-800 grid place-content-center border border-emerald-200 text-sm font-semibold">
+                            ✔
+                          </div>
+                          <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                            Análise Praxis
+                          </span>
+                        </div>
+                      </div>
+
+                      {!expandedMyResumesCard && (
+                        <div className="mt-3">
+                          <h3 className="text-lg font-semibold text-zinc-900">
+                            Análises
+                          </h3>
+                          <p className="mt-1.5 text-sm text-zinc-600">
+                            {myResumes.length === 0
+                              ? "Nenhum currículo enviado"
+                              : `${myResumes.length} currículo${
+                                  myResumes.length > 1 ? "s" : ""
+                                }`}
+                          </p>
+                        </div>
+                      )}
+
+                      {expandedMyResumesCard && (
+                        <div
+                          className="pt-4 mt-4 border-t border-zinc-200"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <h3 className="text-lg font-semibold text-zinc-900 mb-3">
+                            Currículos Enviados
+                          </h3>
+
+                          {myResumes.length === 0 ? (
+                            <div className="text-center py-8 text-zinc-500">
+                              <p className="text-sm">
+                                Nenhum currículo enviado ainda.
+                              </p>
+                              <p className="text-xs mt-1">
+                                Envie seu primeiro currículo na área de Análise.
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="space-y-3 max-h-72 overflow-y-auto">
+                              {myResumes.map((resume) => (
+                                <div
+                                  key={resume.id}
+                                  className={`border border-zinc-200 rounded-lg p-3 transition-all duration-300 ${
+                                    deletingResumeId === resume.id
+                                      ? "opacity-0 scale-95 translate-x-4"
+                                      : "opacity-100 scale-100 translate-x-0"
+                                  }`}
+                                >
+                                  <div className="flex items-start justify-between mb-2">
+                                    <div className="flex-1">
+                                      <h4 className="font-semibold text-zinc-900 text-sm">
+                                        {resume.title || "Sem título"}
+                                      </h4>
+                                      <p className="text-xs text-zinc-500 mt-1">
+                                        Enviado em{" "}
+                                        {new Date(
+                                          resume.created_at
+                                        ).toLocaleDateString("pt-BR")}
+                                      </p>
+                                    </div>
+                                    {resume.has_analysis && (
+                                      <span className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        ✓ Analisado
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="flex gap-2 mt-2">
+                                    <button
+                                      onClick={() =>
+                                        handleAnalyzeResume(resume.id)
+                                      }
+                                      disabled={
+                                        analyzingResume &&
+                                        selectedResumeId === resume.id
+                                      }
+                                      className="flex-1 px-3 py-1.5 text-sm font-medium border border-primary-200 text-primary-700 rounded-md hover:bg-primary-50 transition disabled:opacity-50 cursor-pointer"
+                                    >
+                                      {analyzingResume &&
+                                      selectedResumeId === resume.id
+                                        ? "Analisando..."
+                                        : resume.has_analysis
+                                        ? "Ver Análise"
+                                        : "Analisar com IA"}
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleDeleteResume(resume.id)
+                                      }
+                                      disabled={deletingResumeId === resume.id}
+                                      className="px-3 py-1.5 text-sm font-medium border border-red-200 text-red-600 rounded-md hover:bg-red-50 transition disabled:opacity-50 cursor-pointer"
+                                      title="Excluir currículo"
+                                    >
+                                      {deletingResumeId === resume.id
+                                        ? "..."
+                                        : "Excluir"}
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="mt-4 flex justify-end">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedMyResumesCard(false);
+                              }}
+                              className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50"
+                            >
+                              Fechar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </Card>
+                  </div>
+                </Section>
+              </div>
+            </div>
           </>
         )}
       </main>
+
+      {/* Modal de Análise de Currículo - Centralizado com Blur */}
+      {showAnalysisModal && resumeAnalysis && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          {/* Card centralizado */}
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto my-8">
+            {/* Header */}
+            <div className="sticky top-0 bg-white border-b border-zinc-200 px-6 py-4 rounded-t-2xl z-10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-zinc-900">
+                    Análise do Currículo
+                  </h2>
+                  <p className="text-sm text-zinc-600 mt-1">
+                    Análise gerada pela Praxis com base na sua trilha
+                  </p>
+                </div>
+                <button
+                  onClick={handleCloseAnalysis}
+                  className="px-4 py-2 text-sm font-medium text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-colors"
+                >
+                  ✕ Fechar
+                </button>
+              </div>
+            </div>
+
+            {/* Conteúdo da Análise */}
+            <div className="px-6 py-6">
+              {/* Nota Geral - Destaque */}
+              <div className="bg-gradient-to-br from-primary-50 to-primary-100 rounded-2xl p-6 mb-6 border-2 border-primary-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-zinc-900 mb-1">
+                      Nota Geral
+                    </h3>
+                    <p className="text-sm text-zinc-600">
+                      Avaliação geral do seu currículo
+                    </p>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-5xl font-bold text-primary-600">
+                      {resumeAnalysis.nota_geral ||
+                        resumeAnalysis.full_report?.nota_geral ||
+                        "N/A"}
+                    </span>
+                    <span className="text-2xl text-zinc-500">/100</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Seções da Análise */}
+              {(resumeAnalysis.resumo_executivo ||
+                resumeAnalysis.full_report) && (
+                <div className="space-y-5">
+                  {/* Resumo Executivo */}
+                  {(resumeAnalysis.resumo_executivo ||
+                    resumeAnalysis.full_report?.resumo_executivo) && (
+                    <div className="bg-primary-50 border border-primary-200 rounded-xl p-5">
+                      <h4 className="font-semibold text-zinc-900 mb-3 flex items-center gap-2">
+                        <span className="text-xl">📋</span>
+                        <span>Resumo Executivo</span>
+                      </h4>
+                      <p className="text-sm text-zinc-700 leading-relaxed">
+                        {resumeAnalysis.resumo_executivo ||
+                          resumeAnalysis.full_report?.resumo_executivo}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Pontos Fortes */}
+                  {((resumeAnalysis.pontos_fortes &&
+                    resumeAnalysis.pontos_fortes.length > 0) ||
+                    (resumeAnalysis.full_report?.pontos_fortes &&
+                      resumeAnalysis.full_report.pontos_fortes.length > 0)) && (
+                    <div className="bg-white rounded-xl p-5 border border-zinc-200 shadow-sm">
+                      <h4 className="font-semibold text-emerald-800 mb-3 flex items-center gap-2">
+                        <span className="text-xl">✓</span>
+                        <span>Pontos Fortes</span>
+                      </h4>
+                      <ul className="space-y-2">
+                        {(
+                          resumeAnalysis.pontos_fortes ||
+                          resumeAnalysis.full_report?.pontos_fortes ||
+                          []
+                        ).map((ponto, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-emerald-600 mt-1 flex-shrink-0">
+                              ●
+                            </span>
+                            <span className="text-sm text-zinc-700">
+                              {ponto}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Gaps Técnicos */}
+                  {((resumeAnalysis.gaps_tecnicos &&
+                    resumeAnalysis.gaps_tecnicos.length > 0) ||
+                    (resumeAnalysis.full_report?.gaps_tecnicos &&
+                      resumeAnalysis.full_report.gaps_tecnicos.length > 0)) && (
+                    <div className="bg-white rounded-xl p-5 border border-zinc-200 shadow-sm">
+                      <h4 className="font-semibold text-orange-800 mb-3 flex items-center gap-2">
+                        <span className="text-xl">⚠</span>
+                        <span>Habilidades Faltantes</span>
+                      </h4>
+                      <ul className="space-y-2">
+                        {(
+                          resumeAnalysis.gaps_tecnicos ||
+                          resumeAnalysis.full_report?.gaps_tecnicos ||
+                          []
+                        ).map((gap, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-orange-600 mt-1 flex-shrink-0">
+                              ●
+                            </span>
+                            <span className="text-sm text-zinc-700">{gap}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Sugestões de Melhoria */}
+                  {((resumeAnalysis.sugestoes_melhoria &&
+                    resumeAnalysis.sugestoes_melhoria.length > 0) ||
+                    (resumeAnalysis.full_report?.sugestoes_melhoria &&
+                      resumeAnalysis.full_report.sugestoes_melhoria.length >
+                        0)) && (
+                    <div className="bg-white rounded-xl p-5 border border-zinc-200 shadow-sm">
+                      <h4 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                        <span className="text-xl">💡</span>
+                        <span>Sugestões de Melhoria</span>
+                      </h4>
+                      <ul className="space-y-2">
+                        {(
+                          resumeAnalysis.sugestoes_melhoria ||
+                          resumeAnalysis.full_report?.sugestoes_melhoria ||
+                          []
+                        ).map((sugestao, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-blue-600 mt-1 flex-shrink-0">
+                              ●
+                            </span>
+                            <span className="text-sm text-zinc-700">
+                              {sugestao}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Habilidades Evidenciadas */}
+                  {(resumeAnalysis.habilidades_evidenciadas ||
+                    resumeAnalysis.full_report?.habilidades_evidenciadas) && (
+                    <div className="bg-white rounded-xl p-5 border border-zinc-200 shadow-sm">
+                      <h4 className="font-semibold text-zinc-900 mb-3 flex items-center gap-2">
+                        <span className="text-xl">📊</span>
+                        <span>Habilidades Evidenciadas</span>
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {Object.entries(
+                          resumeAnalysis.habilidades_evidenciadas ||
+                            resumeAnalysis.full_report
+                              ?.habilidades_evidenciadas ||
+                            {}
+                        ).map(([skill, level]) => (
+                          <div
+                            key={skill}
+                            className="bg-zinc-50 rounded-lg p-3 border border-zinc-200"
+                          >
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-sm font-medium text-zinc-700">
+                                {skill}
+                              </span>
+                              <span className="text-xs font-semibold text-zinc-600">
+                                {level}/100
+                              </span>
+                            </div>
+                            <div className="w-full bg-zinc-200 rounded-full h-2">
+                              <div
+                                className="bg-primary-500 h-2 rounded-full transition-all duration-500"
+                                style={{ width: `${level}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Próximos Passos */}
+                  {((resumeAnalysis.proximos_passos &&
+                    resumeAnalysis.proximos_passos.length > 0) ||
+                    (resumeAnalysis.full_report?.proximos_passos &&
+                      resumeAnalysis.full_report.proximos_passos.length >
+                        0)) && (
+                    <div className="bg-gradient-to-r from-primary-50 to-emerald-50 border-2 border-primary-200 rounded-xl p-5">
+                      <h4 className="font-semibold text-zinc-900 mb-3 flex items-center gap-2">
+                        <span className="text-xl">🎯</span>
+                        <span>Próximos Passos</span>
+                      </h4>
+                      <ol className="space-y-2 list-decimal list-inside">
+                        {(
+                          resumeAnalysis.proximos_passos ||
+                          resumeAnalysis.full_report?.proximos_passos ||
+                          []
+                        ).map((passo, idx) => (
+                          <li key={idx} className="text-sm text-zinc-700 ml-2">
+                            {passo}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Confirmação de Exclusão */}
       {showDeleteModal && (
@@ -804,10 +1293,11 @@ export default function Profile() {
               Tem certeza absoluta?
             </h3>
             <p className="text-zinc-600 mb-6">
-              Esta ação <strong className="text-red-600">não pode ser desfeita</strong>. 
+              Esta ação{" "}
+              <strong className="text-red-600">não pode ser desfeita</strong>.
               Você perderá permanentemente:
             </p>
-            
+
             <ul className="list-disc list-inside text-sm text-zinc-700 mb-6 space-y-1">
               <li>Todo o seu progresso e pontuação</li>
               <li>Histórico de desafios completados</li>
@@ -837,7 +1327,9 @@ export default function Profile() {
                 disabled={deleteLoading}
                 className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
-                {deleteLoading ? "Excluindo..." : "Sim, Excluir Permanentemente"}
+                {deleteLoading
+                  ? "Excluindo..."
+                  : "Sim, Excluir Permanentemente"}
               </button>
             </div>
           </div>

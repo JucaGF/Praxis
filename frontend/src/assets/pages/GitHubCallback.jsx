@@ -15,7 +15,7 @@ export default function GitHubCallback() {
         if (error) throw error;
 
         if (data.session) {
-          // Usuário autenticado com GitHub - verifica se precisa fazer onboarding
+          // Usuário autenticado com GitHub - verifica se precisa fazer questionários
           const user = data.session.user;
 
           try {
@@ -31,7 +31,11 @@ export default function GitHubCallback() {
             );
 
             if (response.status === 404 || !response.ok) {
-              navigate("/onboarding", { replace: true });
+              // NOVO USUÁRIO - Redireciona para CadastroSucesso (questionários)
+              console.log(
+                "🎉 Novo usuário GitHub - Redirecionando para questionários..."
+              );
+              navigate("/cadastro-sucesso", { replace: true });
               return;
             }
 
@@ -45,14 +49,21 @@ export default function GitHubCallback() {
               Object.keys(attributes.soft_skills).length > 0;
 
             if (!hasRealData) {
-              navigate("/onboarding", { replace: true });
+              // USUÁRIO EXISTENTE SEM DADOS - Vai para questionários
+              console.log(
+                "📝 Usuário existente sem dados - Redirecionando para questionários..."
+              );
+              navigate("/cadastro-sucesso", { replace: true });
               return;
             }
 
+            // USUÁRIO EXISTENTE COM DADOS - Vai direto para home
+            console.log("🚀 Usuário com dados - Redirecionando para home...");
             navigate("/home", { replace: true });
           } catch (apiError) {
             console.warn("⚠️ Erro ao verificar attributes:", apiError);
-            navigate("/onboarding", { replace: true });
+            // Em caso de erro, vai para questionários por segurança
+            navigate("/cadastro-sucesso", { replace: true });
           }
         } else {
           setError("Falha na autenticação com GitHub");

@@ -17,6 +17,8 @@ import Challenge from "./assets/pages/Challenge";
 import ChallengeResult from "./assets/pages/ChallengeResult";
 import Onboarding from "./assets/pages/Onboarding";
 import ForceLogout from "./assets/pages/ForceLogout";
+import GitHubCallback from "./assets/pages/GitHubCallback";
+import CadastroSucesso from "./assets/pages/CadastroSucesso";
 
 // --- Hook de autenticação ---
 import { useAuth } from "./assets/hooks/useAuth";
@@ -59,7 +61,7 @@ export default function App() {
       <Routes>
         {/* --- Rota pública (acessível a todos) --- */}
         <Route path="/" element={<Landing />} />
-        
+
         {/* --- Rota de emergência para forçar logout (sempre acessível) --- */}
         <Route path="/force-logout" element={<ForceLogout />} />
 
@@ -80,6 +82,10 @@ export default function App() {
             </PublicRoute>
           }
         />
+
+        {/* --- Rotas de callback OAuth (públicas) --- */}
+        <Route path="/github-callback" element={<GitHubCallback />} />
+        <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
 
         {/* --- Rotas protegidas (só para logados) --- */}
         <Route
