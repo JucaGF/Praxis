@@ -10,6 +10,13 @@ import logger from "../../utils/logger";
 export default function DailyTaskChallenge({ challenge }) {
   const navigate = useNavigate();
   
+  // Debug: ver estrutura do enunciado
+  console.log("📧 DailyTaskChallenge - Enunciado:", {
+    hasEnunciado: !!challenge.description?.enunciado,
+    enunciadoType: challenge.description?.enunciado?.type,
+    enunciado: challenge.description?.enunciado
+  });
+  
   // Usar o hook de timer persistente
   const durationMinutes = challenge.difficulty?.time_limit || 120;
   const { 
@@ -222,13 +229,26 @@ export default function DailyTaskChallenge({ challenge }) {
 
           <div className="border-t border-zinc-800 pt-4 mt-4">
             <h3 className="font-semibold text-sm mb-2">📧 E-mail do Cliente</h3>
-            <div className="bg-zinc-800 rounded p-3 text-xs space-y-1">
-              <p><span className="text-zinc-500">De:</span> carlos.silva@email.com</p>
-              <p><span className="text-zinc-500">Assunto:</span> Problema com pedido #8472</p>
-              <p><span className="text-zinc-500">Data:</span> 31 Out 2025, 14:32</p>
-            </div>
-            <div className="mt-3 bg-zinc-800/50 rounded p-3 text-xs text-zinc-400 leading-relaxed max-h-48 overflow-y-auto">
-              {challenge.description?.email_content || challenge.description?.context || `Prezados,
+            {challenge.description?.enunciado?.type === 'email' ? (
+              <>
+                <div className="bg-zinc-800 rounded p-3 text-xs space-y-1">
+                  <p><span className="text-zinc-500">De:</span> {challenge.description.enunciado.de || "cliente@email.com"}</p>
+                  <p><span className="text-zinc-500">Assunto:</span> {challenge.description.enunciado.assunto || "Assunto do email"}</p>
+                  <p><span className="text-zinc-500">Data:</span> {challenge.description.enunciado.data || "Data"}</p>
+                </div>
+                <div className="mt-3 bg-zinc-800/50 rounded p-3 text-xs text-zinc-400 leading-relaxed max-h-48 overflow-y-auto whitespace-pre-wrap">
+                  {challenge.description.enunciado.corpo || "Conteúdo do email não disponível"}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="bg-zinc-800 rounded p-3 text-xs space-y-1">
+                  <p><span className="text-zinc-500">De:</span> carlos.silva@email.com</p>
+                  <p><span className="text-zinc-500">Assunto:</span> Problema com pedido #8472</p>
+                  <p><span className="text-zinc-500">Data:</span> 31 Out 2025, 14:32</p>
+                </div>
+                <div className="mt-3 bg-zinc-800/50 rounded p-3 text-xs text-zinc-400 leading-relaxed max-h-48 overflow-y-auto">
+                  {challenge.description?.email_content || challenge.description?.context || `Prezados,
 
 Estou extremamente frustrado. Fiz um pedido há 5 dias (pedido #8472) e até agora não recebi nenhuma atualização sobre o envio. Quando tento rastrear, o sistema diz que o código de rastreamento é inválido.
 
@@ -238,7 +258,9 @@ Se não conseguirem resolver, vou ter que cancelar e solicitar reembolso.
 
 Att,
 Carlos Silva`}
-            </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 

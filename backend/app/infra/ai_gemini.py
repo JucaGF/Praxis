@@ -225,7 +225,8 @@ ESTRUTURA DE CADA DESAFIO:
     "type": "codigo|texto_livre|planejamento",
     "language": "python|javascript|sql|markdown",
     "eval_criteria": ["critério1", "critério2", "critério3"],
-    "target_skill": "Skill do perfil",
+    "target_skill": "Skill principal do perfil",
+    "affected_skills": ["Skill1", "Skill2", "Skill3"],  // NOVO: 2-4 skills que o desafio avalia
     "hints": ["dica útil 1", "dica útil 2"],
     "enunciado": null  // NOVO: objeto estruturado (veja regras abaixo)
   },
@@ -248,11 +249,15 @@ ESTRUTURA DE CADA DESAFIO:
 
 REGRAS OBRIGATÓRIAS:
 1. Retorne array com exatamente 3 desafios
-2. target_skill DEVE existir nas skills do usuário
-3. Varie dificuldade: 1 easy, 1 medium, 1 hard
-4. description.text: Tom conversacional (chefe falando)
-5. SEMPRE adicione 2-4 hints úteis e práticas
-6. Para type="codigo" → category="code":
+2. target_skill DEVE existir nas skills do usuário (skill principal)
+3. affected_skills: array com 2-4 skills do perfil que o desafio avalia (DEVE incluir target_skill)
+   - Para code: skills técnicas relacionadas (ex: ["Python", "FastAPI", "SQL"])
+   - Para daily-task: soft skills (ex: ["Comunicação", "Empatia", "Resolução de Conflitos"])
+   - Para organization: skills de arquitetura (ex: ["Arquitetura", "Escalabilidade", "Trade-offs"])
+4. Varie dificuldade: 1 easy, 1 medium, 1 hard
+5. description.text: Tom conversacional (chefe falando)
+6. SEMPRE adicione 2-4 hints úteis e práticas
+7. Para type="codigo" → category="code":
    - fs é OBRIGATÓRIO (não null!)
    - fs.files: 2-4 caminhos realistas
    - fs.open: arquivo principal
@@ -260,12 +265,12 @@ REGRAS OBRIGATÓRIAS:
    - Código deve ser bugado, incompleto ou precisar refatoração
    - enunciado: null
    - template_code: null
-7. Para type="texto_livre" → category="daily-task":
+8. Para type="texto_livre" → category="daily-task":
    - fs: null
    - enunciado: OBRIGATÓRIO - simule um e-mail/ticket realista
      Formato: {"type": "email", "de": "nome@empresa.com", "assunto": "assunto do email", "data": "2024-11-15", "corpo": "texto do email (3-5 linhas)"}
    - template_code: null
-8. Para type="planejamento" → category="organization":
+9. Para type="planejamento" → category="organization":
    - fs: null
    - enunciado: OBRIGATÓRIO - requisitos estruturados
      Formato: {"type": "requisitos", "funcionais": ["req1", "req2", "req3"], "nao_funcionais": ["req1", "req2"]}
@@ -595,50 +600,53 @@ Para COMUNICAÇÃO:
 - Contexto: entende impacto em sistema?
 """
 
-        assessment_instructions = """
+        # Extrai affected_skills do desafio para avaliar múltiplas skills
+        affected_skills = (ch_desc.get("affected_skills") or [ch_desc.get("target_skill")] or [])
+        affected_skills_str = ", ".join(affected_skills) if affected_skills else "skill principal"
+        
+        assessment_instructions = f"""
 TAREFA DE AVALIAÇÃO:
 
 1. Analise a submissão profundamente considerando os critérios acima
 2. Atribua uma nota geral (0-100)
 3. Avalie métricas específicas por critério
-4. IMPORTANTE: Faça SKILL ASSESSMENT inteligente:
+4. IMPORTANTE: Faça SKILLS ASSESSMENT (MÚLTIPLAS SKILLS):
+   
+   O desafio avalia estas skills: {affected_skills_str}
+   
+   Para CADA skill, avalie:
    
    a) skill_level_demonstrated (0-100):
-      - NÃO é igual à nota!
-      - Considere: nota + qualidade + práticas + complexidade
-      - Exemplo: nota 88 mas código com más práticas → demonstrated=75
-      - Exemplo: nota 75 mas excelente arquitetura → demonstrated=82
+      - NÃO é igual à nota geral!
+      - Considere: nota + qualidade + práticas + complexidade ESPECÍFICOS dessa skill
+      - Exemplo: nota geral 85, mas Python=90 (excelente), SQL=70 (básico)
    
-   b) should_progress (true/false):
-      - true se demonstrated >= 70
-      - false caso contrário
-   
-   c) progression_intensity (-1.0 a +1.0):
-      - Positivo: submissão mostra evolução
+   b) progression_intensity (-1.0 a +1.0):
+      - Positivo: submissão mostra domínio/evolução nessa skill
         * +0.9: excelente, domínio claro
         * +0.7: muito bom, boas práticas
         * +0.5: bom, competente
         * +0.3: satisfatório, funcional
         * +0.1: mínimo aceitável
-      - Negativo: submissão mostra problemas
+      - Negativo: submissão mostra problemas/desconhecimento
         * -0.2: falhas leves, más práticas
         * -0.5: falhas significativas, desconhecimento
       
-   d) reasoning (string):
-      - Explique POR QUÊ a skill deve progredir/regredir
-      - Seja específico e construtivo
+   c) reasoning (string):
+      - Explique POR QUÊ essa skill específica deve progredir/regredir
+      - Seja específico sobre o uso DESSA skill na submissão
       - Mencione pontos fortes E fracos
 
 FORMATO DE SAÍDA (JSON ESTRITO):
 Retorne APENAS JSON neste formato:
 
-{
+{{
   "nota_geral": 85,
-  "metricas": {
+  "metricas": {{
     "criterio1": 90,
     "criterio2": 85,
     "criterio3": 80
-  },
+  }},
   "pontos_positivos": [
     "Ponto forte 1",
     "Ponto forte 2"
@@ -652,20 +660,28 @@ Retorne APENAS JSON neste formato:
     "Sugestão específica 2"
   ],
   "feedback_detalhado": "Análise detalhada em 2-4 linhas explicando a avaliação geral",
-  "skill_assessment": {
-    "skill_level_demonstrated": 88,
-    "should_progress": true,
-    "progression_intensity": 0.7,
-    "reasoning": "Demonstrou domínio sólido com boas práticas. Query otimizada com índices apropriados, mas poderia considerar particionamento para escalabilidade futura."
-  }
-}
+  "skills_assessment": {{
+    "{affected_skills[0] if affected_skills else 'SkillName1'}": {{
+      "skill_level_demonstrated": 90,
+      "progression_intensity": 0.8,
+      "reasoning": "Excelente uso de recursos avançados, código limpo e bem estruturado"
+    }},
+    "{affected_skills[1] if len(affected_skills) > 1 else 'SkillName2'}": {{
+      "skill_level_demonstrated": 75,
+      "progression_intensity": 0.5,
+      "reasoning": "Implementação funcional mas poderia ser mais robusta"
+    }}
+  }}
+}}
 
-REGRAS:
+REGRAS CRÍTICAS:
 - Retorne APENAS o JSON, sem texto antes ou depois
+- DEVE avaliar TODAS as skills em: {affected_skills_str}
+- Cada skill tem seu próprio assessment independente
 - Seja justo mas rigoroso
 - Valorize boas práticas mesmo que funcione
 - Penalize más práticas mesmo que funcione
-- skill_level_demonstrated deve ser calculado holisticamente
+- skill_level_demonstrated de cada skill deve ser calculado individualmente
 """
 
         return base_prompt + criteria + assessment_instructions

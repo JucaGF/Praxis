@@ -38,7 +38,25 @@ export default function ChallengeResult() {
   
   // Construir skill_changes se houver progressão
   const skill_changes = [];
-  if (result.target_skill && result.delta_applied !== null && result.updated_skill_value !== null) {
+  
+  // NOVO FORMATO: Múltiplas skills
+  if (result.skills_progression) {
+    const { deltas, new_values } = result.skills_progression;
+    
+    Object.keys(deltas || {}).forEach(skill_name => {
+      const delta = deltas[skill_name];
+      const new_value = new_values[skill_name];
+      const old_value = new_value - delta;
+      
+      skill_changes.push({
+        skill_name,
+        old_value,
+        new_value
+      });
+    });
+  }
+  // FALLBACK: Formato antigo (1 skill) para compatibilidade
+  else if (result.target_skill && result.delta_applied !== null && result.updated_skill_value !== null) {
     const oldValue = result.updated_skill_value - result.delta_applied;
     skill_changes.push({
       skill_name: result.target_skill,
@@ -224,25 +242,18 @@ export default function ChallengeResult() {
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4">
           <Link
-            to="/home"
-            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-primary-500 text-zinc-900 font-semibold rounded-lg hover:bg-primary-600 transition"
-          >
-            <Trophy className="w-5 h-5" />
-            Novo Desafio
-          </Link>
-          <Link
             to="/perfil#historico"
-            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-zinc-800 text-zinc-300 font-semibold rounded-lg hover:bg-zinc-700 transition"
+            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-primary-500 text-zinc-900 font-semibold rounded-lg hover:bg-primary-600 transition"
           >
             <History className="w-5 h-5" />
             Ver Histórico Completo
           </Link>
           <button
             onClick={() => navigate('/home')}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-zinc-800 text-zinc-300 rounded-lg hover:bg-zinc-700 transition"
+            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-zinc-800 text-zinc-300 font-semibold rounded-lg hover:bg-zinc-700 transition"
           >
             <ArrowLeft className="w-5 h-5" />
-            Voltar
+            Voltar para Home
           </button>
         </div>
 
