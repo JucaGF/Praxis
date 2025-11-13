@@ -114,6 +114,23 @@ class IRepository(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_soft_skills(self, profile_id: str) -> Dict[str, int]:
+        """
+        Retorna apenas as soft_skills de um perfil.
+
+        Returns:
+            dict tipo {"Comunicação": 70, "Empatia": 85}
+        """
+        pass
+
+    @abstractmethod
+    def update_soft_skills(self, profile_id: str, soft_skills: Dict[str, int]) -> None:
+        """
+        Atualiza as soft_skills de um perfil.
+        """
+        pass
+
     # -------------- CHALLENGES --------------
     @abstractmethod
     def create_challenges_for_profile(self, profile_id: str, challenges: List[dict]) -> List[dict]:

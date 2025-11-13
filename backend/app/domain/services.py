@@ -19,7 +19,7 @@ Exemplo:
 """
 
 import math
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from backend.app.domain.ports import IRepository, IAIService
 from backend.app.domain.exceptions import (
     ProfileNotFoundError,
@@ -104,6 +104,87 @@ def calculate_skill_delta(
     return int(round(ganho))
 
 
+def calculate_skill_delta_v2(
+    skill_atual: int,
+    nota_geral: int,
+    skill_assessment: dict,
+    dificuldade_level: str,
+    tentativas: int
+) -> int:
+    """
+    Nova fórmula com progressão e regressão baseadas na nota geral.
+    
+    REGRESSÃO (nota < 50):
+    - Nota 40-49: -1 a -2 pontos
+    - Nota 30-39: -2 a -4 pontos
+    - Nota < 30: -4 a -8 pontos
+    
+    PROGRESSÃO (nota >= 50):
+    - Nota 50-60: +1 a +3 pontos (ganho leve)
+    - Nota 60-75: +2 a +5 pontos (ganho moderado)
+    - Nota 75-90: +4 a +8 pontos (ganho bom)
+    - Nota 90-100: +6 a +12 pontos (ganho excelente)
+    
+    Args:
+        skill_atual: Nível atual da skill (0-100)
+        nota_geral: Nota geral do desafio (0-100)
+        skill_assessment: Dict da IA com skill_level_demonstrated, progression_intensity
+        dificuldade_level: "easy", "medium" ou "hard"
+        tentativas: Número da tentativa (1, 2, 3...)
+    
+    Returns:
+        Delta (variação) a aplicar na skill (pode ser negativo!)
+    """
+    # Extrai dados do assessment da IA
+    skill_demonstrated = skill_assessment.get("skill_level_demonstrated", skill_atual)
+    intensity = skill_assessment.get("progression_intensity", 0.0)
+    
+    # Gap: diferença entre nível demonstrado e atual
+    gap = skill_demonstrated - skill_atual
+    
+    # Fator baseado na nota geral
+    if nota_geral < 50:
+        # REGRESSÃO: nota baixa = perda de pontos
+        # Quanto pior a nota, maior a perda
+        nota_factor = (nota_geral - 50) / 50.0  # -1.0 a 0.0
+        # Amplifica perda se intensity for negativo (más práticas)
+        if intensity < 0:
+            nota_factor *= (1 + abs(intensity))
+    else:
+        # PROGRESSÃO: nota boa = ganho de pontos
+        # Notas altas ganham mais
+        if nota_geral >= 90:
+            nota_factor = 2.0  # Ganho dobrado
+        elif nota_geral >= 75:
+            nota_factor = 1.5  # Ganho 50% maior
+        elif nota_geral >= 60:
+            nota_factor = 1.0  # Ganho normal
+        else:  # 50-59
+            nota_factor = 0.6  # Ganho reduzido
+    
+    # Pesos por dificuldade
+    pesos = {"easy": 0.7, "medium": 1.0, "hard": 1.3}
+    peso = pesos.get(dificuldade_level, 1.0)
+    
+    # Curva de aprendizado: mais difícil subir quando skill já é alta (>70)
+    curva = 1 / (1 + math.exp((skill_atual - 70) / 10))
+    
+    # Penalidade por tentativas: -10% a cada tentativa adicional (mínimo 60%)
+    penal = max(0.6, 1 - 0.1 * (tentativas - 1))
+    
+    # Fórmula final
+    # Divisor menor (10) para mudanças mais perceptíveis
+    ganho = gap * intensity * nota_factor * peso * curva * penal / 10.0
+    
+    # Garante mínimos de mudança para notas extremas
+    if nota_geral >= 90 and ganho > 0 and ganho < 3:
+        ganho = 3  # Mínimo +3 para notas excelentes
+    elif nota_geral < 40 and ganho < 0 and ganho > -2:
+        ganho = -2  # Mínimo -2 para notas ruins
+    
+    return int(round(ganho))
+
+
 def clamp_skill(value: int) -> int:
     """
     Garante que skill fique entre 0 e 100.
@@ -137,6 +218,92 @@ def apply_skill_update(
     new_value = clamp_skill(current_value + delta)
     tech_skills[target_skill] = new_value
     return tech_skills
+
+
+def process_multiple_skills(
+    profile_id: str,
+    affected_skills: List[str],
+    skills_assessment: Dict[str, dict],
+    nota_geral: int,
+    difficulty_level: str,
+    attempts: int,
+    category: str,
+    repo: IRepository
+) -> Dict[str, Any]:
+    """
+    Processa progressão de múltiplas skills de uma vez.
+    
+    Diferencia automaticamente entre tech_skills e soft_skills baseado na categoria.
+    
+    Args:
+        profile_id: ID do perfil
+        affected_skills: Lista de skills que o desafio avalia
+        skills_assessment: Dict com assessment individual de cada skill
+        nota_geral: Nota geral do desafio (0-100)
+        difficulty_level: "easy", "medium" ou "hard"
+        attempts: Número da tentativa
+        category: "code", "daily-task" ou "organization"
+        repo: Repositório para acessar/atualizar skills
+    
+    Returns:
+        {
+            "skills_updated": ["Python", "FastAPI"],
+            "deltas": {"Python": +5, "FastAPI": +2},
+            "new_values": {"Python": 75, "FastAPI": 62},
+            "skill_type": "tech_skills" ou "soft_skills"
+        }
+    """
+    # Determina se atualiza tech_skills ou soft_skills
+    is_soft_skill = category == "daily-task"
+    skill_type = "soft_skills" if is_soft_skill else "tech_skills"
+    
+    # Busca skills atuais
+    if is_soft_skill:
+        current_skills = repo.get_soft_skills(profile_id)
+    else:
+        current_skills = repo.get_tech_skills(profile_id)
+    
+    deltas = {}
+    new_values = {}
+    
+    # Processa cada skill
+    for skill_name in affected_skills:
+        # Pula se não tiver assessment da IA para essa skill
+        if skill_name not in skills_assessment:
+            logger.warning(f"Skill '{skill_name}' não tem assessment da IA, pulando")
+            continue
+        
+        skill_atual = current_skills.get(skill_name, 50)  # Default 50 se não existe
+        assessment = skills_assessment[skill_name]
+        
+        # Calcula delta com nova fórmula
+        delta = calculate_skill_delta_v2(
+            skill_atual,
+            nota_geral,
+            assessment,
+            difficulty_level,
+            attempts
+        )
+        
+        # Aplica mudança
+        new_value = clamp_skill(skill_atual + delta)
+        current_skills[skill_name] = new_value
+        
+        deltas[skill_name] = delta
+        new_values[skill_name] = new_value
+    
+    # Salva no banco
+    if is_soft_skill:
+        repo.update_soft_skills(profile_id, current_skills)
+    else:
+        repo.update_tech_skills(profile_id, current_skills)
+    
+    return {
+        "skills_updated": list(deltas.keys()),
+        "deltas": deltas,
+        "new_values": new_values,
+        "skill_type": skill_type
+    }
 
 
 # ==================== CHALLENGE SERVICE ====================
@@ -413,7 +580,11 @@ class SubmissionService:
         score = int(eval_result.get("nota_geral", 0))
         metrics = eval_result.get("metricas", {})
         feedback_text = eval_result.get("feedback_detalhado", "Sem detalhes")
-        skill_assessment = eval_result.get("skill_assessment", {})
+        
+        # Novo formato: skills_assessment (múltiplas skills)
+        skills_assessment = eval_result.get("skills_assessment", {})
+        # Fallback: formato antigo skill_assessment (singular) para compatibilidade
+        skill_assessment_old = eval_result.get("skill_assessment", {})
 
         ctx["score"] = score
         logger.info(f"Nota obtida: {score}", extra={"extra_data": ctx})
@@ -428,39 +599,73 @@ class SubmissionService:
             "raw_ai_response": eval_result
         })
 
-        # ===== PASSO 7: Progressão de skill (se aplicável) =====
-        difficulty_level = (challenge.get("difficulty")
-                            or {}).get("level", "medium")
-        target_skill = (challenge.get("description") or {}).get("target_skill")
+        # ===== PASSO 7: Progressão de skills (NOVO SISTEMA - MÚLTIPLAS SKILLS) =====
+        difficulty_level = (challenge.get("difficulty") or {}).get("level", "medium")
+        category = challenge.get("category", "code")
+        affected_skills = (challenge.get("description") or {}).get("affected_skills", [])
+        
+        # Fallback: se não tiver affected_skills, usa target_skill (compatibilidade)
+        if not affected_skills:
+            target_skill = (challenge.get("description") or {}).get("target_skill")
+            if target_skill:
+                affected_skills = [target_skill]
 
+        skills_progression = None
+        # Variáveis antigas para compatibilidade
         delta_applied: Optional[int] = None
         updated_value: Optional[int] = None
-        skill_reasoning: Optional[str] = None
+        target_skill_name: Optional[str] = None
 
-        if target_skill:
+        # NOVO SISTEMA: Múltiplas skills
+        if affected_skills and skills_assessment:
             try:
-                # Busca skills atuais
-                current_skills = self.repo.get_tech_skills(
-                    submission_data["profile_id"])
-                skill_atual = int(current_skills.get(target_skill, 50))
-
-                # Calcula quanto a skill deve mudar usando assessment da IA
-                delta = calculate_skill_delta(
-                    skill_atual, skill_assessment, difficulty_level, attempts)
-
-                # Aplica a mudança
-                new_skills = apply_skill_update(
-                    current_skills, target_skill, delta)
-                self.repo.update_tech_skills(
-                    submission_data["profile_id"], new_skills)
-
-                delta_applied = int(delta)
-                updated_value = int(new_skills.get(target_skill, skill_atual))
-                skill_reasoning = skill_assessment.get("reasoning")
+                skills_progression = process_multiple_skills(
+                    submission_data["profile_id"],
+                    affected_skills,
+                    skills_assessment,
+                    score,
+                    difficulty_level,
+                    attempts,
+                    category,
+                    self.repo
+                )
+                
+                # Mantém compatibilidade: pega primeira skill para campos antigos
+                if skills_progression["deltas"]:
+                    first_skill = list(skills_progression["deltas"].keys())[0]
+                    delta_applied = skills_progression["deltas"][first_skill]
+                    updated_value = skills_progression["new_values"][first_skill]
+                    target_skill_name = first_skill
+                
+                logger.info(
+                    f"Skills atualizadas: {skills_progression['skills_updated']}",
+                    extra={"extra_data": {**ctx, "deltas": skills_progression["deltas"]}}
+                )
             except Exception as e:
-                # Se não conseguir atualizar skills (usuário sem attributes), continua sem progressão
                 logger.warning(
                     f"Não foi possível atualizar skills: {e}",
+                    extra={"extra_data": ctx}
+                )
+        
+        # FALLBACK: Sistema antigo (1 skill) para compatibilidade
+        elif affected_skills and skill_assessment_old:
+            try:
+                target_skill_name = affected_skills[0] if affected_skills else None
+                if target_skill_name:
+                    current_skills = self.repo.get_tech_skills(submission_data["profile_id"])
+                    skill_atual = int(current_skills.get(target_skill_name, 50))
+                    
+                    delta = calculate_skill_delta(
+                        skill_atual, skill_assessment_old, difficulty_level, attempts)
+                    
+                    new_skills = apply_skill_update(current_skills, target_skill_name, delta)
+                    self.repo.update_tech_skills(submission_data["profile_id"], new_skills)
+                    
+                    delta_applied = int(delta)
+                    updated_value = int(new_skills.get(target_skill_name, skill_atual))
+            except Exception as e:
+                logger.warning(
+                    f"Não foi possível atualizar skills (fallback): {e}",
                     extra={"extra_data": ctx}
                 )
 
@@ -471,9 +676,7 @@ class SubmissionService:
         ctx.update({
             "status": "scored",
             "score": score,
-            "skill_delta": delta_applied,
-            "skill_updated": updated_value,
-            "skill_reasoning": skill_reasoning
+            "skills_progression": skills_progression
         })
         logger.info("Submissão processada com sucesso",
                     extra={"extra_data": ctx})
@@ -484,8 +687,10 @@ class SubmissionService:
             "score": score,
             "metrics": metrics,
             "feedback": feedback_text,
-            "target_skill": target_skill,
+            # Novo formato (múltiplas skills)
+            "skills_progression": skills_progression,
+            # Mantém formato antigo para compatibilidade
+            "target_skill": target_skill_name,
             "delta_applied": delta_applied,
-            "updated_skill_value": updated_value,
-            "skill_reasoning": skill_reasoning
+            "updated_skill_value": updated_value
         }

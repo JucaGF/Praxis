@@ -289,10 +289,69 @@ class SqlRepo(IRepository):
                 raise ValueError(
                     f"Attributes não encontrados para profile_id: {profile_id}")
 
+            # Log antes da atualização
+            from backend.app.logging_config import get_logger
+            logger = get_logger(__name__)
+            logger.info(f"💾 Atualizando tech_skills no banco: {tech_skills}")
+
             a.tech_skills = tech_skills
             a.updated_at = datetime.utcnow()
             s.add(a)
             s.commit()
+            
+            logger.info(f"✅ Tech_skills atualizadas com sucesso no banco")
+
+    def get_soft_skills(self, profile_id: str) -> Dict[str, int]:
+        """
+        Busca soft_skills de um perfil.
+        Similar a get_tech_skills mas retorna soft_skills.
+        """
+        with Session(self.engine) as s:
+            # Tenta converter para UUID, se falhar usa string diretamente
+            try:
+                pid = uuid.UUID(profile_id)
+            except ValueError:
+                pid = profile_id
+
+            a = s.exec(select(Attributes).where(
+                Attributes.user_id == pid)).first()
+
+            if not a:
+                raise ValueError(
+                    f"Attributes não encontrados para profile_id: {profile_id}")
+
+            return dict(a.soft_skills or {})
+
+    def update_soft_skills(self, profile_id: str, soft_skills: Dict[str, int]) -> None:
+        """
+        Atualiza soft_skills de um perfil.
+        Similar a update_tech_skills mas atualiza soft_skills.
+        """
+        with Session(self.engine) as s:
+            # Tenta converter para UUID, se falhar usa string diretamente
+            try:
+                pid = uuid.UUID(profile_id)
+            except ValueError:
+                pid = profile_id
+
+            a = s.exec(select(Attributes).where(
+                Attributes.user_id == pid)).first()
+
+            if not a:
+                raise ValueError(
+                    f"Attributes não encontrados para profile_id: {profile_id}")
+
+            # Log antes da atualização
+            from backend.app.logging_config import get_logger
+            logger = get_logger(__name__)
+            logger.info(f"💾 Atualizando soft_skills no banco: {soft_skills}")
+
+            a.soft_skills = soft_skills
+            a.updated_at = datetime.utcnow()
+            s.add(a)
+            s.commit()
+            
+            logger.info(f"✅ Soft_skills atualizadas com sucesso no banco")
 
     # -------------- CHALLENGES --------------
     def create_challenges_for_profile(self, profile_id: str, challenges: List[dict]) -> List[dict]:
