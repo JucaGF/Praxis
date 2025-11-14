@@ -34,14 +34,14 @@ def get_submission_details(
 ):
     """
     Busca detalhes completos de uma submissão específica.
-    
+
     🔒 ENDPOINT PROTEGIDO - Requer autenticação
-    
+
     Retorna:
     - Dados da submissão
     - Challenge completo (descrição, requisitos, etc)
     - Feedback completo da IA (score, métricas, comentários)
-    
+
     ✅ Erros específicos:
     - 401: Token inválido ou ausente
     - 404: Submissão não encontrada
@@ -50,21 +50,23 @@ def get_submission_details(
     try:
         # Busca submissão
         submissions = service.repo.get_submissions_by_profile(current_user.id)
-        submission = next((s for s in submissions if s.id == submission_id), None)
-        
+        submission = next(
+            (s for s in submissions if s.id == submission_id), None)
+
         if not submission:
-            raise HTTPException(status_code=404, detail="Submissão não encontrada")
-        
+            raise HTTPException(
+                status_code=404, detail="Submissão não encontrada")
+
         # Verifica se pertence ao usuário
         if str(submission.profile_id) != str(current_user.id):
             raise HTTPException(status_code=403, detail="Acesso negado")
-        
+
         # Busca challenge
         challenge = service.repo.get_challenge(submission.challenge_id)
-        
+
         # Busca feedback
         feedback = service.repo.get_feedback_by_submission(submission.id)
-        
+
         return {
             "submission": {
                 "id": submission.id,
@@ -84,13 +86,14 @@ def get_submission_details(
                 "raw_ai_response": feedback.raw_ai_response if feedback else {}
             } if feedback else None
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.exception(
             "Erro ao buscar detalhes da submissão",
-            extra={"extra_data": {"submission_id": submission_id, "user_id": current_user.id}}
+            extra={"extra_data": {"submission_id": submission_id,
+                                  "user_id": current_user.id}}
         )
         raise HTTPException(status_code=500, detail="Erro ao buscar detalhes")
 
@@ -103,18 +106,18 @@ def get_my_submissions(
 ):
     """
     Busca todas as submissões do usuário autenticado.
-    
+
     🔒 ENDPOINT PROTEGIDO - Requer autenticação
-    
+
     Query params:
     - challenge_id (opcional): filtra submissões de um desafio específico
-    
+
     Retorna lista com todas as submissões do usuário logado,
     incluindo feedbacks e pontuações.
-    
+
     ✅ Erros específicos:
     - 401: Token inválido ou ausente
-    
+
     ⚡ OTIMIZADO: Usa uma única query com JOINs para evitar N+1 queries
     """
     try:
@@ -123,19 +126,20 @@ def get_my_submissions(
             profile_id=current_user.id,
             challenge_id=challenge_id
         )
-        
+
         # Formata resposta
         result = []
         for item in submissions_with_data:
             sub = item['submission']
             feedback = item.get('feedback')
             challenge = item.get('challenge')
-            
+
             # Extrai score do feedback (se existir)
             score = 0
             if feedback:
-                score = feedback.score if hasattr(feedback, 'score') and feedback.score is not None else 0
-            
+                score = feedback.score if hasattr(
+                    feedback, 'score') and feedback.score is not None else 0
+
             result.append({
                 "id": sub.id,
                 "challenge_id": sub.challenge_id,
@@ -143,12 +147,13 @@ def get_my_submissions(
                 "score": score,
                 "points": score,  # Points é o mesmo que score
                 "date": sub.submitted_at.strftime("%d/%m/%Y") if sub.submitted_at else "Data desconhecida",
+                "submitted_at": sub.submitted_at.isoformat() if sub.submitted_at else None,
                 "tags": challenge.get("category") if challenge else "",
                 "status": sub.status
             })
-        
+
         return result
-        
+
     except Exception as e:
         logger.exception(
             "Erro ao buscar submissões",
@@ -166,13 +171,13 @@ def create_and_score_submission(
 ):
     """
     Cria uma submissão e retorna avaliação completa.
-    
+
     🔒 ENDPOINT PROTEGIDO - Requer autenticação
-    
+
     ✅ Segurança:
     - profile_id é extraído do token (não do body)
     - Impossível enviar submissão em nome de outro usuário
-    
+
     Fluxo (executado pelo SERVICE):
     1. Valida que challenge existe
     2. Conta tentativas
@@ -181,7 +186,7 @@ def create_and_score_submission(
     5. Salva feedback
     6. Calcula e aplica progressão de skills
     7. Retorna resultado consolidado
-    
+
     ✅ Tratamento de erros específicos:
     - 401: Token inválido ou ausente
     - 404: Desafio não encontrado
@@ -190,31 +195,32 @@ def create_and_score_submission(
     try:
         # Converte Pydantic model para dict
         submission_data = body.model_dump()
-        
+
         # SEGURANÇA: Força profile_id do token (não confia no body!)
         # Antes: qualquer um podia enviar profile_id de outro usuário
         # Depois: sempre usa ID do token (Supabase garante autenticidade)
         submission_data['profile_id'] = current_user.id
-        
+
         # Delega TUDO para o service
         result = service.create_and_score_submission(submission_data)
-        
+
         return result
-        
+
     except PraxisError as e:
         # Todas as exceções customizadas caem aqui!
         # get_http_status_code() escolhe o status correto automaticamente
         status_code = get_http_status_code(e)
         raise HTTPException(status_code=status_code, detail=str(e))
-        
+
     except Exception as e:
         # Apenas erros INESPERADOS (bugs) caem aqui
         # Log completo com traceback para investigação
         logger.exception(
             "Erro inesperado ao processar submissão",
-            extra={"extra_data": {"profile_id": current_user.id, "challenge_id": body.challenge_id}}
+            extra={"extra_data": {"profile_id": current_user.id,
+                                  "challenge_id": body.challenge_id}}
         )
         raise HTTPException(
-            status_code=500, 
+            status_code=500,
             detail="Erro inesperado ao processar submissão. Por favor, tente novamente."
         )
