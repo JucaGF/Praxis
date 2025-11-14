@@ -103,8 +103,8 @@ function ChallengeHistoryItem({ id, title, score, points, date, tags }) {
         <div className="flex-1">
           <h4 className="font-semibold text-zinc-900">{title}</h4>
           <div className="flex items-center gap-3 text-xs text-zinc-500 mt-1">
-            <span>📅 {date}</span>
-            <span>📈 +{points} pontos</span>
+            <span> {date}</span>
+            <span> +{points} pontos</span>
           </div>
         </div>
         <div className="flex items-center gap-3">

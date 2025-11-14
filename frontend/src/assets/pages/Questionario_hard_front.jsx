@@ -27,7 +27,7 @@ export default function QuestionarioHardFront({ modoOnboarding = false, onConclu
     },
     "Estilização & UI (Código)": {
       tipo: "codigo",
-      opcoes: ["Tailwind CSS", "Styled Components", "Sass/SCSS", "Bootstrap"]
+      opcoes: ["Tailwind CSS", "Componentes estilizados", "Sass/SCSS", "Bootstrap"]
     },
     "Ferramentas de Build (Código)": {
       tipo: "codigo",
@@ -35,7 +35,7 @@ export default function QuestionarioHardFront({ modoOnboarding = false, onConclu
     },
     "Design & UX (Planejamento)": {
       tipo: "planejamento",
-      opcoes: ["Design Responsivo", "Acessibilidade (a11y)", "UI/UX Principles", "Figma/Design Tools"]
+      opcoes: ["Design Responsivo", "Acessibilidade (a11y)", "Princípios de UI/UX", "Figma/Design Tools"]
     },
     "Performance & Otimização (Planejamento)": {
       tipo: "planejamento",
@@ -47,7 +47,7 @@ export default function QuestionarioHardFront({ modoOnboarding = false, onConclu
     },
     "Documentação & Comunicação (Comunicação)": {
       tipo: "comunicacao",
-      opcoes: ["Documentação de Componentes", "Storybook", "Technical Writing"]
+      opcoes: ["Documentação de Componentes", "Storybook", "Escrita técnica"]
     }
   };
 
