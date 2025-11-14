@@ -1,9 +1,9 @@
 // src/components/challenges/ChallengeCardHome.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useChallengeTimer, ChallengeStatus } from '../../hooks/useChallengeTimer';
 import { Difficulty, Meta, Skill, Card } from '../ui';
-import { fetchChallengeResult } from '../../lib/api';
+import { fetchChallengeResult, fetchSubmissionDetails } from '../../lib/api';
 
 // Ícone baseado na categoria
 function getChallengeIcon(category) {
@@ -26,6 +26,7 @@ function getChallengeCategoryName(category) {
 }
 
 export default function ChallengeCardHome({ challenge, expanded, onToggle }) {
+  const navigate = useNavigate();
   const { 
     status: timerStatus, 
     formattedTime, 
@@ -43,6 +44,7 @@ export default function ChallengeCardHome({ challenge, expanded, onToggle }) {
 
   const [result, setResult] = useState(null);
   const [loadingResult, setLoadingResult] = useState(false);
+  const [loadingViewResult, setLoadingViewResult] = useState(false);
 
   // Buscar resultado do banco quando o desafio estiver completado
   // Usa useRef para evitar múltiplas requisições
@@ -104,6 +106,48 @@ export default function ChallengeCardHome({ challenge, expanded, onToggle }) {
     resetChallenge();
     startChallenge();
     // Navegação será tratada pelo Link
+  };
+
+  const handleViewResult = async (e) => {
+    e.stopPropagation();
+    
+    setLoadingViewResult(true);
+    
+    try {
+      // Buscar submissões do desafio
+      const submissions = await fetchChallengeResult(challenge.id);
+      
+      if (submissions && submissions.length > 0) {
+        // Pegar a última submissão (mais recente)
+        const latestSubmission = submissions[0];
+        
+        // Buscar detalhes completos da submissão (com feedback)
+        const details = await fetchSubmissionDetails(latestSubmission.id);
+        
+        // Navegar para a página de resultado com os dados completos
+        navigate('/challenge-result', {
+          state: {
+            result: {
+              submission_id: details.submission.id,
+              score: details.feedback?.score || 0,
+              feedback: details.feedback?.feedback || 'Sem feedback disponível',
+              metrics: details.feedback?.metrics || {},
+              skills_progression: details.feedback?.raw_ai_response?.skills_progression,
+              status: details.submission.status
+            },
+            challenge: details.challenge,
+            timeTaken: details.submission.time_taken_sec
+          }
+        });
+      } else {
+        alert('Nenhuma submissão encontrada para este desafio.');
+      }
+    } catch (error) {
+      console.error('Erro ao buscar resultado:', error);
+      alert('Erro ao carregar resultado. Tente novamente.');
+    } finally {
+      setLoadingViewResult(false);
+    }
   };
 
   // Status badge
@@ -284,11 +328,13 @@ export default function ChallengeCardHome({ challenge, expanded, onToggle }) {
             )}
 
             {isCompleted && (
-              <Link to={`/desafio/${challenge.id}`} onClick={(e) => e.stopPropagation()}>
-                <button className="rounded-lg px-4 py-2.5 text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition cursor-pointer">
-                  Ver resultado
-                </button>
-              </Link>
+              <button 
+                onClick={handleViewResult}
+                disabled={loadingViewResult}
+                className="rounded-lg px-4 py-2.5 text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loadingViewResult ? 'Carregando...' : 'Ver resultado'}
+              </button>
             )}
 
             <button

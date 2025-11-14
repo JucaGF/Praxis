@@ -1,31 +1,57 @@
 # Git
-.git/
+.git
 .gitignore
-.gitattributes
 
-# Docker
-.dockerignore
-Dockerfile
-docker-compose*.yml
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
 
-# Documentation
-*.md
-docs/
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDEs
+.vscode
+.idea
+*.swp
+*.swo
+
+# Logs
+*.log
+backend.log
 
 # Environment
 .env
-.env.*
+.env.local
+.env.*.local
 
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
+# Frontend (não precisa no backend)
+frontend/
+node_modules/
+
+# Docker
+docker-compose.yml
+Dockerfile.dev
+*.dockerfile
+
+# Documentation
+*.md
+!README.md
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
-
+# Railway
+railway.json
+Procfile
+nixpacks.toml
