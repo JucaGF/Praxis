@@ -269,7 +269,13 @@ REGRAS OBRIGATÓRIAS:
    - Use nomes objetivos de habilidades (substantivos)
 4. eval_criteria: Array com 3-4 habilidades que serão avaliadas
    - Use nomes objetivos (ex: "Python", "FastAPI", "Comunicação", "Resolução de problemas")
-5. ⚠️ DIFICULDADE DOS DESAFIOS (REGRA CRÍTICA):
+5. ⚠️ TIPOS DE DESAFIOS (REGRA CRÍTICA):
+   - Gere EXATAMENTE 1 desafio de cada tipo: 1 code, 1 daily-task, 1 organization
+   - ❌ PROIBIDO: 2 code + 1 organization (falta daily-task)
+   - ❌ PROIBIDO: 3 code (falta daily-task e organization)
+   - ❌ PROIBIDO: 2 daily-task + 1 code (falta organization)
+   - ✅ OBRIGATÓRIO: Sempre 1 code + 1 daily-task + 1 organization
+6. ⚠️ DIFICULDADE DOS DESAFIOS (REGRA CRÍTICA):
    - Gere exatamente 1 desafio EASY, 1 MEDIUM e 1 HARD
    - ❌ PROIBIDO: organization=hard, daily-task=medium, code=easy (padrão fixo)
    - ✅ OBRIGATÓRIO: Varie a distribuição a cada geração
@@ -279,9 +285,9 @@ REGRAS OBRIGATÓRIAS:
      * daily-task=medium, organization=easy, code=hard
      * code=easy, organization=hard, daily-task=medium
    - Se você gerar organization=hard, daily-task=medium, code=easy, a resposta será REJEITADA
-6. description.text: Tom conversacional (chefe falando)
-7. SEMPRE adicione 2-4 hints úteis e práticas
-8. Para type="codigo" → category="code":
+7. description.text: Tom conversacional (chefe falando)
+8. SEMPRE adicione 2-4 hints úteis e práticas
+9. Para type="codigo" → category="code":
    - fs é OBRIGATÓRIO (não null!)
    - fs.files: 2-4 caminhos realistas
    - fs.open: arquivo principal
@@ -289,12 +295,12 @@ REGRAS OBRIGATÓRIAS:
    - Código deve ser bugado, incompleto ou precisar refatoração
    - enunciado: null
    - template_code: null
-9. Para type="texto_livre" → category="daily-task":
+10. Para type="texto_livre" → category="daily-task":
    - fs: null
    - enunciado: OBRIGATÓRIO - simule um e-mail/ticket realista
      Formato: {"type": "email", "de": "nome@empresa.com", "assunto": "assunto do email", "data": "2024-11-15", "corpo": "texto do email (3-5 linhas)"}
    - template_code: null
-10. Para type="planejamento" → category="organization":
+11. Para type="planejamento" → category="organization":
    - fs: null
    - enunciado: OBRIGATÓRIO - requisitos estruturados
      Formato: {"type": "requisitos", "funcionais": ["req1", "req2", "req3"], "nao_funcionais": ["req1", "req2"]}

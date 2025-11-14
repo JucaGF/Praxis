@@ -639,6 +639,17 @@ export default function Home() {
     }
   };
 
+  // Função unificada para enviar currículo (arquivo ou texto)
+  const handleResumeSubmit = async () => {
+    if (uploadType === "file") {
+      await handleUploadResumeFile();
+    } else {
+      await handleUploadResume();
+    }
+    // Fecha o card após enviar
+    setExpandedUploadCard(false);
+  };
+
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
@@ -1585,28 +1596,32 @@ export default function Home() {
                       </div>
                     )}
 
-                    {/* Botão Fechar (estilo dos desafios) */}
-                    <div className="mt-5 flex justify-end">
+                    {/* Botões de ação */}
+                    <div className="mt-5 flex justify-end gap-3">
                       <button
-                        onClick={(e) => { e.stopPropagation(); setExpandedUploadCard(false); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedUploadCard(false);
+                        }}
                         className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50 cursor-pointer"
                       >
                         Fechar
                       </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleResumeSubmit();
+                        }}
+                        disabled={
+                          uploadType === "file"
+                            ? !selectedFile
+                            : !resumeContent.trim()
+                        }
+                        className="rounded-lg px-4 py-2.5 text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 disabled:bg-zinc-300 disabled:cursor-not-allowed cursor-pointer"
+                      >
+                        Enviar
+                      </button>
                     </div>
-                  </div>
-
-                  {/* Botão Fechar (estilo dos desafios) */}
-                  <div className="mt-5 flex justify-end">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setExpandedUploadCard(false);
-                      }}
-                      className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50"
-                    >
-                      Fechar
-                    </button>
                   </div>
                 </div>
               )}
