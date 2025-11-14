@@ -4,14 +4,14 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import PraxisLogo from "../components/PraxisLogo";
 
-const LinkedInIcon = () => (
+const GitHubIcon = () => (
   <svg
     className="w-5 h-5 mr-2"
     viewBox="0 0 24 24"
     fill="currentColor"
     xmlns="http://www.w3.org/2000/svg"
   >
-    <path d="M4.98 3.5c0 1.381-1.11 2.5-2.489 2.5C1.11 6 0 4.881 0 3.5S1.11 1 2.491 1C3.869 1 4.98 2.119 4.98 3.5zm-2.5 5.5H5v14H2.48v-14zM8.254 8h5.084v2.18h.073c.712-1.34 2.457-2.18 4.93-2.18 5.27 0 6.24 3.46 6.24 7.96v9.04h-5.08V16.7c0-1.85-.353-3.12-1.996-3.12-1.638 0-1.87 1.25-1.87 3.09v6.33H8.254V8z" />
+    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
   </svg>
 );
 
@@ -22,10 +22,25 @@ export default function Cadastro() {
     email: "",
     senha: "",
   });
-  
+
   const [cadastroRealizado, setCadastroRealizado] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const handleGitHubLogin = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "github",
+        options: {
+          redirectTo: `${window.location.origin}/github-callback`,
+        },
+      });
+
+      if (error) throw error;
+    } catch (err) {
+      setError(`Erro ao conectar com GitHub: ${err.message}`);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -60,15 +75,15 @@ export default function Cadastro() {
   const reenviarEmail = async () => {
     setLoading(true);
     setError("");
-    
+
     try {
       const { error } = await supabase.auth.resend({
-        type: 'signup',
+        type: "signup",
         email: formData.email,
       });
-      
+
       if (error) throw error;
-      
+
       alert("Email de confirmação reenviado! Verifique sua caixa de entrada.");
     } catch (err) {
       setError(`Erro ao reenviar email: ${err.message}`);
@@ -83,15 +98,28 @@ export default function Cadastro() {
       return (
         <div className="text-center">
           <div className="mb-6">
-            <svg className="w-16 h-16 text-green-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="w-16 h-16 text-green-500 mx-auto"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Cadastro realizado!</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Cadastro realizado!
+          </h2>
           <p className="text-gray-600 mb-6">
-            Verifique seu e-mail ({formData.email}) para confirmar sua conta e fazer login.
+            Verifique seu e-mail ({formData.email}) para confirmar sua conta e
+            fazer login.
           </p>
-          
+
           <div className="space-y-3">
             <Link
               to="/login"
@@ -99,13 +127,15 @@ export default function Cadastro() {
             >
               Ir para Login
             </Link>
-            
+
             <button
               onClick={reenviarEmail}
               disabled={loading}
               className="text-sm text-gray-600 hover:text-gray-900 underline cursor-pointer disabled:opacity-50"
             >
-              {loading ? "Reenviando..." : "Não recebeu o email? Clique para reenviar"}
+              {loading
+                ? "Reenviando..."
+                : "Não recebeu o email? Clique para reenviar"}
             </button>
           </div>
         </div>
@@ -127,10 +157,11 @@ export default function Cadastro() {
         <div className="mb-6">
           <button
             type="button"
-            className="w-full flex items-center justify-center py-3 px-4 rounded-lg shadow-sm text-base font-semibold text-white transition duration-150 ease-in-out bg-blue-600 hover:bg-blue-700"
+            onClick={handleGitHubLogin}
+            className="w-full flex items-center justify-center py-3 px-4 rounded-lg shadow-sm text-base font-semibold text-white transition duration-150 ease-in-out bg-gray-800 hover:bg-gray-900 cursor-pointer"
           >
-            <LinkedInIcon />
-            Conecte-se com o LinkedIn
+            <GitHubIcon />
+            Conecte-se com o GitHub
           </button>
         </div>
 
@@ -142,7 +173,10 @@ export default function Cadastro() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="nome" className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="nome"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
               Nome Completo
             </label>
             <input
@@ -151,7 +185,9 @@ export default function Cadastro() {
               type="text"
               required
               value={formData.nome}
-              onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, nome: e.target.value })
+              }
               className="block w-full px-4 py-3 border border-gray-300 bg-white rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-500 text-sm transition duration-150"
               placeholder="Seu nome completo"
               disabled={loading}
@@ -159,7 +195,10 @@ export default function Cadastro() {
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
               E-mail
             </label>
             <input
@@ -168,7 +207,9 @@ export default function Cadastro() {
               type="email"
               required
               value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, email: e.target.value })
+              }
               className="block w-full px-4 py-3 border border-gray-300 bg-white rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-500 text-sm transition duration-150"
               placeholder="seu@email.com"
               disabled={loading}
@@ -176,7 +217,10 @@ export default function Cadastro() {
           </div>
 
           <div>
-            <label htmlFor="senha" className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="senha"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
               Senha
             </label>
             <input
@@ -185,7 +229,9 @@ export default function Cadastro() {
               type="password"
               required
               value={formData.senha}
-              onChange={(e) => setFormData({ ...formData, senha: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, senha: e.target.value })
+              }
               className="block w-full px-4 py-3 border border-gray-300 bg-white rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-500 text-sm transition duration-150"
               placeholder="Mínimo 6 caracteres"
               disabled={loading}
@@ -194,7 +240,10 @@ export default function Cadastro() {
           </div>
 
           {error && (
-            <div className="bg-red-50 border-l-4 border-red-400 text-red-700 p-4 text-sm rounded-lg" role="alert">
+            <div
+              className="bg-red-50 border-l-4 border-red-400 text-red-700 p-4 text-sm rounded-lg"
+              role="alert"
+            >
               <p className="font-medium">{error}</p>
             </div>
           )}
@@ -216,7 +265,10 @@ export default function Cadastro() {
           <div className="mt-6 text-center">
             <p className="text-xs text-gray-600">
               Já possui uma conta?{" "}
-              <Link to="/login" className="font-semibold text-yellow-600 hover:text-yellow-700">
+              <Link
+                to="/login"
+                className="font-semibold text-yellow-600 hover:text-yellow-700"
+              >
                 Entrar agora
               </Link>
             </p>
@@ -235,12 +287,22 @@ export default function Cadastro() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-white font-sans relative overflow-hidden">
       {/* Botão Voltar */}
-      <Link 
-        to="/" 
+      <Link
+        to="/"
         className="absolute top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 transition cursor-pointer"
       >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M10 19l-7-7m0 0l7-7m-7 7h18"
+          />
         </svg>
         Voltar
       </Link>
@@ -302,11 +364,57 @@ export default function Cadastro() {
       })}
 
       {/* FORMAS GEOMÉTRICAS PEQUENAS */}
-      <div className="absolute rounded-full bg-yellow-500/70 float-slow z-20" style={{ top: "8%", left: "8%", width: "24px", height: "24px", animationDelay: "1s" }} />
-      <div className="absolute rounded-lg bg-yellow-600/60 float-slow z-20 rotate-6" style={{ bottom: "20%", left: "24%", width: "20px", height: "20px", animationDelay: "2s" }} />
-      <div className="absolute rounded-full bg-amber-500/70 float-slow z-20 -rotate-3" style={{ top: "12%", right: "12%", width: "16px", height: "16px", animationDelay: "3s" }} />
-      <div className="absolute rounded-lg bg-yellow-400/80 float-slow z-20 rotate-8" style={{ top: "32%", right: "32%", width: "24px", height: "24px", animationDelay: "4s" }} />
-      <div className="absolute rounded-full bg-yellow-500/70 float-slow z-20" style={{ bottom: "32%", left: "50%", transform: "translateX(-50%)", width: "20px", height: "20px", animationDelay: "5s" }} />
+      <div
+        className="absolute rounded-full bg-yellow-500/70 float-slow z-20"
+        style={{
+          top: "8%",
+          left: "8%",
+          width: "24px",
+          height: "24px",
+          animationDelay: "1s",
+        }}
+      />
+      <div
+        className="absolute rounded-lg bg-yellow-600/60 float-slow z-20 rotate-6"
+        style={{
+          bottom: "20%",
+          left: "24%",
+          width: "20px",
+          height: "20px",
+          animationDelay: "2s",
+        }}
+      />
+      <div
+        className="absolute rounded-full bg-amber-500/70 float-slow z-20 -rotate-3"
+        style={{
+          top: "12%",
+          right: "12%",
+          width: "16px",
+          height: "16px",
+          animationDelay: "3s",
+        }}
+      />
+      <div
+        className="absolute rounded-lg bg-yellow-400/80 float-slow z-20 rotate-8"
+        style={{
+          top: "32%",
+          right: "32%",
+          width: "24px",
+          height: "24px",
+          animationDelay: "4s",
+        }}
+      />
+      <div
+        className="absolute rounded-full bg-yellow-500/70 float-slow z-20"
+        style={{
+          bottom: "32%",
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "20px",
+          height: "20px",
+          animationDelay: "5s",
+        }}
+      />
 
       {/* CONTEÚDO PRINCIPAL */}
       <div className="w-full max-w-7xl mx-6 lg:mx-12 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center relative z-30">
@@ -328,7 +436,8 @@ export default function Cadastro() {
                 PARA O FUTURO
               </h3>
               <p className="text-sm text-gray-600 max-w-xs ml-auto leading-relaxed">
-                Desenvolva suas habilidades profissionais com desafios práticos e feedback personalizado
+                Desenvolva suas habilidades profissionais com desafios práticos
+                e feedback personalizado
               </p>
             </div>
           </div>
