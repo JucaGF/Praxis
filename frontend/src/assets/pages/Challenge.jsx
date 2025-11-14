@@ -31,6 +31,8 @@ export default function Challenge() {
           challengeId: id,
           category: data.category,
           difficulty: data.difficulty?.level,
+          description: data.description,
+          affectedSkills: data.description?.affected_skills,
         });
         
         setChallenge(data);

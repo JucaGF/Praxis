@@ -402,8 +402,8 @@ export default function CodeChallenge({ challenge }) {
             <div>
               <h3 className="text-sm font-semibold text-white mb-2">Habilidades Aprimoradas</h3>
               <div className="flex flex-wrap gap-2">
-                {['React', 'JavaScript', 'Debugging', 'Problem Solving'].map(skill => (
-                  <span key={skill} className="px-2 py-1 text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded">
+                {(challenge.description?.affected_skills || []).map((skill, idx) => (
+                  <span key={`${skill}-${idx}`} className="px-2 py-1 text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded">
                     {skill}
                   </span>
                 ))}

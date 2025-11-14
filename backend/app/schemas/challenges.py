@@ -44,6 +44,7 @@ class Description(BaseModel):
     language: Optional[str] = None
     eval_criteria: List[str] = Field(default_factory=list)
     target_skill: Optional[str] = None
+    affected_skills: List[str] = Field(default_factory=list)
     hints: List[str] = Field(default_factory=list)
     # Novo campo: contexto estruturado para novos layouts
     enunciado: Optional[Dict[str, Any]] = None
