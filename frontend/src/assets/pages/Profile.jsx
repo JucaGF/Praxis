@@ -118,8 +118,8 @@ function ChallengeHistoryItem({ id, title, score, points, date, tags }) {
         <div className="flex-1">
           <h4 className="font-semibold text-zinc-900">{title}</h4>
           <div className="flex items-center gap-3 text-xs text-zinc-500 mt-1">
-            <span>📅 {date}</span>
-            <span>📈 +{points} pontos</span>
+            <span> {date}</span>
+            <span> +{points} pontos</span>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -1045,15 +1045,11 @@ export default function Profile() {
                                 e.stopPropagation();
                                 setExpandedMyResumesCard(false);
                               }}
-                              className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50"
+                              className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50 cursor-pointer"
                             >
                               Fechar
                             </button>
                           </div>
-                        )}
-
-                        <div className="mt-4 flex justify-end">
-                          <button onClick={(e) => { e.stopPropagation(); setExpandedMyResumesCard(false); }} className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50 cursor-pointer">Fechar</button>
                         </div>
                       )}
                     </Card>
@@ -1064,230 +1060,6 @@ export default function Profile() {
           </>
         )}
       </main>
-
-      {/* Modal de Análise de Currículo - Centralizado com Blur */}
-      {showAnalysisModal && resumeAnalysis && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          {/* Card centralizado */}
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto my-8">
-            {/* Header */}
-            <div className="sticky top-0 bg-white border-b border-zinc-200 px-6 py-4 rounded-t-2xl z-10">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-zinc-900">
-                    Análise do Currículo
-                  </h2>
-                  <p className="text-sm text-zinc-600 mt-1">
-                    Análise gerada pela Praxis com base na sua trilha
-                  </p>
-                </div>
-                <button
-                  onClick={handleCloseAnalysis}
-                  className="px-4 py-2 text-sm font-medium text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-colors"
-                >
-                  ✕ Fechar
-                </button>
-              </div>
-            </div>
-
-            {/* Conteúdo da Análise */}
-            <div className="px-6 py-6">
-              {/* Nota Geral - Destaque */}
-              <div className="bg-gradient-to-br from-primary-50 to-primary-100 rounded-2xl p-6 mb-6 border-2 border-primary-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-zinc-900 mb-1">
-                      Nota Geral
-                    </h3>
-                    <p className="text-sm text-zinc-600">
-                      Avaliação geral do seu currículo
-                    </p>
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-5xl font-bold text-primary-600">
-                      {resumeAnalysis.nota_geral ||
-                        resumeAnalysis.full_report?.nota_geral ||
-                        "N/A"}
-                    </span>
-                    <span className="text-2xl text-zinc-500">/100</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Seções da Análise */}
-              {(resumeAnalysis.resumo_executivo ||
-                resumeAnalysis.full_report) && (
-                <div className="space-y-5">
-                  {/* Resumo Executivo */}
-                  {(resumeAnalysis.resumo_executivo ||
-                    resumeAnalysis.full_report?.resumo_executivo) && (
-                    <div className="bg-primary-50 border border-primary-200 rounded-xl p-5">
-                      <h4 className="font-semibold text-zinc-900 mb-3 flex items-center gap-2">
-                        <span className="text-xl">📋</span>
-                        <span>Resumo Executivo</span>
-                      </h4>
-                      <p className="text-sm text-zinc-700 leading-relaxed">
-                        {resumeAnalysis.resumo_executivo ||
-                          resumeAnalysis.full_report?.resumo_executivo}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Pontos Fortes */}
-                  {((resumeAnalysis.pontos_fortes &&
-                    resumeAnalysis.pontos_fortes.length > 0) ||
-                    (resumeAnalysis.full_report?.pontos_fortes &&
-                      resumeAnalysis.full_report.pontos_fortes.length > 0)) && (
-                    <div className="bg-white rounded-xl p-5 border border-zinc-200 shadow-sm">
-                      <h4 className="font-semibold text-emerald-800 mb-3 flex items-center gap-2">
-                        <span className="text-xl">✓</span>
-                        <span>Pontos Fortes</span>
-                      </h4>
-                      <ul className="space-y-2">
-                        {(
-                          resumeAnalysis.pontos_fortes ||
-                          resumeAnalysis.full_report?.pontos_fortes ||
-                          []
-                        ).map((ponto, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <span className="text-emerald-600 mt-1 flex-shrink-0">
-                              ●
-                            </span>
-                            <span className="text-sm text-zinc-700">
-                              {ponto}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Gaps Técnicos */}
-                  {((resumeAnalysis.gaps_tecnicos &&
-                    resumeAnalysis.gaps_tecnicos.length > 0) ||
-                    (resumeAnalysis.full_report?.gaps_tecnicos &&
-                      resumeAnalysis.full_report.gaps_tecnicos.length > 0)) && (
-                    <div className="bg-white rounded-xl p-5 border border-zinc-200 shadow-sm">
-                      <h4 className="font-semibold text-orange-800 mb-3 flex items-center gap-2">
-                        <span className="text-xl">⚠</span>
-                        <span>Habilidades Faltantes</span>
-                      </h4>
-                      <ul className="space-y-2">
-                        {(
-                          resumeAnalysis.gaps_tecnicos ||
-                          resumeAnalysis.full_report?.gaps_tecnicos ||
-                          []
-                        ).map((gap, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <span className="text-orange-600 mt-1 flex-shrink-0">
-                              ●
-                            </span>
-                            <span className="text-sm text-zinc-700">{gap}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Sugestões de Melhoria */}
-                  {((resumeAnalysis.sugestoes_melhoria &&
-                    resumeAnalysis.sugestoes_melhoria.length > 0) ||
-                    (resumeAnalysis.full_report?.sugestoes_melhoria &&
-                      resumeAnalysis.full_report.sugestoes_melhoria.length >
-                        0)) && (
-                    <div className="bg-white rounded-xl p-5 border border-zinc-200 shadow-sm">
-                      <h4 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
-                        <span className="text-xl">💡</span>
-                        <span>Sugestões de Melhoria</span>
-                      </h4>
-                      <ul className="space-y-2">
-                        {(
-                          resumeAnalysis.sugestoes_melhoria ||
-                          resumeAnalysis.full_report?.sugestoes_melhoria ||
-                          []
-                        ).map((sugestao, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <span className="text-blue-600 mt-1 flex-shrink-0">
-                              ●
-                            </span>
-                            <span className="text-sm text-zinc-700">
-                              {sugestao}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Habilidades Evidenciadas */}
-                  {(resumeAnalysis.habilidades_evidenciadas ||
-                    resumeAnalysis.full_report?.habilidades_evidenciadas) && (
-                    <div className="bg-white rounded-xl p-5 border border-zinc-200 shadow-sm">
-                      <h4 className="font-semibold text-zinc-900 mb-3 flex items-center gap-2">
-                        <span className="text-xl">📊</span>
-                        <span>Habilidades Evidenciadas</span>
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {Object.entries(
-                          resumeAnalysis.habilidades_evidenciadas ||
-                            resumeAnalysis.full_report
-                              ?.habilidades_evidenciadas ||
-                            {}
-                        ).map(([skill, level]) => (
-                          <div
-                            key={skill}
-                            className="bg-zinc-50 rounded-lg p-3 border border-zinc-200"
-                          >
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="text-sm font-medium text-zinc-700">
-                                {skill}
-                              </span>
-                              <span className="text-xs font-semibold text-zinc-600">
-                                {level}/100
-                              </span>
-                            </div>
-                            <div className="w-full bg-zinc-200 rounded-full h-2">
-                              <div
-                                className="bg-primary-500 h-2 rounded-full transition-all duration-500"
-                                style={{ width: `${level}%` }}
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Próximos Passos */}
-                  {((resumeAnalysis.proximos_passos &&
-                    resumeAnalysis.proximos_passos.length > 0) ||
-                    (resumeAnalysis.full_report?.proximos_passos &&
-                      resumeAnalysis.full_report.proximos_passos.length >
-                        0)) && (
-                    <div className="bg-gradient-to-r from-primary-50 to-emerald-50 border-2 border-primary-200 rounded-xl p-5">
-                      <h4 className="font-semibold text-zinc-900 mb-3 flex items-center gap-2">
-                        <span className="text-xl">🎯</span>
-                        <span>Próximos Passos</span>
-                      </h4>
-                      <ol className="space-y-2 list-decimal list-inside">
-                        {(
-                          resumeAnalysis.proximos_passos ||
-                          resumeAnalysis.full_report?.proximos_passos ||
-                          []
-                        ).map((passo, idx) => (
-                          <li key={idx} className="text-sm text-zinc-700 ml-2">
-                            {passo}
-                          </li>
-                        ))}
-                      </ol>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal de Análise de Currículo - Centralizado com Blur */}
       {showAnalysisModal && resumeAnalysis && (
