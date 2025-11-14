@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import TelaSaudacaoQuestionario from "../components/TelaSaudacaoQuestionario";
+import PraxisLogo from "../components/PraxisLogo";
 
 export default function QuestionarioHardFullstack({ modoOnboarding = false, onConcluir = null, onVoltar: onVoltarProp = null }) {
   const navigate = useNavigate();
@@ -259,7 +260,7 @@ export default function QuestionarioHardFullstack({ modoOnboarding = false, onCo
 
           <div className="animate-fade-in opacity-0 [animation-fill-mode:forwards]">
             <div className="flex items-center gap-3 mb-4">
-              <img src="/Logo.png" alt="Praxis" className="w-12 h-12 md:w-16 md:h-16" />
+              <PraxisLogo className="h-12 md:h-16" />
               <div className="text-left flex-1">
                 {etapa === "selecao" ? (
                   <>

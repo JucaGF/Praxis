@@ -1,4 +1,5 @@
 import React from "react";
+import PraxisLogo from "./PraxisLogo";
 
 /**
  * Componente de tela de boas-vindas para questionários
@@ -60,7 +61,9 @@ export default function TelaSaudacaoQuestionario({ titulo, descricao, onComecar,
           </button>
         )}
 
-        <img src="/Logo.png" alt="Praxis" className="w-32 h-32 md:w-40 md:h-40 mb-4 md:mb-6" />
+        <div className="mb-6 flex justify-center">
+          <PraxisLogo className="h-20 md:h-24" />
+        </div>
         
         <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 mb-3 md:mb-4 px-4">
           {titulo}

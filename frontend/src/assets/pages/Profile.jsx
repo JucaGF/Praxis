@@ -347,26 +347,6 @@ function StatCard({ value, label }) {
   );
 }
 
-const evolutionData = {
-  labels: ["Jun", "Jul", "Ago", "Set", "Out"],
-  datasets: [
-    {
-      label: "Pontuação",
-      data: [50, 58, 65, 68, 72],
-      borderColor: "#eab308", // primary-500
-      backgroundColor: "#eab308",
-      tension: 0.1,
-    },
-    {
-      label: "Atividades",
-      data: [10, 15, 18, 20, 25],
-      borderColor: "#10b981", // emerald-500
-      backgroundColor: "#10b981",
-      tension: 0.1,
-    },
-  ],
-};
-
 const evolutionOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -408,6 +388,101 @@ export default function Profile() {
   const [deleteError, setDeleteError] = useState("");
   const [resumeAnalysis, setResumeAnalysis] = useState(null);
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+
+  // Calcular dados de evolução baseado nas submissões reais
+  const evolutionData = React.useMemo(() => {
+    if (!submissions || submissions.length === 0) {
+      // Sem dados - gráfico zerado
+      return {
+        labels: ["Início"],
+        datasets: [
+          {
+            label: "Pontuação",
+            data: [0],
+            borderColor: "#eab308",
+            backgroundColor: "#eab308",
+            tension: 0.1,
+          },
+          {
+            label: "Atividades",
+            data: [0],
+            borderColor: "#10b981",
+            backgroundColor: "#10b981",
+            tension: 0.1,
+          },
+        ],
+      };
+    }
+
+    // Ordenar submissões por data (mais antigas primeiro)
+    const sortedSubmissions = [...submissions].sort((a, b) => 
+      new Date(a.submitted_at || a.date) - new Date(b.submitted_at || b.date)
+    );
+
+    // Agrupar por mês
+    const monthlyData = {};
+    sortedSubmissions.forEach((sub) => {
+      const date = new Date(sub.submitted_at || sub.date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const monthLabel = date.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+      
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = {
+          label: monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1),
+          scores: [],
+          count: 0,
+        };
+      }
+      
+      monthlyData[monthKey].scores.push(sub.score || 0);
+      monthlyData[monthKey].count += 1;
+    });
+
+    // Converter para arrays para o gráfico (último mês apenas)
+    const months = Object.keys(monthlyData).sort().slice(-1);
+    const labels = months.map(key => monthlyData[key].label);
+    const scores = months.map(key => {
+      const avg = monthlyData[key].scores.reduce((sum, s) => sum + s, 0) / monthlyData[key].scores.length;
+      return Math.round(avg);
+    });
+    const activities = months.map(key => monthlyData[key].count);
+
+    return {
+      labels: labels.length > 0 ? labels : ["Início"],
+      datasets: [
+        {
+          label: "Pontuação",
+          data: scores.length > 0 ? scores : [0],
+          borderColor: "#eab308",
+          backgroundColor: "#eab308",
+          tension: 0.1,
+        },
+        {
+          label: "Atividades",
+          data: activities.length > 0 ? activities : [0],
+          borderColor: "#10b981",
+          backgroundColor: "#10b981",
+          tension: 0.1,
+        },
+      ],
+    };
+  }, [submissions]);
+
+  // Calcular crescimento percentual
+  const growthPercentage = React.useMemo(() => {
+    if (!submissions || submissions.length < 2) return 0;
+    
+    const sortedSubmissions = [...submissions].sort((a, b) => 
+      new Date(a.submitted_at || a.date) - new Date(b.submitted_at || b.date)
+    );
+    
+    const firstScore = sortedSubmissions[0]?.score || 0;
+    const lastScore = sortedSubmissions[sortedSubmissions.length - 1]?.score || 0;
+    
+    if (firstScore === 0) return 0;
+    
+    return Math.round(((lastScore - firstScore) / firstScore) * 100);
+  }, [submissions]);
 
   // Scroll para seção de histórico se houver hash na URL
   useEffect(() => {
@@ -847,7 +922,17 @@ export default function Profile() {
                     }
                     label="Habilidades Rastreadas"
                   />
-                  <StatCard value="90" label="Score Médio" />
+                  <StatCard 
+                    value={
+                      submissions && submissions.length > 0
+                        ? Math.round(
+                            submissions.reduce((sum, sub) => sum + (sub.score || 0), 0) / 
+                            submissions.length
+                          )
+                        : 0
+                    }
+                    label="Score Médio" 
+                  />
                 </div>
 
                 {/* Seção de Exclusão de Conta */}
@@ -875,20 +960,32 @@ export default function Profile() {
               <div className="space-y-8">
                 <Section
                   title="Evolução da Pontuação"
-                  subtitle="Seu progresso nos últimos 5 meses"
+                  subtitle="Seu progresso no último mês"
                 >
                   <div className="h-64">
                     <Line options={evolutionOptions} data={evolutionData} />
                   </div>
-                  <div className="mt-4 text-center p-3 rounded-lg bg-emerald-50 border border-emerald-200">
-                    <p className="font-semibold text-emerald-700">
-                      📈 Crescimento de +44% em 5 meses!
-                    </p>
-                    <p className="text-sm text-zinc-600">
-                      Você está no caminho certo. Continue praticando
-                      regularmente.
-                    </p>
-                  </div>
+                  {submissions && submissions.length > 0 ? (
+                    <div className="mt-4 text-center p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+                      <p className="font-semibold text-emerald-700">
+                        📈 {growthPercentage > 0 ? `Crescimento de +${growthPercentage}%` : growthPercentage < 0 ? `Queda de ${growthPercentage}%` : 'Mantenha o ritmo'}!
+                      </p>
+                      <p className="text-sm text-zinc-600">
+                        {growthPercentage > 0 
+                          ? 'Você está no caminho certo. Continue praticando regularmente.'
+                          : 'Continue se dedicando aos desafios para melhorar sua pontuação.'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-4 text-center p-3 rounded-lg bg-zinc-50 border border-zinc-200">
+                      <p className="font-semibold text-zinc-700">
+                        🎯 Comece sua jornada!
+                      </p>
+                      <p className="text-sm text-zinc-600">
+                        Complete desafios para ver sua evolução aqui.
+                      </p>
+                    </div>
+                  )}
                 </Section>
 
                 {/* Nova área: Meus Currículos (movido da Home) */}

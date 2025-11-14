@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { updateAttributes } from "../lib/api";
+import PraxisLogo from "../components/PraxisLogo";
 
 export default function Onboarding() {
   const navigate = useNavigate();
@@ -199,11 +200,12 @@ function EscolhaTrilha({ onSelecionarTrilha }) {
           />
         );
       })}
-
       <div className="relative z-10 w-full max-w-2xl mx-6">
         <div className="bg-white/95 backdrop-blur-sm shadow-2xl rounded-2xl border border-gray-200 p-8">
           <div className="text-center mb-8">
-            <img src="/Logo.png" alt="Praxis" className="w-20 h-20 mx-auto mb-4" />
+            <div className="flex justify-center mb-4">
+              <PraxisLogo className="h-20" />
+            </div>
             <h2 className="text-3xl font-bold text-gray-900 mb-2">Bem-vindo ao Praxis!</h2>
             <p className="text-gray-600">
               Escolha sua trilha de carreira para começar

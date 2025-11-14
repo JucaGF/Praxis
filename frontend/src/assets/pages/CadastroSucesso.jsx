@@ -1,7 +1,6 @@
 //SÓ PARA O GITHUB
 import React from "react";
 import { Link } from "react-router-dom";
-import PraxisLogo from "../components/PraxisLogo";
 
 export default function CadastroSucesso() {
   return (
@@ -80,12 +79,6 @@ export default function CadastroSucesso() {
       })}
 
       <div className="w-full max-w-md mx-6 p-8 rounded-2xl bg-white/95 backdrop-blur-sm shadow-2xl border border-gray-100 text-center relative z-30">
-        <div className="mb-6">
-          <div className="flex justify-center mb-4">
-            <PraxisLogo className="h-16" />
-          </div>
-        </div>
-
         <div className="mb-6">
           <svg
             className="w-16 h-16 text-green-500 mx-auto"
