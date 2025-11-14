@@ -81,7 +81,7 @@ export default function CodeChallenge({ challenge }) {
   // Se não houver arquivos, criar um arquivo padrão
   const defaultFileList = fileList.length > 0 ? fileList : ["main.js"];
   const defaultFilesContent = Object.keys(filesContent).length > 0 ? filesContent : {
-    "main.js": "// Escreva seu código aqui\n\nconsole.log('Hello, World!');"
+    "main.js": "// Escreva seu código aqui\n\n"
   };
   
   // Arquivo inicial: usar fs.open se disponível, senão o primeiro da lista
@@ -478,4 +478,3 @@ export default function CodeChallenge({ challenge }) {
     </div>
   );
 }
-

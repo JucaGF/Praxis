@@ -81,9 +81,7 @@ export default function Login() {
 
         if (response.status === 404 || !response.ok) {
           // Attributes não existem, redirecionar para onboarding
-          console.log(
-            "⚠️ Attributes não encontrados. Redirecionando para onboarding..."
-          );
+          
           navigate("/onboarding");
           return;
         }
@@ -102,9 +100,7 @@ export default function Login() {
           Object.keys(attributes.soft_skills).length > 0;
 
         if (!hasRealData) {
-          console.log(
-            "⚠️ Attributes vazios ou mockados. Redirecionando para onboarding..."
-          );
+          
           navigate("/onboarding");
           return;
         }
@@ -112,7 +108,7 @@ export default function Login() {
         // Tudo OK, redireciona para home
         navigate("/home");
       } catch (apiError) {
-        console.warn("⚠️ Erro ao verificar attributes:", apiError);
+        
         // Em caso de erro, assume que precisa de onboarding
         navigate("/onboarding");
       }

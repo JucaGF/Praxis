@@ -11,11 +11,6 @@ export default function DailyTaskChallenge({ challenge }) {
   const navigate = useNavigate();
   
   // Debug: ver estrutura do enunciado
-  console.log("📧 DailyTaskChallenge - Enunciado:", {
-    hasEnunciado: !!challenge.description?.enunciado,
-    enunciadoType: challenge.description?.enunciado?.type,
-    enunciado: challenge.description?.enunciado
-  });
   
   // Usar o hook de timer persistente
   const durationMinutes = challenge.difficulty?.time_limit || 120;
@@ -403,5 +398,3 @@ Carlos Silva`}
     </div>
   );
 }
-
-

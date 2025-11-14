@@ -32,9 +32,7 @@ export default function GitHubCallback() {
 
             if (response.status === 404 || !response.ok) {
               // NOVO USUÁRIO - Redireciona para CadastroSucesso (questionários)
-              console.log(
-                "🎉 Novo usuário GitHub - Redirecionando para questionários..."
-              );
+              
               navigate("/cadastro-sucesso", { replace: true });
               return;
             }
@@ -50,18 +48,16 @@ export default function GitHubCallback() {
 
             if (!hasRealData) {
               // USUÁRIO EXISTENTE SEM DADOS - Vai para questionários
-              console.log(
-                "📝 Usuário existente sem dados - Redirecionando para questionários..."
-              );
+              
               navigate("/cadastro-sucesso", { replace: true });
               return;
             }
 
             // USUÁRIO EXISTENTE COM DADOS - Vai direto para home
-            console.log("🚀 Usuário com dados - Redirecionando para home...");
+            
             navigate("/home", { replace: true });
           } catch (apiError) {
-            console.warn("⚠️ Erro ao verificar attributes:", apiError);
+            
             // Em caso de erro, vai para questionários por segurança
             navigate("/cadastro-sucesso", { replace: true });
           }

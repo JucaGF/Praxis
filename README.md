@@ -1,133 +1,146 @@
-# 🚀 Praxis
+# Praxis
 
-Uma plataforma de IA focada em preparar e dar confiança a jovens que estão entrando no mercado de trabalho, através de análise de currículo e simulações práticas de desafios técnicos.
+Plataforma de desenvolvimento profissional que utiliza IA para gerar desafios personalizados, avaliar solucoes e acompanhar a progressao de habilidades de desenvolvedores.
 
-## 🎯 Sobre o Projeto
+## Sobre o Projeto
 
-O Praxis nasceu da necessidade de criar uma ponte entre o conhecimento teórico e a confiança prática exigida pelo mercado de trabalho. Muitos jovens talentosos se sentem perdidos ou inseguros ao dar os primeiros passos em suas carreiras. Nossa plataforma busca resolver esse problema, oferecendo duas ferramentas principais:
+Praxis e uma plataforma que ajuda desenvolvedores a evoluirem suas habilidades tecnicas e comportamentais atraves de:
 
-1.  **Análise de Currículo:** Um assistente de IA que fornece feedback instantâneo e construtivo sobre o currículo do usuário, ajudando a destacar suas qualidades e a corrigir erros comuns.
-2.  **Desafios Práticos:** Simulações de tarefas reais de trabalho, onde o usuário pode resolver problemas de código e receber uma avaliação da IA, simulando um ambiente de code review.
+1. **Desafios Personalizados**: Sistema de IA que gera desafios adaptados ao nivel e objetivos do usuario
+2. **Avaliacao Inteligente**: Feedback detalhado sobre codigo, comunicacao e planejamento
+3. **Progressao de Habilidades**: Acompanhamento da evolucao em multiplas competencias
+4. **Analise de Curriculo**: Sugestoes de melhoria baseadas em IA
 
-O objetivo é ser um ambiente seguro para praticar, errar e aprender, preparando o usuário para os desafios reais do dia a dia profissional.
+## Funcionalidades Principais
 
-## ✨ Funcionalidades Principais (MVP)
+- Geracao automatica de 3 tipos de desafios: codigo, comunicacao e planejamento
+- Sistema de timer para simular pressao de ambiente real
+- Avaliacao com IA (Google Gemini) e feedback detalhado
+- Dashboard com historico de desafios e progressao
+- Analise de curriculo com sugestoes personalizadas
+- Sistema de autenticacao seguro (Supabase Auth + GitHub OAuth)
 
-* **Análise de Currículo com IA:** O usuário insere o texto do seu currículo e recebe um relatório com pontos fortes e sugestões de melhoria.
-* **Simulador de Desafios Técnicos:** O usuário escolhe um desafio, escreve o código em um editor integrado e submete para receber feedback da IA sobre a solução.
-* **Interface Simples e Focada:** Um design limpo para que o usuário se concentre no que realmente importa: seu desenvolvimento.
+## Tecnologias Utilizadas
 
-## 🛠️ Tecnologias Utilizadas
+### Backend
+- **Framework**: FastAPI (Python 3.11+)
+- **Banco de Dados**: PostgreSQL via Supabase
+- **ORM**: SQLModel
+- **IA**: Google Gemini 2.5 Flash
+- **Autenticacao**: Supabase Auth (JWT)
 
-Este projeto é construído com tecnologias modernas, visando performance e uma ótima experiência de desenvolvimento.
+### Frontend
+- **Framework**: React 18 com Vite
+- **Estilizacao**: Tailwind CSS
+- **Roteamento**: React Router v6
+- **Editor de Codigo**: Monaco Editor
+- **Notificacoes**: Sistema de Toast customizado
 
-| Parte             | Tecnologia                                                                                                 |
-| :---------------- | :--------------------------------------------------------------------------------------------------------- |
-| **Frontend** | [React](https://reactjs.org/) (com [Vite](https://vitejs.dev/))                                            |
-| **Estilização** | [TailwindCSS](https://tailwindcss.com/)                                                                    |
-| **Backend** | [Python 3.11+](https://www.python.org/) com [FastAPI](https://fastapi.tiangolo.com/)                         |
-| **Banco de Dados** | [PostgreSQL](https://www.postgresql.org/) com [SQLModel](https://sqlmodel.tiangolo.com/)                |
-| **IA** | [Google Gemini 2.5](https://ai.google.dev/) (Flash ou Pro)                                                 |
-| **Autenticação** | [Supabase Auth](https://supabase.com/docs/guides/auth)                                                    |
-| **Editor de Código** | [Monaco Editor](https://microsoft.github.io/monaco-editor/)                                          |
+### Infraestrutura
+- **Containerizacao**: Docker + Docker Compose
+- **Proxy**: Nginx (producao)
 
-## 🚀 Começando
+## Como Rodar Localmente
 
-Para rodar este projeto localmente, siga os passos abaixo.
+### Pre-requisitos
 
-### Pré-requisitos
+- Docker e Docker Compose (recomendado)
+- OU Node.js 18+ e Python 3.11+
+- Conta no Supabase
+- API Key do Google Gemini
 
-* **Node.js** (versão 18 ou superior) - [Download](https://nodejs.org/)
-* **Python** (versão 3.11 ou superior) - [Download](https://www.python.org/)
-* **Git** - [Download](https://git-scm.com/)
-* **uv** - Um instalador e resolvedor de pacotes Python extremamente rápido. [Instruções de instalação](https://github.com/astral-sh/uv).
-* Uma chave de API do **Google AI Studio** para o Gemini - [Obtenha sua chave](https://aistudio.google.com/app/apikey)
+### Opcao 1: Com Docker (Recomendado)
 
-### Instalação do Backend
+```bash
+# Clonar repositorio
+git clone <repository-url>
+cd Praxis
 
-1.  **Clone o repositório:**
-    ```bash
-    git clone [https://github.com/seu-usuario/praxis.git](https://github.com/seu-usuario/praxis.git)
-    cd praxis/backend
-    ```
+# Configurar variaveis de ambiente
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+# Editar os arquivos .env com suas credenciais
 
-2.  **Crie e ative um ambiente virtual com `uv`:**
-    ```bash
-    # Cria o ambiente na pasta .venv
-    uv venv
+# Iniciar servicos
+docker-compose up -d
 
-    # Ativa o ambiente
-    # Windows
-    .\.venv\Scripts\activate
-    # Linux / macOS
-    source .venv/bin/activate
-    ```
+# Acessar
+# Frontend: http://localhost:3000
+# Backend: http://localhost:8000
+# Docs API: http://localhost:8000/docs
+```
 
-3.  **Instale as dependências com `uv`:**
-    ```bash
-    uv pip install -r backend/requirements.txt
-    ```
+Ver `README_DOCKER.md` para detalhes.
 
-4.  **Configure as variáveis de ambiente:**
-    * Crie um arquivo chamado `.env` na pasta `backend`.
-    * **Para desenvolvimento** (IA mock, sem custos):
-        ```env
-        DATABASE_URL=postgresql://user:password@localhost:5432/praxis
-        AI_PROVIDER=fake
-        AUTH_ENABLED=false
-        ```
-    * **Para usar IA real** (Google Gemini):
-        ```env
-        DATABASE_URL=postgresql://user:password@localhost:5432/praxis
-        AI_PROVIDER=gemini
-        GEMINI_API_KEY=sua_chave_aqui
-        AUTH_ENABLED=false
-        ```
-    
-    📖 **Guia completo de configuração da IA**: Veja [`backend/AI_SETUP.md`](backend/AI_SETUP.md)
-    📖 **Autenticação e Supabase**: Veja [`backend/AUTHENTICATION.md`](backend/AUTHENTICATION.md)
-    📖 **Desenvolvimento Backend**: Veja [`backend/README_DEV.md`](backend/README_DEV.md)
+### Opcao 2: Sem Docker
 
-5.  **Rode o servidor:**
-    ```bash
-    cd backend
-    uvicorn app.main:app --reload
-    ```
-    O backend estará rodando em `http://127.0.0.1:8000`.
+#### Backend
 
-### Instalação do Frontend
+```bash
+cd backend
 
-1.  **Navegue até a pasta do frontend (em um novo terminal):**
-    ```bash
-    cd ../frontend
-    ```
+# Criar ambiente virtual
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+# .venv\Scripts\activate   # Windows
 
-2.  **Instale as dependências:**
-    ```bash
-    npm install
-    ```
+# Instalar dependencias
+pip install -r requirements.txt
 
-3.  **Configure as variáveis de ambiente:**
-    * Crie um arquivo chamado `.env.local` na pasta `frontend`.
-    * Adicione a URL do seu backend local:
-        ```
-        VITE_API_BASE_URL=[http://127.0.0.1:8000](http://127.0.0.1:8000)
-        ```
+# Configurar .env (ver backend/.env.example)
+# Executar migracoes no Supabase (ver backend/migrations/)
 
-4.  **Rode o cliente de desenvolvimento:**
-    ```bash
-    npm run dev
-    ```
-    Abra `http://localhost:5173` (ou a porta indicada no seu terminal) para ver o projeto no navegador.
+# Iniciar servidor
+uvicorn app.main:app --reload
+```
 
-## 📚 Documentação Adicional
+#### Frontend
 
-- **[Fluxo de Cadastro com Questionários](FLUXO_CADASTRO.md)** - Documentação completa do fluxo de onboarding
-- **[Configuração com Docker](README_DOCKER.md)** - Como rodar o projeto com Docker
-- **[Setup de IA](backend/AI_SETUP.md)** - Configuração detalhada do Google Gemini
-- **[Autenticação](backend/AUTHENTICATION.md)** - Como funciona a autenticação com Supabase
-- **[Desenvolvimento Backend](backend/README_DEV.md)** - Guia para desenvolvedores do backend
+```bash
+cd frontend
 
-## 🤝 Contribuindo
+# Instalar dependencias
+npm install
 
-Este é um projeto em desenvolvimento ativo. Sinta-se à vontade para abrir issues ou enviar pull requests!
+# Configurar .env (ver frontend/.env.example)
+
+# Iniciar dev server
+npm run dev
+```
+
+## Estrutura do Projeto
+
+```
+Praxis/
+├── backend/                 # API FastAPI
+│   ├── app/
+│   │   ├── domain/         # Logica de negocio
+│   │   ├── infra/          # Implementacoes (DB, IA)
+│   │   ├── routers/        # Endpoints da API
+│   │   └── schemas/        # Validacao Pydantic
+│   ├── migrations/         # Scripts SQL
+│   └── requirements.txt
+├── frontend/               # App React
+│   ├── src/
+│   │   ├── assets/
+│   │   │   ├── components/ # Componentes React
+│   │   │   ├── pages/      # Paginas
+│   │   │   ├── hooks/      # Custom hooks
+│   │   │   └── utils/      # Utilitarios
+│   │   └── App.jsx
+│   └── package.json
+└── docker-compose.yml      # Orquestracao Docker
+```
+
+## Documentacao
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Arquitetura detalhada do sistema
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Guia de deploy e configuracao
+- **[README_DOCKER.md](README_DOCKER.md)** - Instrucoes Docker
+- **[backend/AI_SETUP.md](backend/AI_SETUP.md)** - Configuracao do Gemini
+- **[backend/AUTHENTICATION.md](backend/AUTHENTICATION.md)** - Sistema de autenticacao
+- **[backend/README_DEV.md](backend/README_DEV.md)** - Guia de desenvolvimento
+
+## Licenca
+
+Este projeto foi desenvolvido como projeto academico.

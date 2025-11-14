@@ -236,14 +236,14 @@ ESTRUTURA DE CADA DESAFIO:
     "text": "Descrição conversacional (chefe pedindo) 2-3 linhas",
     "type": "codigo|texto_livre|planejamento",
     "language": "python|javascript|sql|markdown",
-    "eval_criteria": ["critério1", "critério2", "critério3"],  // ⚠️ Use NOMES DE HABILIDADES objetivos
+    "eval_criteria": ["critério1", "critério2", "critério3"],
     "target_skill": "Skill principal do perfil",
-    "affected_skills": ["Skill1", "Skill2", "Skill3"],  // NOVO: 2-4 skills que o desafio avalia
+    "affected_skills": ["Skill1", "Skill2", "Skill3"],
     "hints": ["dica útil 1", "dica útil 2"],
-    "enunciado": null  // NOVO: objeto estruturado (veja regras abaixo)
+    "enunciado": null
   },
   "difficulty": {"level": "easy|medium|hard", "time_limit": 20-90},
-  "category": "code|daily-task|organization",  // ⚠️ DIFERENTE de description.type!
+  "category": "code|daily-task|organization",
   "fs": {
     "files": ["caminho/arquivo1.ext", "caminho/arquivo2.ext"],
     "open": "caminho/arquivo1.ext",
@@ -266,15 +266,9 @@ REGRAS OBRIGATÓRIAS:
    - Para code: skills técnicas relacionadas (ex: ["Python", "FastAPI", "SQL"])
    - Para daily-task: soft skills (ex: ["Comunicação", "Empatia", "Resolução de Conflitos"])
    - Para organization: skills de arquitetura (ex: ["Arquitetura", "Escalabilidade", "Trade-offs"])
-   - ⚠️ IMPORTANTE: Use NOMES DE HABILIDADES, não frases em primeira pessoa
-   - ❌ ERRADO: "Consigo explicar problemas técnicos para pessoas não técnicas"
-   - ✅ CORRETO: "Comunicação técnica", "Explicação simplificada", "Didática"
-4. eval_criteria: Array com 3-4 NOMES DE HABILIDADES que serão avaliadas
-   - ⚠️ Use SUBSTANTIVOS/NOMES TÉCNICOS objetivos, NÃO frases em primeira pessoa
-   - ❌ ERRADO: "Consigo explicar problemas técnicos para pessoas não técnicas"
-   - ❌ ERRADO: "Clareza e objetividade da explicação"
-   - ✅ CORRETO: "Comunicação técnica", "SQL", "Debugging", "Arquitetura de software"
-   - Exemplos válidos: "Python", "FastAPI", "Resolução de problemas", "Empatia", "Trade-offs"
+   - Use nomes objetivos de habilidades (substantivos)
+4. eval_criteria: Array com 3-4 habilidades que serão avaliadas
+   - Use nomes objetivos (ex: "Python", "FastAPI", "Comunicação", "Resolução de problemas")
 5. ⚠️ DIFICULDADE DOS DESAFIOS (REGRA CRÍTICA):
    - Gere exatamente 1 desafio EASY, 1 MEDIUM e 1 HARD
    - ❌ PROIBIDO: organization=hard, daily-task=medium, code=easy (padrão fixo)
@@ -943,38 +937,67 @@ REGRAS CRÍTICAS:
         Returns:
             True se válido, False caso contrário
         """
+        # Log do desafio completo para debug
+        challenge_title = challenge.get("title", "SEM TÍTULO")
+        logger.debug(f"🔍 Validando desafio: '{challenge_title}'")
+        logger.debug(f"   Campos presentes: {list(challenge.keys())}")
+        
         required_fields = ["title", "description", "difficulty", "category"]
 
         # Valida campos de primeiro nível
         for field in required_fields:
-            if field not in challenge or not challenge[field]:
-                logger.warning(f"Campo '{field}' faltando ou vazio no desafio")
+            if field not in challenge:
+                logger.warning(f"❌ DESAFIO REJEITADO: Campo '{field}' não existe no desafio '{challenge_title}'")
+                logger.debug(f"   Desafio completo: {challenge}")
+                return False
+            
+            if not challenge[field]:
+                logger.warning(f"❌ DESAFIO REJEITADO: Campo '{field}' está vazio no desafio '{challenge_title}'")
+                logger.debug(f"   Valor de '{field}': {challenge[field]}")
                 return False
 
         # Valida description
         description = challenge["description"]
         if not isinstance(description, dict):
-            logger.warning(f"'description' não é um dict: {type(description)}")
+            logger.warning(f"❌ DESAFIO REJEITADO: 'description' não é um dict (é {type(description)}) no desafio '{challenge_title}'")
+            logger.debug(f"   Valor de 'description': {description}")
             return False
 
-        if "text" not in description or not description["text"]:
-            logger.warning("'description.text' faltando ou vazio")
+        if "text" not in description:
+            logger.warning(f"❌ DESAFIO REJEITADO: 'description.text' não existe no desafio '{challenge_title}'")
+            logger.debug(f"   Campos em 'description': {list(description.keys())}")
+            return False
+            
+        if not description["text"]:
+            logger.warning(f"❌ DESAFIO REJEITADO: 'description.text' está vazio no desafio '{challenge_title}'")
             return False
 
         # Valida difficulty
         difficulty = challenge["difficulty"]
         if not isinstance(difficulty, dict):
-            logger.warning(f"'difficulty' não é um dict: {type(difficulty)}")
+            logger.warning(f"❌ DESAFIO REJEITADO: 'difficulty' não é um dict (é {type(difficulty)}) no desafio '{challenge_title}'")
+            logger.debug(f"   Valor de 'difficulty': {difficulty}")
             return False
 
-        if "level" not in difficulty or not difficulty["level"]:
-            logger.warning("'difficulty.level' faltando ou vazio")
+        if "level" not in difficulty:
+            logger.warning(f"❌ DESAFIO REJEITADO: 'difficulty.level' não existe no desafio '{challenge_title}'")
+            logger.debug(f"   Campos em 'difficulty': {list(difficulty.keys())}")
+            return False
+            
+        if not difficulty["level"]:
+            logger.warning(f"❌ DESAFIO REJEITADO: 'difficulty.level' está vazio no desafio '{challenge_title}'")
             return False
 
-        if "time_limit" not in difficulty or not difficulty["time_limit"]:
-            logger.warning("'difficulty.time_limit' faltando ou vazio")
+        if "time_limit" not in difficulty:
+            logger.warning(f"❌ DESAFIO REJEITADO: 'difficulty.time_limit' não existe no desafio '{challenge_title}'")
+            logger.debug(f"   Campos em 'difficulty': {list(difficulty.keys())}")
+            return False
+            
+        if not difficulty["time_limit"]:
+            logger.warning(f"❌ DESAFIO REJEITADO: 'difficulty.time_limit' está vazio no desafio '{challenge_title}'")
             return False
 
+        logger.debug(f"✅ Desafio '{challenge_title}' validado com sucesso")
         return True
 
     def _extract_partial_fields(self, json_buffer: str) -> List[dict]:
@@ -1110,12 +1133,10 @@ REGRAS CRÍTICAS:
             prompt = self._build_challenge_prompt(profile, attributes, track)
 
             # Configurar modelo com streaming
-            # IMPORTANTE: NÃO usar response_mime_type="application/json" aqui
-            # pois isso força o Gemini a esperar até ter um JSON completo,
-            # anulando o benefício do streaming!
             generation_config = self.generation_config.copy()
-            generation_config["max_output_tokens"] = 8192
-            # Removido: generation_config["response_mime_type"] = "application/json"
+            generation_config["max_output_tokens"] = 16384  # Aumentado para garantir que o JSON complete
+            generation_config["response_mime_type"] = "application/json"  # Força a IA a retornar JSON válido
+            # Nota: response_mime_type força JSON mode, garantindo que a IA complete o JSON antes de parar
 
             model = genai.GenerativeModel(
                 model_name=self.model_name,

@@ -1,11 +1,12 @@
 // src/pages/Challenge.jsx
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { fetchChallengeById } from "../lib/api.js";
-import CodeChallenge from "../components/challenges/CodeChallenge.jsx";
-import DailyTaskChallenge from "../components/challenges/DailyTaskChallenge.jsx";
-import OrganizationChallenge from "../components/challenges/OrganizationChallenge.jsx";
-import logger from "../utils/logger.js";
+import { fetchChallengeById } from "../lib/api";
+import CodeChallenge from "../components/challenges/CodeChallenge";
+import DailyTaskChallenge from "../components/challenges/DailyTaskChallenge";
+import OrganizationChallenge from "../components/challenges/OrganizationChallenge";
+import logger from "../utils/logger";
+import { getErrorMessage } from "../utils/errorMessages";
 
 export default function Challenge() {
   const { id } = useParams();
@@ -35,7 +36,7 @@ export default function Challenge() {
         setChallenge(data);
       } catch (err) {
         logger.error("challenge:load:error", { challengeId: id, error: err });
-        setError(err.message || "Erro ao carregar desafio");
+        setError(getErrorMessage(err, 'challenge'));
       } finally {
         setLoading(false);
       }

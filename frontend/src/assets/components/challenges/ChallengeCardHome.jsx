@@ -235,7 +235,7 @@ export default function ChallengeCardHome({ challenge, expanded, onToggle }) {
       <div className="mt-4"><Meta icon="⏲️">{challenge.time}</Meta></div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        {challenge.skills.map((s) => <Skill key={s}>{s}</Skill>)}
+        {challenge.skills.map((s, i) => <Skill key={`${s}-${i}`}>{s}</Skill>)}
       </div>
 
       {/* Área extra quando expandido */}

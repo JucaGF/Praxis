@@ -1,3 +1,13 @@
+"""
+Repository SQL - Implementacao PostgreSQL
+
+Implementa a interface IRepository usando SQLModel/PostgreSQL.
+Responsavel por todas as operacoes de banco de dados:
+- CRUD de perfis, desafios, submissoes
+- Queries otimizadas com JOINs
+- Gerenciamento de habilidades e progressao
+"""
+
 # backend/app/infra/repo_sql.py
 from __future__ import annotations
 from backend.app.domain.ports import IRepository
@@ -239,7 +249,7 @@ class SqlRepo(IRepository):
             if "career_goal" in patch and patch["career_goal"] is not None:
                 a.career_goal = patch["career_goal"]
             if "soft_skills" in patch and patch["soft_skills"]:
-                # ⚠️ SUBSTITUIÇÃO COMPLETA (não merge) para evitar skills mockadas antigas
+          # ⚠️ SUBSTITUIÇÃO COMPLETA (não merge) para evitar skills mockadas antigas
                 a.soft_skills = patch["soft_skills"]
             if "tech_skills" in patch and patch["tech_skills"]:
                 # ⚠️ SUBSTITUIÇÃO COMPLETA (não merge) para evitar skills mockadas antigas

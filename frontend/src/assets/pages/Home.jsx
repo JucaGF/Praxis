@@ -27,32 +27,55 @@ import PraxisLogo from "../components/PraxisLogo";
 import ChallengeCardHome from "../components/challenges/ChallengeCardHome";
 import logger from "../utils/logger";
 
+/* ----- Mapeamento de soft skills para os 3 tipos fixos ----- */
+function mapToRealSoftSkill(skillName) {
+  if (!skillName || typeof skillName !== 'string') return null;
+  
+  const skillLower = skillName.toLowerCase();
+  
+  // Mapeamento baseado em palavras-chave para as 3 soft skills fixas
+  const comunicacaoKeywords = [
+    'comunicação', 'comunicacao', 'comunicar', 'explicar', 'escrever', 
+    'mensagem', 'email', 'técnica', 'tecnica', 'equipe', 'conversa',
+    'apresentar', 'falar', 'expressar', 'clarity', 'didática'
+  ];
+  
+  const organizacaoKeywords = [
+    'organização', 'organizacao', 'organizar', 'planejar', 'planejamento',
+    'planejo', 'priorizar', 'gerenciar', 'gestão', 'gestao', 'tempo',
+    'atividades', 'tarefas', 'estrutura', 'semanalmente', 'agenda'
+  ];
+  
+  const resolucaoKeywords = [
+    'resolução', 'resolucao', 'resolver', 'problema', 'debugar', 
+    'debug', 'investigar', 'análise', 'analise', 'solução', 'solucao',
+    'troubleshoot', 'fix', 'corrigir', 'encontrar', 'identificar'
+  ];
+  
+  // Verifica qual categoria a skill pertence
+  if (comunicacaoKeywords.some(keyword => skillLower.includes(keyword))) {
+    return 'Comunicação';
+  }
+  
+  if (organizacaoKeywords.some(keyword => skillLower.includes(keyword))) {
+    return 'Organização';
+  }
+  
+  if (resolucaoKeywords.some(keyword => skillLower.includes(keyword))) {
+    return 'Resolução de Problemas';
+  }
+  
+  // Se não mapear para nenhuma soft skill, retorna a skill original (tech skill)
+  return skillName;
+}
+
 /* ----- Função para transformar dados da API no formato esperado ----- */
 function transformChallenges(apiChallenges, submissions = []) {
-  console.log("🔄 transformChallenges chamada com:", {
-    challengesCount: apiChallenges.length,
-    submissionsCount: submissions.length,
-    allSubmissions: submissions.map((s) => ({
-      id: s.id,
-      challenge_id: s.challenge_id,
-      status: s.status,
-    })),
-  });
-
+  
   // Criar mapa de challenge_id -> submissão mais recente com status "scored" (avaliado com sucesso)
   const completedChallenges = new Map();
   const scoredSubmissions = submissions.filter(
     (sub) => sub.status === "scored"
-  );
-
-  console.log(
-    "✅ Submissões com status 'scored':",
-    scoredSubmissions.map((s) => ({
-      id: s.id,
-      challenge_id: s.challenge_id,
-      status: s.status,
-      score: s.score,
-    }))
   );
 
   scoredSubmissions.forEach((sub) => {
@@ -88,7 +111,6 @@ function transformChallenges(apiChallenges, submissions = []) {
           }
         } catch (e) {
           // Se falhar, mantém o existente
-          console.warn("Erro ao comparar datas:", e);
         }
       } else if (subDate && subDate !== "Data desconhecida" && !existingDate) {
         // Se só a nova tem data, usa ela
@@ -106,21 +128,29 @@ function transformChallenges(apiChallenges, submissions = []) {
     };
 
     // Extrai skills de affected_skills (novo formato) ou fallback para eval_criteria/target_skill
-    const skills = [];
+    const rawSkills = [];
     
     // Prioridade 1: affected_skills (formato novo, nomes objetivos)
     if (challenge.description?.affected_skills && challenge.description.affected_skills.length > 0) {
-      skills.push(...challenge.description.affected_skills.slice(0, 3));
+      rawSkills.push(...challenge.description.affected_skills.slice(0, 3));
     } 
     // Fallback: eval_criteria + target_skill (formato antigo, pode ter frases)
     else {
       if (challenge.description?.target_skill) {
-        skills.push(challenge.description.target_skill);
+        rawSkills.push(challenge.description.target_skill);
       }
       if (challenge.description?.eval_criteria) {
-        skills.push(...challenge.description.eval_criteria.slice(0, 2)); // Limita a 3 skills total
+        rawSkills.push(...challenge.description.eval_criteria.slice(0, 2)); // Limita a 3 skills total
       }
     }
+    
+    // Mapeia skills para nomes reais (soft skills → 3 fixas, tech skills → mantém)
+    const mappedSkills = rawSkills
+      .map(skill => mapToRealSoftSkill(skill))
+      .filter(skill => skill !== null); // Remove nulls
+    
+    // Remove duplicatas (ex: "Comunicação" aparece 2x → fica 1x)
+    const skills = [...new Set(mappedSkills)];
 
     // Formata tempo
     const timeLimit = challenge.difficulty?.time_limit || 120;
@@ -150,12 +180,6 @@ function transformChallenges(apiChallenges, submissions = []) {
     };
   });
 
-  console.log("🔄 Challenges transformados:", {
-    total: apiChallenges.length,
-    completed: apiChallenges.filter((c) => completedChallenges.has(c.id))
-      .length,
-    completedIds: Array.from(completedChallenges.keys()),
-  });
 }
 
 /* ----- Função para ícones minimalistas por categoria ----- */
@@ -334,22 +358,18 @@ export default function Home() {
     ]);
 
     try {
-      console.log("🎯 Iniciando geração com streaming...");
 
       const cancel = await generateChallengesStreaming({
         onStart: (data) => {
-          console.log("🎬 Stream iniciado:", data);
           setStreamMessage(data.message || "Iniciando...");
         },
 
         onProgress: (data) => {
-          console.log("📊 Progresso:", data);
           setStreamProgress(data.percent || 0);
           setStreamMessage(data.message || "Gerando...");
         },
 
         onChallengeChunk: (data) => {
-          console.log("📝 Chunk recebido:", data);
           const { challenge_index, field, content } = data;
 
           // Aplicar typewriter effect no campo correspondente
@@ -373,7 +393,6 @@ export default function Home() {
         },
 
         onChallenge: (data) => {
-          console.log("✅ Desafio recebido:", data);
           // Transformar e adicionar ao catálogo imediatamente
           const transformed = transformChallenges([data.data]);
           setCatalog((prev) => [...prev, ...transformed]);
@@ -390,7 +409,6 @@ export default function Home() {
         },
 
         onComplete: (data) => {
-          console.log("🎉 Geração concluída:", data);
           setStreamMessage(data.message || "🎉 Concluído!");
           setStreamProgress(100);
 
@@ -462,8 +480,6 @@ export default function Home() {
         content: resumeContent,
       });
 
-      console.log("✅ Currículo enviado:", result);
-
       // Limpa o formulário
       setResumeContent("");
       setResumeTitle("");
@@ -506,25 +522,21 @@ export default function Home() {
     });
 
     try {
-      console.log("🎯 Iniciando upload + análise com streaming...");
 
       const cancel = await uploadAndAnalyzeResumeFileStreaming(
         selectedFile,
         resumeTitle || selectedFile.name,
         {
           onStart: (data) => {
-            console.log("🎬 Stream iniciado:", data);
             setAnalysisMessage(data.message || "Iniciando...");
           },
 
           onProgress: (data) => {
-            console.log("📊 Progresso:", data);
             setAnalysisProgress(data.percent || 0);
             setAnalysisMessage(data.message || "Processando...");
           },
 
           onFieldChunk: (data) => {
-            console.log("📝 Campo recebido:", data);
             const { field, content } = data;
 
             // Aplicar typewriter effect para strings
@@ -541,7 +553,6 @@ export default function Home() {
           },
 
           onComplete: (data) => {
-            console.log("🎉 Análise concluída:", data);
             setAnalysisMessage(data.message || "🎉 Análise completa!");
             setAnalysisProgress(100);
 
@@ -681,7 +692,6 @@ export default function Home() {
     try {
       const result = await analyzeResume(resumeId);
 
-      console.log("✅ Análise recebida:", result);
       setResumeAnalysis(result);
 
       // Scroll suave até a seção de análise após carregar
@@ -745,7 +755,6 @@ export default function Home() {
       // Chama API em background (se falhar, recarrega para sincronizar)
       await deleteResume(resumeId);
 
-      console.log("✅ Currículo deletado:", resumeId);
     } catch (error) {
       console.error("❌ Erro ao deletar currículo:", error);
       alert("Erro ao deletar currículo: " + error.message);
@@ -777,9 +786,7 @@ export default function Home() {
         } = await supabase.auth.getUser();
 
         if (!authUser) {
-          console.warn(
-            "⚠️ Usuário não autenticado. Redirecionando para login..."
-          );
+          
           isLoadingRef.current = false;
           navigate("/login");
           return;
@@ -794,15 +801,6 @@ export default function Home() {
           authUser?.email?.split("@")[0] || // Parte do email antes do @
           "Usuário"; // Fallback
 
-        console.log("👤 Dados do usuário:", {
-          full_name: authUser?.user_metadata?.full_name, // Cadastro normal
-          nome: authUser?.user_metadata?.nome, // Cadastro normal (pt)
-          user_name: authUser?.user_metadata?.user_name, // GitHub
-          name: authUser?.user_metadata?.name, // Alternativo
-          email: authUser?.email,
-          final_name: fullName,
-        });
-
         // Tenta buscar atributos e desafios
         let attributes = null;
         let challenges = [];
@@ -811,7 +809,6 @@ export default function Home() {
           // Busca atributos
           attributes = await fetchUser();
         } catch (attrError) {
-          console.log("⚠️ Erro ao buscar attributes:", attrError);
 
           // Se erro 404, significa que attributes não existe (usuário precisa fazer onboarding)
           if (
@@ -820,9 +817,7 @@ export default function Home() {
             attrError.message?.includes("não encontrado") ||
             attrError.message?.includes("not found")
           ) {
-            console.warn(
-              "⚠️ Attributes não encontrados (404). Redirecionando para onboarding..."
-            );
+            
             isLoadingRef.current = false;
             navigate("/onboarding");
             return;
@@ -841,7 +836,7 @@ export default function Home() {
         try {
           challenges = await fetchChallenges();
         } catch (chalError) {
-          console.warn("⚠️ Erro ao buscar desafios (não crítico):", chalError);
+          
           challenges = []; // Continua sem desafios
         }
 
@@ -855,79 +850,15 @@ export default function Home() {
           const activeChallengeIds = challenges.map(c => c.id);
           submissions = allSubmissions.filter(s => activeChallengeIds.includes(s.challenge_id));
           
-          console.log("🚀 OTIMIZAÇÃO: Submissões filtradas para home:", {
-            totalSubmissions: allSubmissions.length,
-            activeChallenges: activeChallengeIds.length,
-            relevantSubmissions: submissions.length,
-            filtered: allSubmissions.length - submissions.length
-          });
         } catch (subError) {
-          console.warn("⚠️ Erro ao buscar submissões (não crítico):", subError);
+          
           submissions = []; // Continua sem submissões
         }
 
-        console.log("📊 Dados recebidos da API:", {
-          authUser,
-          attributes,
-          challengesCount: challenges.length,
-          submissionsCount: submissions.length,
-          submissions: submissions.map((s) => ({
-            id: s.id,
-            challenge_id: s.challenge_id,
-            status: s.status,
-            score: s.score,
-            points: s.points,
-          })),
-        });
-
         // Debug CRÍTICO: Ver strong_skills exatamente como vem
-        console.log("🎯 STRONG_SKILLS BRUTO:", attributes?.strong_skills);
-        console.log("🎯 STRONG_SKILLS TYPE:", typeof attributes?.strong_skills);
-        console.log(
-          "🎯 STRONG_SKILLS KEYS:",
-          attributes?.strong_skills
-            ? Object.keys(attributes.strong_skills)
-            : "NULO"
-        );
-        console.log(
-          "🎯 STRONG_SKILLS LENGTH:",
-          attributes?.strong_skills
-            ? Object.keys(attributes.strong_skills).length
-            : 0
-        );
-
+        
         // Debug: Ver estrutura exata dos attributes
-        console.log("🔍 Attributes detalhado:", {
-          attributes,
-          tech_skills: attributes?.tech_skills,
-          tech_skills_type: typeof attributes?.tech_skills,
-          tech_skills_is_array: Array.isArray(attributes?.tech_skills),
-          tech_skills_length: attributes?.tech_skills?.length,
-          tech_skills_keys:
-            attributes?.tech_skills &&
-            typeof attributes.tech_skills === "object"
-              ? Object.keys(attributes.tech_skills)
-              : null,
-          strong_skills: attributes?.strong_skills,
-          strong_skills_type: typeof attributes?.strong_skills,
-          strong_skills_is_array: Array.isArray(attributes?.strong_skills),
-          strong_skills_length: attributes?.strong_skills?.length,
-          strong_skills_keys:
-            attributes?.strong_skills &&
-            typeof attributes.strong_skills === "object"
-              ? Object.keys(attributes.strong_skills)
-              : null,
-          soft_skills: attributes?.soft_skills,
-          soft_skills_type: typeof attributes?.soft_skills,
-          soft_skills_is_array: Array.isArray(attributes?.soft_skills),
-          soft_skills_length: attributes?.soft_skills?.length,
-          soft_skills_keys:
-            attributes?.soft_skills &&
-            typeof attributes.soft_skills === "object"
-              ? Object.keys(attributes.soft_skills)
-              : null,
-        });
-
+        
         // Verifica se os atributos existem e são reais (não mockados)
         // Attributes podem vir como objeto ou array, precisamos tratar ambos os casos
         const hasTechSkills =
@@ -958,51 +889,11 @@ export default function Home() {
           attributes && hasTechSkills && hasStrongSkills && hasSoftSkills;
 
         if (!hasRealData) {
-          console.warn(
-            "⚠️ Atributos vazios ou mockados. Redirecionando para onboarding..."
-          );
-          console.warn("Debug validação:", {
-            hasTechSkills,
-            hasStrongSkills,
-            hasSoftSkills,
-            hasRealData,
-            tech_skills_check: {
-              exists: !!attributes?.tech_skills,
-              is_array: Array.isArray(attributes?.tech_skills),
-              array_length: Array.isArray(attributes?.tech_skills)
-                ? attributes.tech_skills.length
-                : null,
-              is_object:
-                typeof attributes?.tech_skills === "object" &&
-                !Array.isArray(attributes?.tech_skills),
-              object_keys:
-                typeof attributes?.tech_skills === "object" &&
-                !Array.isArray(attributes?.tech_skills)
-                  ? Object.keys(attributes.tech_skills).length
-                  : null,
-            },
-            strong_skills_check: {
-              exists: !!attributes?.strong_skills,
-              is_array: Array.isArray(attributes?.strong_skills),
-              array_length: Array.isArray(attributes?.strong_skills)
-                ? attributes.strong_skills.length
-                : null,
-              is_object:
-                typeof attributes?.strong_skills === "object" &&
-                !Array.isArray(attributes?.strong_skills),
-              object_keys:
-                typeof attributes?.strong_skills === "object" &&
-                !Array.isArray(attributes?.strong_skills)
-                  ? Object.keys(attributes.strong_skills).length
-                  : null,
-            },
-          });
+          
           isLoadingRef.current = false;
           navigate("/onboarding");
           return;
         }
-
-        console.log("✅ Attributes válidos, continuando para Home...");
 
         // Mapeia career_goal para interesses relevantes
         const getInterests = (careerGoal) => {
@@ -1036,30 +927,16 @@ export default function Home() {
           interests: getInterests(attributes.career_goal),
         };
 
-        console.log("✅ Dados transformados para o componente:", userData);
-
         // Transforma os desafios da API para o formato esperado (incluindo status de conclusão)
         // Backend já retorna apenas os 3 mais recentes (ativos)
         const transformedChallenges = transformChallenges(
           challenges || [],
           submissions || []
         );
-        console.log("🔄 Desafios ativos transformados:", transformedChallenges);
 
         const completedCount = transformedChallenges.filter(
           (c) => c.status === "completed"
         ).length;
-
-        console.log("✅ Desafios que serão exibidos na home:", {
-          total: transformedChallenges.length,
-          completed: completedCount,
-          available: transformedChallenges.length - completedCount,
-          challenges: transformedChallenges.map((c) => ({
-            id: c.id,
-            title: c.title,
-            status: c.status,
-          })),
-        });
 
         logger.debug("home:data:loaded", {
           challengesCount: challenges.length,
@@ -1080,10 +957,7 @@ export default function Home() {
         console.error("❌ Mensagem de erro:", error.message);
         console.error("❌ Stack:", error.stack);
 
-        // NÃO cria dados automaticamente para evitar loop
-        // O usuário precisará clicar no botão "Criar Dados Mockados"
-
-        // Seta user como null para mostrar a tela com o botão
+        // Seta user como null para mostrar a tela de erro
         setUser(null);
         setCatalog([]);
       } finally {
@@ -1150,7 +1024,6 @@ export default function Home() {
       try {
         navigate(location.pathname, { replace: true, state: {} });
       } catch (e) {
-        console.debug("Não foi possível limpar state da navegação");
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1188,16 +1061,6 @@ export default function Home() {
       return 0;
     });
 
-    console.log("📋 Recommended calculado:", {
-      catalogLength: catalog.length,
-      result: result.length,
-      resultIds: result.map((c) => ({
-        id: c.id,
-        title: c.title,
-        status: c.status,
-      })),
-    });
-
     return result;
   }, [catalog, user]);
 
@@ -1213,59 +1076,69 @@ export default function Home() {
   }
 
   if (!user) {
-    const setupMockData = async () => {
-      try {
-        const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-        const { data } = await supabase.auth.getSession();
-        const token = data?.session?.access_token;
-
-        console.log("🔧 Criando dados mockados...");
-
-        const response = await fetch(`${API_URL}/dev/setup-mock-data`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (response.ok) {
-          console.log("✅ Dados criados! Recarregando...");
-          window.location.reload();
-        } else {
-          const error = await response.text();
-          console.error("❌ Erro:", error);
-          alert("Erro ao criar dados: " + error);
-        }
-      } catch (error) {
-        console.error("❌ Erro:", error);
-        alert("Erro ao criar dados: " + error.message);
-      }
-    };
-
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <h2 className="text-2xl font-bold text-zinc-900 mb-4">
-            Dados não encontrados
-          </h2>
-          <p className="text-zinc-600 mb-6">
-            Parece que você não tem dados de perfil ainda. Clique no botão
-            abaixo para criar dados mockados automaticamente.
-          </p>
-          <button
-            onClick={setupMockData}
-            className="px-6 py-3 bg-primary-500 text-black font-semibold rounded-lg hover:bg-primary-600 transition cursor-pointer mb-4"
-          >
-            Criar Dados Mockados
-          </button>
-          <br />
-          <Link
-            to="/"
-            className="text-primary-600 hover:text-primary-700 text-sm"
-          >
-            Voltar para Landing Page
-          </Link>
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
+        <div className="text-center max-w-lg mx-4">
+          <div className="bg-white rounded-lg shadow-lg p-8 border border-zinc-200">
+            {/* Ícone de erro */}
+            <div className="mb-6">
+              <div className="w-20 h-20 mx-auto bg-red-100 rounded-full flex items-center justify-center">
+                <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+            </div>
+
+            <h2 className="text-2xl font-bold text-zinc-900 mb-3">
+              Erro ao Carregar Dados
+            </h2>
+            
+            <p className="text-zinc-600 mb-4 leading-relaxed">
+              Não foi possível carregar seus dados de perfil.
+            </p>
+
+            {/* Causas possíveis */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
+              <p className="text-sm font-semibold text-blue-900 mb-2">
+                Possíveis causas:
+              </p>
+              <ul className="text-sm text-blue-800 space-y-1.5">
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-600 mt-0.5">•</span>
+                  <span><strong>Conexão com a internet:</strong> Verifique se você está conectado</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-600 mt-0.5">•</span>
+                  <span><strong>Servidor temporariamente indisponível:</strong> Tente novamente em alguns instantes</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-600 mt-0.5">•</span>
+                  <span><strong>Sessão expirada:</strong> Faça login novamente</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Botões de ação */}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                onClick={() => window.location.reload()}
+                className="px-6 py-3 bg-primary-500 text-black font-semibold rounded-lg hover:bg-primary-600 transition cursor-pointer"
+              >
+                Tentar Novamente
+              </button>
+              <Link
+                to="/"
+                className="px-6 py-3 bg-white text-zinc-700 font-semibold rounded-lg border border-zinc-300 hover:bg-zinc-50 transition inline-block"
+              >
+                ← Voltar para Início
+              </Link>
+            </div>
+
+            {/* Link de suporte */}
+            <p className="text-xs text-zinc-500 mt-6">
+              Problema persistindo? Entre em contato com o suporte.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -1318,8 +1191,8 @@ export default function Home() {
                 <Pill className="bg-emerald-50 text-emerald-700 border border-emerald-200">
                   Pontos Fortes
                 </Pill>
-                {user.skills.map((s) => (
-                  <Skill key={s}>{s}</Skill>
+                {user.skills.map((s, i) => (
+                  <Skill key={`${s}-${i}`}>{s}</Skill>
                 ))}
               </div>
             </div>

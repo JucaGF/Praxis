@@ -77,7 +77,6 @@ async function fetchWithAuth(url, options = {}) {
     
     // 401: Não autenticado - Redireciona para login
     if (response.status === 401) {
-      console.warn("⚠️ Sessão expirada ou inválida. Redirecionando para login...");
       
       // Limpa sessão do Supabase
       await supabase.auth.signOut();
@@ -95,7 +94,6 @@ async function fetchWithAuth(url, options = {}) {
     
     // 404: Recurso não encontrado (pode ser usuário novo sem attributes)
     if (response.status === 404) {
-      console.warn("⚠️ Recurso não encontrado (404):", errorMessage);
       
       // Cria erro customizado para 404
       const notFoundError = new Error(errorMessage);
@@ -271,7 +269,7 @@ export async function uploadResumeFile(file, title = null) {
     const errorMessage = errorData.detail || `Erro HTTP: ${response.status}`;
     
     if (response.status === 401) {
-      console.warn("Sessão expirada ou inválida. Redirecionando para login...");
+      
       await supabase.auth.signOut();
       window.location.href = "/login";
       throw new AuthenticationError(errorMessage);
@@ -382,12 +380,11 @@ export async function analyzeResumeStreaming(resumeId, callbacks) {
           const { done, value } = await reader.read();
           
           if (done) {
-            console.log("✅ Stream de análise finalizado");
+            
             break;
           }
 
           const chunk = decoder.decode(value, { stream: true });
-          console.log(`📦 Chunk recebido: ${chunk.length} bytes`);
           
           buffer += chunk;
           
@@ -400,7 +397,6 @@ export async function analyzeResumeStreaming(resumeId, callbacks) {
             } else if (line.startsWith("data:")) {
               currentData = line.substring(5).trim();
             } else if (line === "" && currentEvent && currentData) {
-              console.log(`⚡ Processando evento: ${currentEvent}`);
               
               try {
                 const data = JSON.parse(currentData);
@@ -442,7 +438,7 @@ export async function analyzeResumeStreaming(resumeId, callbacks) {
     readStream();
     
     return () => {
-      console.log("🛑 Cancelando stream de análise...");
+      
       controller.abort();
       reader.cancel();
     };
@@ -506,12 +502,11 @@ export async function uploadAndAnalyzeResumeFileStreaming(file, title, callbacks
           const { done, value } = await reader.read();
           
           if (done) {
-            console.log("✅ Stream de upload+análise finalizado");
+            
             break;
           }
 
           const chunk = decoder.decode(value, { stream: true });
-          console.log(`📦 Chunk recebido: ${chunk.length} bytes`);
           
           buffer += chunk;
           
@@ -524,7 +519,6 @@ export async function uploadAndAnalyzeResumeFileStreaming(file, title, callbacks
             } else if (line.startsWith("data:")) {
               currentData = line.substring(5).trim();
             } else if (line === "" && currentEvent && currentData) {
-              console.log(`⚡ Processando evento: ${currentEvent}`);
               
               try {
                 const data = JSON.parse(currentData);
@@ -566,7 +560,7 @@ export async function uploadAndAnalyzeResumeFileStreaming(file, title, callbacks
     readStream();
     
     return () => {
-      console.log("🛑 Cancelando stream de upload+análise...");
+      
       controller.abort();
       reader.cancel();
     };
@@ -618,13 +612,12 @@ export async function generateChallengesStreaming(callbacks) {
           const { done, value } = await reader.read();
           
           if (done) {
-            console.log("✅ Stream finalizado");
+            
             break;
           }
 
           // Decodificar chunk
           const chunk = decoder.decode(value, { stream: true });
-          console.log(`📦 Chunk recebido: ${chunk.length} bytes`);
           
           buffer += chunk;
           
@@ -639,7 +632,6 @@ export async function generateChallengesStreaming(callbacks) {
               currentData = line.substring(5).trim();
             } else if (line === "" && currentEvent && currentData) {
               // Evento completo, processar IMEDIATAMENTE
-              console.log(`⚡ Processando evento: ${currentEvent}`);
               
               try {
                 const data = JSON.parse(currentData);
@@ -687,7 +679,7 @@ export async function generateChallengesStreaming(callbacks) {
     
     // Retorna função para cancelar
     return () => {
-      console.log("🛑 Cancelando stream...");
+      
       controller.abort();
       reader.cancel();
     };
