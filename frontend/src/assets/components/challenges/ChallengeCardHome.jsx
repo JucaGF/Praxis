@@ -255,10 +255,6 @@ export default function ChallengeCardHome({ challenge, expanded, onToggle }) {
               <span className="font-medium">O que será avaliado:</span> clareza do código, testes básicos,
               comunicação (README) e performance quando aplicável.
             </div>
-            <div>
-              <span className="font-medium">Passos sugeridos:</span> entender o bug/feature, planejar,
-              implementar, testar e documentar.
-            </div>
           </div>
 
           {/* Ações extras quando expandido */}
