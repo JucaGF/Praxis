@@ -239,14 +239,14 @@ class SqlRepo(IRepository):
             if "career_goal" in patch and patch["career_goal"] is not None:
                 a.career_goal = patch["career_goal"]
             if "soft_skills" in patch and patch["soft_skills"]:
-                a.soft_skills = {**(a.soft_skills or {}),
-                                 **patch["soft_skills"]}
+                # ⚠️ SUBSTITUIÇÃO COMPLETA (não merge) para evitar skills mockadas antigas
+                a.soft_skills = patch["soft_skills"]
             if "tech_skills" in patch and patch["tech_skills"]:
-                a.tech_skills = {**(a.tech_skills or {}),
-                                 **patch["tech_skills"]}
+                # ⚠️ SUBSTITUIÇÃO COMPLETA (não merge) para evitar skills mockadas antigas
+                a.tech_skills = patch["tech_skills"]
             if "strong_skills" in patch and patch["strong_skills"]:
-                a.strong_skills = {**(a.strong_skills or {}),
-                                   **patch["strong_skills"]}
+                # ⚠️ SUBSTITUIÇÃO COMPLETA (não merge) para evitar skills mockadas antigas
+                a.strong_skills = patch["strong_skills"]
             a.updated_at = datetime.utcnow()
             s.add(a)
             s.commit()

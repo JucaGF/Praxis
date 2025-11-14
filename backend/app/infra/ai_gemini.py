@@ -236,7 +236,7 @@ ESTRUTURA DE CADA DESAFIO:
     "text": "Descrição conversacional (chefe pedindo) 2-3 linhas",
     "type": "codigo|texto_livre|planejamento",
     "language": "python|javascript|sql|markdown",
-    "eval_criteria": ["critério1", "critério2", "critério3"],
+    "eval_criteria": ["critério1", "critério2", "critério3"],  // ⚠️ Use NOMES DE HABILIDADES objetivos
     "target_skill": "Skill principal do perfil",
     "affected_skills": ["Skill1", "Skill2", "Skill3"],  // NOVO: 2-4 skills que o desafio avalia
     "hints": ["dica útil 1", "dica útil 2"],
@@ -266,7 +266,16 @@ REGRAS OBRIGATÓRIAS:
    - Para code: skills técnicas relacionadas (ex: ["Python", "FastAPI", "SQL"])
    - Para daily-task: soft skills (ex: ["Comunicação", "Empatia", "Resolução de Conflitos"])
    - Para organization: skills de arquitetura (ex: ["Arquitetura", "Escalabilidade", "Trade-offs"])
-4. ⚠️ DIFICULDADE DOS DESAFIOS (REGRA CRÍTICA):
+   - ⚠️ IMPORTANTE: Use NOMES DE HABILIDADES, não frases em primeira pessoa
+   - ❌ ERRADO: "Consigo explicar problemas técnicos para pessoas não técnicas"
+   - ✅ CORRETO: "Comunicação técnica", "Explicação simplificada", "Didática"
+4. eval_criteria: Array com 3-4 NOMES DE HABILIDADES que serão avaliadas
+   - ⚠️ Use SUBSTANTIVOS/NOMES TÉCNICOS objetivos, NÃO frases em primeira pessoa
+   - ❌ ERRADO: "Consigo explicar problemas técnicos para pessoas não técnicas"
+   - ❌ ERRADO: "Clareza e objetividade da explicação"
+   - ✅ CORRETO: "Comunicação técnica", "SQL", "Debugging", "Arquitetura de software"
+   - Exemplos válidos: "Python", "FastAPI", "Resolução de problemas", "Empatia", "Trade-offs"
+5. ⚠️ DIFICULDADE DOS DESAFIOS (REGRA CRÍTICA):
    - Gere exatamente 1 desafio EASY, 1 MEDIUM e 1 HARD
    - ❌ PROIBIDO: organization=hard, daily-task=medium, code=easy (padrão fixo)
    - ✅ OBRIGATÓRIO: Varie a distribuição a cada geração
@@ -276,9 +285,9 @@ REGRAS OBRIGATÓRIAS:
      * daily-task=medium, organization=easy, code=hard
      * code=easy, organization=hard, daily-task=medium
    - Se você gerar organization=hard, daily-task=medium, code=easy, a resposta será REJEITADA
-5. description.text: Tom conversacional (chefe falando)
-6. SEMPRE adicione 2-4 hints úteis e práticas
-7. Para type="codigo" → category="code":
+6. description.text: Tom conversacional (chefe falando)
+7. SEMPRE adicione 2-4 hints úteis e práticas
+8. Para type="codigo" → category="code":
    - fs é OBRIGATÓRIO (não null!)
    - fs.files: 2-4 caminhos realistas
    - fs.open: arquivo principal
@@ -286,12 +295,12 @@ REGRAS OBRIGATÓRIAS:
    - Código deve ser bugado, incompleto ou precisar refatoração
    - enunciado: null
    - template_code: null
-8. Para type="texto_livre" → category="daily-task":
+9. Para type="texto_livre" → category="daily-task":
    - fs: null
    - enunciado: OBRIGATÓRIO - simule um e-mail/ticket realista
      Formato: {"type": "email", "de": "nome@empresa.com", "assunto": "assunto do email", "data": "2024-11-15", "corpo": "texto do email (3-5 linhas)"}
    - template_code: null
-9. Para type="planejamento" → category="organization":
+10. Para type="planejamento" → category="organization":
    - fs: null
    - enunciado: OBRIGATÓRIO - requisitos estruturados
      Formato: {"type": "requisitos", "funcionais": ["req1", "req2", "req3"], "nao_funcionais": ["req1", "req2"]}
@@ -308,8 +317,9 @@ EXEMPLOS COMPLETOS:
     "text": "E aí! O endpoint de login tá aceitando email sem @ e retornando 500. Os clientes tão reclamando. Pode corrigir pra retornar 400 com mensagem clara?",
     "type": "codigo",
     "language": "python",
-    "eval_criteria": ["Status HTTP 400", "Validação de email", "Mensagem clara"],
+    "eval_criteria": ["FastAPI", "Validação de dados", "Tratamento de erros"],
     "target_skill": "FastAPI",
+    "affected_skills": ["FastAPI", "Python", "Pydantic", "APIs REST"],
     "hints": ["Use EmailStr do pydantic", "HTTPException(status_code=400)", "Adicione try-except na rota"],
     "enunciado": null
   },
@@ -334,8 +344,9 @@ EXEMPLOS COMPLETOS:
     "text": "Oi! Temos um cliente insatisfeito com atraso na entrega. Ele enviou um email meio áspero. Pode redigir uma resposta profissional explicando o ocorrido e oferecendo compensação?",
     "type": "texto_livre",
     "language": "markdown",
-    "eval_criteria": ["Tom profissional", "Empatia", "Solução proposta", "Clareza"],
+    "eval_criteria": ["Comunicação escrita", "Empatia", "Resolução de conflitos"],
     "target_skill": "Comunicação",
+    "affected_skills": ["Comunicação", "Empatia", "Gestão de crises", "Profissionalismo"],
     "hints": ["Reconheça o problema primeiro", "Explique sem fazer desculpas", "Ofereça algo concreto"],
     "enunciado": {
       "type": "email",
@@ -358,8 +369,9 @@ EXEMPLOS COMPLETOS:
     "text": "Fala! Vamos implementar notificações em tempo real no app (likes, comentários, mensagens). Preciso que você planeje a arquitetura: quais tecnologias usar, como escalar, trade-offs, etc.",
     "type": "planejamento",
     "language": "markdown",
-    "eval_criteria": ["Escolha de tecnologias", "Escalabilidade", "Justificativa técnica", "Trade-offs"],
+    "eval_criteria": ["Arquitetura de software", "Escalabilidade", "Análise de trade-offs"],
     "target_skill": "Arquitetura",
+    "affected_skills": ["Arquitetura", "WebSockets", "Redis", "Escalabilidade"],
     "hints": ["Pense em WebSocket vs SSE vs Polling", "Como armazenar notificações não lidas?", "Redis pode ajudar na performance"],
     "enunciado": {
       "type": "requisitos",

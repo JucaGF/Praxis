@@ -105,13 +105,21 @@ function transformChallenges(apiChallenges, submissions = []) {
       hard: "Difícil",
     };
 
-    // Extrai skills do target_skill ou eval_criteria
+    // Extrai skills de affected_skills (novo formato) ou fallback para eval_criteria/target_skill
     const skills = [];
-    if (challenge.description?.target_skill) {
-      skills.push(challenge.description.target_skill);
-    }
-    if (challenge.description?.eval_criteria) {
-      skills.push(...challenge.description.eval_criteria.slice(0, 2)); // Limita a 3 skills total
+    
+    // Prioridade 1: affected_skills (formato novo, nomes objetivos)
+    if (challenge.description?.affected_skills && challenge.description.affected_skills.length > 0) {
+      skills.push(...challenge.description.affected_skills.slice(0, 3));
+    } 
+    // Fallback: eval_criteria + target_skill (formato antigo, pode ter frases)
+    else {
+      if (challenge.description?.target_skill) {
+        skills.push(challenge.description.target_skill);
+      }
+      if (challenge.description?.eval_criteria) {
+        skills.push(...challenge.description.eval_criteria.slice(0, 2)); // Limita a 3 skills total
+      }
     }
 
     // Formata tempo
@@ -1524,32 +1532,6 @@ export default function Home() {
               );
           })
         )}
-        </div>
-
-              return (
-                <div
-                  key={c.id}
-                  style={{
-                    gridColumn: expanded
-                      ? "span 6"
-                      : isFirstCollapsed
-                      ? "2 / span 2"
-                      : isSecondCollapsed
-                      ? "4 / span 2"
-                      : "span 2",
-                  }}
-                  className={
-                    expandedId && !expanded ? "scale-95 opacity-90" : ""
-                  }
-                >
-                  <ChallengeCardHome
-                    challenge={c}
-                    expanded={expanded}
-                    onToggle={() => toggleExpand(c.id)}
-                  />
-                </div>
-              );
-            })}
         </div>
 
         {/* ==================== ANÁLISE DE CURRÍCULO ==================== */}

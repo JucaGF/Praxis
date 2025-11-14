@@ -220,6 +220,69 @@ def apply_skill_update(
     return tech_skills
 
 
+def map_skill_to_user_skill(skill_name: str, user_skills: Dict[str, int], is_soft_skill: bool) -> Optional[str]:
+    """
+    Mapeia uma skill avaliada pela IA para a skill real do usuário.
+    
+    Para soft skills, faz matching inteligente baseado em palavras-chave.
+    Para tech skills, busca match exato ou parcial.
+    
+    Args:
+        skill_name: Nome da skill avaliada pela IA
+        user_skills: Dict com as skills do usuário
+        is_soft_skill: Se True, usa mapeamento de soft skills
+    
+    Returns:
+        Nome da skill do usuário que corresponde, ou None se não encontrar
+    """
+    # Match exato (prioridade máxima)
+    if skill_name in user_skills:
+        return skill_name
+    
+    # Para soft skills, usa mapeamento baseado em palavras-chave
+    if is_soft_skill:
+        skill_lower = skill_name.lower()
+        
+        # Mapeamento de palavras-chave para soft skills padrão
+        comunicacao_keywords = ["comunicação", "comunicacao", "comunicar", "explicar", "escrever", "mensagem", "email", "técnica", "tecnica", "equipe"]
+        organizacao_keywords = ["organização", "organizacao", "organizar", "planejar", "planejamento", "priorizar", "gerenciar", "gestão", "gestao"]
+        resolucao_keywords = ["resolução", "resolucao", "resolver", "problema", "debugar", "debug", "investigar", "análise", "analise"]
+        
+        # Verifica cada skill do usuário
+        for user_skill in user_skills.keys():
+            user_skill_lower = user_skill.lower()
+            
+            # Se a skill avaliada contém palavras-chave de Comunicação
+            if any(keyword in skill_lower for keyword in comunicacao_keywords):
+                if any(keyword in user_skill_lower for keyword in comunicacao_keywords):
+                    logger.info(f"Mapeamento soft skill: '{skill_name}' → '{user_skill}'")
+                    return user_skill
+            
+            # Se a skill avaliada contém palavras-chave de Organização
+            if any(keyword in skill_lower for keyword in organizacao_keywords):
+                if any(keyword in user_skill_lower for keyword in organizacao_keywords):
+                    logger.info(f"Mapeamento soft skill: '{skill_name}' → '{user_skill}'")
+                    return user_skill
+            
+            # Se a skill avaliada contém palavras-chave de Resolução de Problemas
+            if any(keyword in skill_lower for keyword in resolucao_keywords):
+                if any(keyword in user_skill_lower for keyword in resolucao_keywords):
+                    logger.info(f"Mapeamento soft skill: '{skill_name}' → '{user_skill}'")
+                    return user_skill
+    
+    # Para tech skills, tenta match parcial (case-insensitive)
+    else:
+        skill_lower = skill_name.lower()
+        for user_skill in user_skills.keys():
+            if skill_lower in user_skill.lower() or user_skill.lower() in skill_lower:
+                logger.info(f"Mapeamento tech skill: '{skill_name}' → '{user_skill}'")
+                return user_skill
+    
+    # Não encontrou correspondência
+    logger.warning(f"Skill '{skill_name}' não pôde ser mapeada para nenhuma skill do usuário: {list(user_skills.keys())}")
+    return None
+
+
 def process_multiple_skills(
     profile_id: str,
     affected_skills: List[str],
@@ -234,6 +297,7 @@ def process_multiple_skills(
     Processa progressão de múltiplas skills de uma vez.
     
     Diferencia automaticamente entre tech_skills e soft_skills baseado na categoria.
+    Faz mapeamento inteligente entre skills avaliadas e skills do usuário.
     
     Args:
         profile_id: ID do perfil
@@ -266,15 +330,30 @@ def process_multiple_skills(
     deltas = {}
     new_values = {}
     
-    # Processa cada skill
-    for skill_name in affected_skills:
-        # Pula se não tiver assessment da IA para essa skill
-        if skill_name not in skills_assessment:
-            logger.warning(f"Skill '{skill_name}' não tem assessment da IA, pulando")
+    # Processa cada skill avaliada pela IA
+    for assessed_skill_name in skills_assessment.keys():
+        assessment = skills_assessment[assessed_skill_name]
+        
+        # ✅ MAPEAMENTO INTELIGENTE: Mapeia skill avaliada para skill do usuário
+        user_skill_name = map_skill_to_user_skill(assessed_skill_name, current_skills, is_soft_skill)
+        
+        if user_skill_name is None:
+            # Skill não pôde ser mapeada para nenhuma skill do usuário
+            logger.warning(
+                f"Skill avaliada '{assessed_skill_name}' não corresponde a nenhuma skill do usuário. "
+                f"Skills disponíveis ({skill_type}): {list(current_skills.keys())}"
+            )
             continue
         
-        skill_atual = current_skills.get(skill_name, 50)  # Default 50 se não existe
-        assessment = skills_assessment[skill_name]
+        # Evita processar a mesma skill do usuário múltiplas vezes
+        if user_skill_name in deltas:
+            logger.info(
+                f"Skill '{user_skill_name}' já foi processada (mapeada de '{assessed_skill_name}'). "
+                f"Usando apenas a primeira avaliação."
+            )
+            continue
+        
+        skill_atual = current_skills[user_skill_name]
         
         # Calcula delta com nova fórmula
         delta = calculate_skill_delta_v2(
@@ -287,10 +366,16 @@ def process_multiple_skills(
         
         # Aplica mudança
         new_value = clamp_skill(skill_atual + delta)
-        current_skills[skill_name] = new_value
+        current_skills[user_skill_name] = new_value
         
-        deltas[skill_name] = delta
-        new_values[skill_name] = new_value
+        deltas[user_skill_name] = delta
+        new_values[user_skill_name] = new_value
+        
+        logger.info(
+            f"Skill atualizada: '{user_skill_name}' "
+            f"(avaliada como '{assessed_skill_name}'): "
+            f"{skill_atual} → {new_value} (delta: {delta:+d})"
+        )
     
     # Salva no banco
     if is_soft_skill:
@@ -619,10 +704,22 @@ class SubmissionService:
         # NOVO SISTEMA: Múltiplas skills
         if affected_skills and skills_assessment:
             try:
+                # ✅ VALIDAÇÃO PÓS-IA: Remove skills que não estão em affected_skills
+                validated_assessment = {}
+                for skill_name, assessment in skills_assessment.items():
+                    if skill_name in affected_skills:
+                        validated_assessment[skill_name] = assessment
+                    else:
+                        logger.warning(
+                            f"IA avaliou skill '{skill_name}' que não está em affected_skills. "
+                            f"Ignorando. Esperado: {affected_skills}",
+                            extra={"extra_data": {**ctx, "invalid_skill": skill_name}}
+                        )
+                
                 skills_progression = process_multiple_skills(
                     submission_data["profile_id"],
                     affected_skills,
-                    skills_assessment,
+                    validated_assessment,  # Usa assessment validado
                     score,
                     difficulty_level,
                     attempts,
