@@ -106,16 +106,16 @@ export default function CadastroSucesso() {
           Conta criada com sucesso!
         </h2>
         <p className="text-gray-600 mb-6">
-          Sua conta foi criada com o GitHub. Agora você pode fazer login e
-          começar a usar a plataforma.
+          Sua conta foi criada com o GitHub. Complete seu perfil para ter uma
+          experiência personalizada.
         </p>
 
         <div className="space-y-3">
           <Link
-            to="/login"
+            to="/onboarding"
             className="inline-block px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold transition w-full cursor-pointer"
           >
-            Fazer Login
+            Completar Meu Perfil
           </Link>
         </div>
 
