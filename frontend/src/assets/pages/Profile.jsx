@@ -464,15 +464,6 @@ export default function Profile() {
           authUser?.email?.split("@")[0] || // Parte do email antes do @
           "Usuário"; // Fallback
 
-        console.log("👤 Dados do usuário Profile:", {
-          full_name: authUser?.user_metadata?.full_name, // Cadastro normal
-          nome: authUser?.user_metadata?.nome, // Cadastro normal (pt)
-          user_name: authUser?.user_metadata?.user_name, // GitHub
-          name: authUser?.user_metadata?.name, // Alternativo
-          email: authUser?.email,
-          final_name: fullName,
-        });
-
         // Formata o usuário com o nome real
         setUser({ full_name: fullName });
 
@@ -494,19 +485,7 @@ export default function Profile() {
           );
           // Limita aos últimos 5 desafios
           const last5Submissions = completedSubmissions.slice(0, 5);
-          console.log("📊 Submissões recebidas:", {
-            total: submissionsData?.length || 0,
-            scored: completedSubmissions.length,
-            last5: last5Submissions.length,
-            allStatuses:
-              submissionsData?.map((s) => ({
-                id: s.id,
-                status: s.status,
-                date: s.date,
-                score: s.score,
-                points: s.points,
-              })) || [],
-          });
+          
           setSubmissions(last5Submissions);
         } catch (error) {
           console.error("Erro ao buscar submissões:", error);
@@ -522,7 +501,6 @@ export default function Profile() {
           setMyResumes([]);
         }
 
-        console.log("📊 Dados do perfil carregados:", { fullName });
       } catch (error) {
         console.error("Erro ao carregar dados do perfil:", error);
         // Seta valores padrão se tudo falhar
@@ -654,8 +632,6 @@ export default function Profile() {
       // 1. Deleta o perfil (trigger limpa dados relacionados)
       // 2. Deleta o usuário de auth.users via Admin API
       await deleteAccount();
-
-      console.log("Conta deletada com sucesso");
 
       // Faz logout local
       await supabase.auth.signOut();

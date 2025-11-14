@@ -33,37 +33,30 @@ export default function Onboarding() {
         });
       }
     } catch (err) {
-      console.warn("Erro ao atualizar career_goal:", err);
+      
     }
     
     setEtapa("hardskills");
   };
 
   const concluirHardSkills = (skillsData) => {
-    console.log("💪 concluirHardSkills chamado!");
-    console.log("📊 Dados recebidos:", skillsData);
-    console.log("📊 Tipo dos dados:", typeof skillsData);
-    console.log("📊 Keys:", skillsData ? Object.keys(skillsData) : "null");
     
     // skillsData agora contém { tech_skills, strong_skills }
     setHardSkills(skillsData);
-    console.log("✅ hardSkills state atualizado");
-    console.log("🔄 Mudando etapa para softskills...");
+    
     setEtapa("softskills");
   };
 
   const concluirSoftSkills = async (skills) => {
-    console.log("🎯 concluirSoftSkills chamado com:", skills);
+    
     setSoftSkills(skills);
     setEtapa("salvando");
     setLoading(true);
 
     try {
-      console.log("🔍 Verificando usuário autenticado...");
+      
       // Obter user ID e verificar se o usuário ainda existe
       const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      console.log("👤 Usuário obtido:", user?.id, "Erro:", authError);
       
       if (authError || !user) {
         console.error("⚠️ Usuário não encontrado ou sessão inválida:", authError);
@@ -73,50 +66,43 @@ export default function Onboarding() {
         return;
       }
 
-      console.log("📦 Preparando payload...");
       // Preparar payload
       const payload = {};
       
       if (hardSkills) {
-        console.log("💪 Hard skills recebidas:", hardSkills);
+        
         // hardSkills agora é { tech_skills, strong_skills }
         if (hardSkills.tech_skills) {
           payload.tech_skills = hardSkills.tech_skills;
-          console.log("✅ tech_skills adicionadas ao payload");
+          
         }
         if (hardSkills.strong_skills) {
           payload.strong_skills = hardSkills.strong_skills;
-          console.log("✅ strong_skills adicionadas ao payload");
+          
         }
       } else {
-        console.warn("⚠️ hardSkills está vazio/null!");
+        
       }
       
       if (skills) {
         payload.soft_skills = skills;
-        console.log("✅ soft_skills adicionadas ao payload");
+        
       } else {
-        console.warn("⚠️ skills (soft) está vazio/null!");
+        
       }
 
       if (carreira) {
         payload.career_goal = carreira;
-        console.log("✅ career_goal adicionado ao payload:", carreira);
+        
       }
-
-      console.log("💾 Salvando atributos para usuário:", user.id);
-      console.log("📦 Payload FINAL a ser enviado:", JSON.stringify(payload, null, 2));
 
       // Salvar atributos na API
       const result = await updateAttributes(user.id, payload);
 
-      console.log("✅ Atributos salvos com sucesso!");
-      console.log("📥 Resposta da API:", result);
-
       // Redirecionar para Home
-      console.log("🏠 Redirecionando para /home em 1 segundo...");
+      
       setTimeout(() => {
-        console.log("🚀 Executando navigate para /home");
+        
         navigate("/home");
       }, 1000);
 
@@ -128,7 +114,7 @@ export default function Onboarding() {
       
       // Se for erro de autenticação, limpar sessão
       if (err.message?.includes("401") || err.message?.includes("Não autenticado") || err.name === "AuthenticationError") {
-        console.warn("⚠️ Erro de autenticação. Limpando sessão...");
+        
         await supabase.auth.signOut();
         navigate("/", { replace: true });
         return;
@@ -136,7 +122,7 @@ export default function Onboarding() {
       
       setError(`Erro ao salvar atributos: ${err.message}`);
       setLoading(false);
-      console.log("🔄 Voltando para etapa softskills devido ao erro");
+      
       setEtapa("softskills"); // Volta para a etapa anterior
     }
   };
@@ -333,14 +319,13 @@ function TelaSalvando({ error }) {
   
   const forcarLogout = async () => {
     try {
-      console.log("🔄 Forçando logout e limpando sessão...");
+      
       await supabase.auth.signOut();
       
       // Limpar qualquer storage do Supabase manualmente (caso necessário)
       localStorage.clear();
       sessionStorage.clear();
       
-      console.log("✅ Sessão limpa com sucesso!");
       navigate("/", { replace: true });
     } catch (err) {
       console.error("❌ Erro ao forçar logout:", err);
@@ -385,5 +370,3 @@ function TelaSalvando({ error }) {
     </div>
   );
 }
-
-

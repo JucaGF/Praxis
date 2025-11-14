@@ -3,6 +3,8 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import PraxisLogo from "../components/PraxisLogo";
+import { useToast } from "../components/ui/Toast";
+import { getErrorMessage, isValidEmail, isValidPassword } from "../utils/errorMessages";
 
 const GitHubIcon = () => (
   <svg
@@ -17,6 +19,7 @@ const GitHubIcon = () => (
 
 export default function Cadastro() {
   const navigate = useNavigate();
+  const { showSuccess, showError: showToastError } = useToast();
   const [formData, setFormData] = useState({
     nome: "",
     email: "",
@@ -38,7 +41,7 @@ export default function Cadastro() {
 
       if (error) throw error;
     } catch (err) {
-      setError(`Erro ao conectar com GitHub: ${err.message}`);
+      setError('Não foi possível conectar com o GitHub. Tente novamente.');
     }
   };
 
@@ -46,6 +49,25 @@ export default function Cadastro() {
     e.preventDefault();
     setError("");
     setLoading(true);
+
+    // Validações no frontend
+    if (!formData.nome || formData.nome.trim().length < 2) {
+      setError('Por favor, insira seu nome completo.');
+      setLoading(false);
+      return;
+    }
+
+    if (!formData.email || !isValidEmail(formData.email)) {
+      setError('Por favor, insira um email válido.');
+      setLoading(false);
+      return;
+    }
+
+    if (!formData.senha || !isValidPassword(formData.senha)) {
+      setError('A senha deve ter pelo menos 6 caracteres.');
+      setLoading(false);
+      return;
+    }
 
     try {
       const { error: authError } = await supabase.auth.signUp({
@@ -65,7 +87,7 @@ export default function Cadastro() {
 
       setCadastroRealizado(true);
     } catch (err) {
-      setError(`Erro ao criar conta: ${err.message}`);
+      setError(getErrorMessage(err, 'signup'));
     } finally {
       setLoading(false);
     }
@@ -84,9 +106,9 @@ export default function Cadastro() {
 
       if (error) throw error;
 
-      alert("Email de confirmação reenviado! Verifique sua caixa de entrada.");
+      showSuccess("Email de confirmação reenviado! Verifique sua caixa de entrada.");
     } catch (err) {
-      setError(`Erro ao reenviar email: ${err.message}`);
+      setError('Não foi possível reenviar o email. Tente novamente em alguns instantes.');
     } finally {
       setLoading(false);
     }

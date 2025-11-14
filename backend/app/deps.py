@@ -16,7 +16,6 @@ from fastapi import Header, Depends
 
 from backend.app.domain.ports import IRepository, IAIService
 from backend.app.infra.repo_sql import SqlRepo
-from backend.app.infra.ai_fake import FakeAI
 from backend.app.domain.services import ChallengeService, SubmissionService
 from backend.app.domain.auth_service import get_auth_service, AuthService, AuthUser
 from backend.app.config import get_settings
@@ -29,60 +28,46 @@ logger = get_logger(__name__)
 
 def _create_ai_service() -> IAIService:
     """
-    Factory que cria a instância correta de IA baseado nas configurações.
+    Factory que cria a instância de IA (Gemini).
 
-    Lê AI_PROVIDER do .env e retorna:
-    - "fake": FakeAI (mock para desenvolvimento)
-    - "gemini": GeminiAI (IA real do Google)
+    Requer GEMINI_API_KEY configurada no .env.
 
     Raises:
-        ValueError: Se AI_PROVIDER inválido ou GEMINI_API_KEY ausente
+        ValueError: Se GEMINI_API_KEY ausente ou erro ao importar GeminiAI
     """
     settings = get_settings()
-    provider = settings.AI_PROVIDER.lower()
-
-    if provider == "fake":
-        logger.info("🤖 Usando FakeAI (modo desenvolvimento)")
-        return FakeAI()
-
-    elif provider == "gemini":
-        # Import tardio (só quando necessário)
-        try:
-            from backend.app.infra.ai_gemini import GeminiAI
-        except ImportError as e:
-            logger.error(f"Erro ao importar GeminiAI: {e}")
-            raise ValueError(
-                "GeminiAI não disponível. Instale: pip install google-generativeai"
-            )
-
-        # Valida API key
-        if not settings.GEMINI_API_KEY:
-            raise ValueError(
-                "GEMINI_API_KEY não configurada! "
-                "Adicione no .env ou use AI_PROVIDER=fake para desenvolvimento."
-            )
-
-        logger.info(
-            f"🚀 Usando GeminiAI (modelo: {settings.GEMINI_MODEL})",
-            extra={"extra_data": {
-                "model": settings.GEMINI_MODEL,
-                "max_retries": settings.AI_MAX_RETRIES,
-                "timeout": settings.AI_TIMEOUT
-            }}
-        )
-
-        return GeminiAI(
-            api_key=settings.GEMINI_API_KEY,
-            model_name=settings.GEMINI_MODEL,
-            max_retries=settings.AI_MAX_RETRIES,
-            timeout=settings.AI_TIMEOUT
-        )
-
-    else:
+    
+    # Import tardio (só quando necessário)
+    try:
+        from backend.app.infra.ai_gemini import GeminiAI
+    except ImportError as e:
+        logger.error(f"Erro ao importar GeminiAI: {e}")
         raise ValueError(
-            f"AI_PROVIDER inválido: '{provider}'. "
-            f"Use 'fake' ou 'gemini'."
+            "GeminiAI não disponível. Instale: pip install google-generativeai"
         )
+
+    # Valida API key
+    if not settings.GEMINI_API_KEY:
+        raise ValueError(
+            "GEMINI_API_KEY não configurada! "
+            "Adicione GEMINI_API_KEY no arquivo .env"
+        )
+
+    logger.info(
+        f"🚀 Usando GeminiAI (modelo: {settings.GEMINI_MODEL})",
+        extra={"extra_data": {
+            "model": settings.GEMINI_MODEL,
+            "max_retries": settings.AI_MAX_RETRIES,
+            "timeout": settings.AI_TIMEOUT
+        }}
+    )
+
+    return GeminiAI(
+        api_key=settings.GEMINI_API_KEY,
+        model_name=settings.GEMINI_MODEL,
+        max_retries=settings.AI_MAX_RETRIES,
+        timeout=settings.AI_TIMEOUT
+    )
 
 
 # ==================== INSTÂNCIAS GLOBAIS ====================
@@ -105,13 +90,9 @@ def get_repo() -> IRepository:
 
 def get_ai() -> IAIService:
     """
-    Fornece instância de AI Service.
+    Fornece instância de AI Service (GeminiAI).
 
-    Retorna automaticamente:
-    - FakeAI se AI_PROVIDER=fake (desenvolvimento)
-    - GeminiAI se AI_PROVIDER=gemini (produção)
-
-    A escolha é feita pelo factory _create_ai_service() baseado no .env
+    Requer GEMINI_API_KEY configurada no .env.
     """
     return _ai
 

@@ -23,6 +23,9 @@ import CadastroSucesso from "./assets/pages/CadastroSucesso";
 // --- Hook de autenticação ---
 import { useAuth } from "./assets/hooks/useAuth";
 
+// --- Toast Provider ---
+import { ToastProvider } from "./assets/components/ui/Toast";
+
 // --- Componente de Loading ---
 function LoadingSpinner() {
   return (
@@ -57,10 +60,11 @@ function PublicRoute({ children }) {
 
 export default function App() {
   return (
-    <Router>
-      <Routes>
-        {/* --- Rota pública (acessível a todos) --- */}
-        <Route path="/" element={<Landing />} />
+    <ToastProvider>
+      <Router>
+        <Routes>
+          {/* --- Rota pública (acessível a todos) --- */}
+          <Route path="/" element={<Landing />} />
 
         {/* --- Rota de emergência para forçar logout (sempre acessível) --- */}
         <Route path="/force-logout" element={<ForceLogout />} />
@@ -132,6 +136,7 @@ export default function App() {
         {/* --- Fallback --- */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </Router>
+      </Router>
+    </ToastProvider>
   );
 }

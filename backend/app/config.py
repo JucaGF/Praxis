@@ -205,25 +205,11 @@ class Settings(BaseSettings):
     
     # ==================== INTELIGÊNCIA ARTIFICIAL ====================
     
-    AI_PROVIDER: str = "fake"
-    """
-    Provedor de IA a usar.
-    
-    Opções:
-    - "fake": IA mock para desenvolvimento (rápido, grátis, sem API calls)
-    - "gemini": Google Gemini (IA real, requer API key)
-    
-    Uso:
-    - Desenvolvimento/Testes: use "fake"
-    - Produção: use "gemini"
-    
-    Exemplo no .env:
-        AI_PROVIDER=fake  # ou gemini
-    """
+    # Nota: Sistema usa apenas Google Gemini. AI_PROVIDER foi removido.
     
     GEMINI_API_KEY: str = ""
     """
-    API Key do Google Gemini.
+    API Key do Google Gemini (obrigatória).
     
     Onde conseguir:
     1. Acesse: https://aistudio.google.com/app/apikey
@@ -232,7 +218,7 @@ class Settings(BaseSettings):
     4. Copie a chave
     
     IMPORTANTE:
-    - Obrigatório se AI_PROVIDER=gemini
+    - Obrigatória para o funcionamento do sistema
     - Mantenha secreta (não commite no git!)
     - Grátis: 60 requests/minuto
     
@@ -342,7 +328,6 @@ def print_settings():
     print(f"DEBUG: {settings.DEBUG}")
     print(f"ENVIRONMENT: {settings.ENVIRONMENT}")
     print(f"CORS_ORIGINS: {settings.CORS_ORIGINS}")
-    print(f"AI_PROVIDER: {settings.AI_PROVIDER}")
     print(f"GEMINI_MODEL: {settings.GEMINI_MODEL}")
     
     # Oculta API key do Gemini
