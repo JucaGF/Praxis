@@ -285,8 +285,7 @@ export default function Login() {
             <div className="mb-6">
               <button
                 type="button"
-                onClick={handleGitHubLogin}
-                className="w-full flex items-center justify-center py-3 px-4 rounded-lg shadow-sm text-base font-semibold text-white transition duration-150 ease-in-out bg-gray-800 hover:bg-gray-900 cursor-pointer"
+                className="w-full flex items-center justify-center py-3 px-4 rounded-lg shadow-sm text-base font-semibold text-white transition duration-150 ease-in-out bg-blue-600 hover:bg-blue-700 cursor-pointer"
               >
                 <GitHubIcon />
                 Entre com o GitHub

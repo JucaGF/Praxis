@@ -523,6 +523,66 @@ class SqlRepo(IRepository):
             ).all()
             
             return list(submissions) if submissions else []
+    
+    def get_submissions_with_details(
+        self, 
+        profile_id: str, 
+        challenge_id: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        🚀 OTIMIZADO: Busca submissões com challenges e feedbacks em uma única query usando JOINs.
+        
+        Evita o problema N+1 queries que causava lentidão no carregamento.
+        
+        Args:
+            profile_id: ID do perfil
+            challenge_id: Opcional - filtra por challenge específico
+            
+        Returns:
+            Lista de dicts com estrutura:
+            {
+                'submission': Submission object,
+                'challenge': dict com dados do challenge,
+                'feedback': SubmissionFeedback object ou None
+            }
+        """
+        from sqlalchemy.orm import selectinload
+        
+        with Session(self.engine) as s:
+            # Converte profile_id para UUID
+            try:
+                pid = uuid.UUID(profile_id)
+            except ValueError:
+                pid = profile_id
+            
+            # Query base com JOINs
+            query = (
+                select(Submission, Challenge, SubmissionFeedback)
+                .join(Challenge, Submission.challenge_id == Challenge.id)
+                .outerjoin(SubmissionFeedback, Submission.id == SubmissionFeedback.submission_id)
+                .where(Submission.profile_id == pid)
+                .order_by(Submission.submitted_at.desc())
+            )
+            
+            # Filtra por challenge_id se fornecido
+            if challenge_id is not None:
+                query = query.where(Submission.challenge_id == challenge_id)
+            
+            # Executa query única
+            results = s.exec(query).all()
+            
+            # Formata resultados
+            output = []
+            for submission, challenge, feedback in results:
+                output.append({
+                    'submission': submission,
+                    'challenge': _challenge_out(challenge) if challenge else None,
+                    'feedback': feedback
+                })
+            
+            logger.info(f"🚀 Busca otimizada: {len(output)} submissões carregadas em 1 query (antes: {len(output) * 3} queries)")
+            
+            return output
 
     # -------------- FEEDBACK --------------
     def create_submission_feedback(self, payload: dict) -> dict:

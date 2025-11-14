@@ -265,7 +265,7 @@ export default function ChallengeCardHome({ challenge, expanded, onToggle }) {
           <div className="mt-5 flex flex-wrap gap-3">
             {isNotStarted && (
               <Link to={`/desafio/${challenge.id}`} onClick={handleStartClick}>
-                <button className="rounded-lg px-4 py-2.5 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition">
+                <button className="rounded-lg px-4 py-2.5 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition cursor-pointer">
                   Começar desafio
                 </button>
               </Link>
@@ -273,7 +273,7 @@ export default function ChallengeCardHome({ challenge, expanded, onToggle }) {
 
             {isInProgress && (
               <Link to={`/desafio/${challenge.id}`} onClick={(e) => e.stopPropagation()}>
-                <button className="rounded-lg px-4 py-2.5 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition">
+                <button className="rounded-lg px-4 py-2.5 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition cursor-pointer">
                   Continuar desafio
                 </button>
               </Link>
@@ -281,7 +281,7 @@ export default function ChallengeCardHome({ challenge, expanded, onToggle }) {
 
             {isExpired && (
               <Link to={`/desafio/${challenge.id}`} onClick={handleRetryClick}>
-                <button className="rounded-lg px-4 py-2.5 text-sm font-medium bg-orange-600 text-white hover:bg-orange-700 transition">
+                <button className="rounded-lg px-4 py-2.5 text-sm font-medium bg-orange-600 text-white hover:bg-orange-700 transition cursor-pointer">
                   Tentar novamente
                 </button>
               </Link>
@@ -289,7 +289,7 @@ export default function ChallengeCardHome({ challenge, expanded, onToggle }) {
 
             {isCompleted && (
               <Link to={`/desafio/${challenge.id}`} onClick={(e) => e.stopPropagation()}>
-                <button className="rounded-lg px-4 py-2.5 text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition">
+                <button className="rounded-lg px-4 py-2.5 text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition cursor-pointer">
                   Ver resultado
                 </button>
               </Link>
@@ -297,7 +297,7 @@ export default function ChallengeCardHome({ challenge, expanded, onToggle }) {
 
             <button
               onClick={(e) => { e.stopPropagation(); onToggle(); }}
-              className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50"
+              className="rounded-lg px-4 py-2.5 text-sm font-medium border border-zinc-200 hover:bg-zinc-50 cursor-pointer"
             >
               Fechar
             </button>

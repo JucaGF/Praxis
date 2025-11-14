@@ -114,42 +114,22 @@ def get_my_submissions(
     
     ✅ Erros específicos:
     - 401: Token inválido ou ausente
+    
+    ⚡ OTIMIZADO: Usa uma única query com JOINs para evitar N+1 queries
     """
     try:
-        # Busca submissões do usuário logado
-        try:
-            submissions = service.repo.get_submissions_by_profile(current_user.id)
-        except Exception:
-            # Se não houver submissões, retorna lista vazia
-            return []
-        
-        # Filtra por challenge_id se fornecido
-        if challenge_id is not None:
-            submissions = [s for s in submissions if s.challenge_id == challenge_id]
+        # 🚀 OTIMIZAÇÃO: Busca tudo de uma vez com JOINs
+        submissions_with_data = service.repo.get_submissions_with_details(
+            profile_id=current_user.id,
+            challenge_id=challenge_id
+        )
         
         # Formata resposta
         result = []
-        for sub in submissions:
-            feedback = None
-            challenge = None
-            
-            try:
-                feedback = service.repo.get_feedback_by_submission(sub.id)
-            except Exception as e:
-                logger.warning(
-                    f"Erro ao buscar feedback para submissão {sub.id}",
-                    extra={"extra_data": {"submission_id": sub.id, "error": str(e)}}
-                )
-                feedback = None
-            
-            try:
-                challenge = service.repo.get_challenge(sub.challenge_id)
-            except Exception as e:
-                logger.warning(
-                    f"Erro ao buscar challenge {sub.challenge_id}",
-                    extra={"extra_data": {"challenge_id": sub.challenge_id, "error": str(e)}}
-                )
-                challenge = None
+        for item in submissions_with_data:
+            sub = item['submission']
+            feedback = item.get('feedback')
+            challenge = item.get('challenge')
             
             # Extrai score do feedback (se existir)
             score = 0
