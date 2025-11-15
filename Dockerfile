@@ -1,4 +1,4 @@
-# Dockerfile para produção no Railway
+# Dockerfile para produção no Railway usando uv
 FROM python:3.11-slim
 
 # Definir diretório de trabalho
@@ -7,9 +7,8 @@ WORKDIR /app
 # Variáveis de ambiente para otimizar Python
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PYTHONPATH=/app
+    PYTHONPATH=/app \
+    UV_SYSTEM_PYTHON=1
 
 # Instalar dependências do sistema necessárias
 RUN apt-get update && apt-get install -y \
@@ -21,13 +20,18 @@ RUN apt-get update && apt-get install -y \
     libtesseract-dev \
     poppler-utils \
     libmagic1 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Instalar uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.cargo/bin:$PATH"
 
 # Copiar apenas requirements.txt primeiro (cache layer)
 COPY backend/requirements.txt /app/requirements.txt
 
-# Instalar dependências Python
-RUN pip install --no-cache-dir -r requirements.txt
+# Instalar dependências Python usando uv (muito mais rápido que pip)
+RUN uv pip install --system -r requirements.txt
 
 # Copiar código do backend (incluindo models.py que está dentro de backend/)
 COPY backend/ /app/backend/
@@ -36,6 +40,7 @@ COPY backend/ /app/backend/
 EXPOSE 8000
 
 # Comando para rodar a aplicação
-# Railway injeta $PORT automaticamente via variável de ambiente
-CMD sh -c "uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+# Formato shell permite expansão de variáveis de ambiente
+# Railway injeta $PORT automaticamente
+CMD ["sh", "-c", "uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
 
