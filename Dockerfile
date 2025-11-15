@@ -36,14 +36,11 @@ RUN uv pip install --system -r requirements.txt
 # Copiar código do backend (incluindo models.py que está dentro de backend/)
 COPY backend/ /app/backend/
 
-# Copiar script de start
-COPY start.sh /app/start.sh
-RUN chmod +x /app/start.sh
-
 # Expor porta (Railway usa variável $PORT)
 EXPOSE 8000
 
-# Comando para rodar a aplicação usando o script
-# O script lê $PORT do Railway automaticamente
-CMD ["/app/start.sh"]
+# Comando para rodar a aplicação
+# Formato shell permite expansão de variáveis de ambiente
+# Railway injeta $PORT automaticamente
+CMD ["sh", "-c", "uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
 
