@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y \
 
 # Instalar uv e mover para /usr/local/bin (já está no PATH)
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    cp /root/.cargo/bin/uv /usr/local/bin/uv && \
+    cp /root/.local/bin/uv /usr/local/bin/uv && \
     chmod +x /usr/local/bin/uv
 
 # Copiar apenas requirements.txt primeiro (cache layer)
