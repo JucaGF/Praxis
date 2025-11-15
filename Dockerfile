@@ -1,4 +1,4 @@
-# Dockerfile para produção no Railway usando uv
+# Dockerfile baseado no backend/Dockerfile, adaptado para Railway
 FROM python:3.11-slim
 
 # Definir diretório de trabalho
@@ -7,10 +7,11 @@ WORKDIR /app
 # Variáveis de ambiente para otimizar Python
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app \
-    UV_SYSTEM_PYTHON=1
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONPATH=/app
 
-# Instalar dependências do sistema necessárias
+# Instalar dependências do sistema
 RUN apt-get update && apt-get install -y \
     gcc \
     postgresql-client \
@@ -20,28 +21,20 @@ RUN apt-get update && apt-get install -y \
     libtesseract-dev \
     poppler-utils \
     libmagic1 \
-    curl \
     && rm -rf /var/lib/apt/lists/*
-
-# Instalar uv e mover para /usr/local/bin (já está no PATH)
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    cp /root/.local/bin/uv /usr/local/bin/uv && \
-    chmod +x /usr/local/bin/uv
 
 # Copiar apenas requirements.txt primeiro (cache layer)
 COPY backend/requirements.txt /app/requirements.txt
 
-# Instalar dependências Python usando uv (muito mais rápido que pip)
-RUN uv pip install --system -r requirements.txt
+# Instalar dependências Python
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar código do backend (incluindo models.py que está dentro de backend/)
+# Copiar código do backend
 COPY backend/ /app/backend/
 
 # Expor porta (Railway usa variável $PORT)
 EXPOSE 8000
 
 # Comando para rodar a aplicação
-# Usa python -m uvicorn para garantir que está no PATH correto
-# Railway injeta $PORT automaticamente
+# Railway injeta $PORT automaticamente, usamos formato shell para expandir variável
 CMD ["sh", "-c", "python -m uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
-
