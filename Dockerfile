@@ -35,6 +35,6 @@ COPY backend/ /app/backend/
 # Expor porta (Railway usa variável $PORT)
 EXPOSE 8000
 
-# Comando para rodar a aplicação - formato array sem shell
-# Railway injeta PORT via variável de ambiente
-CMD ["python", "-m", "uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Comando para rodar a aplicação
+# Railway injeta PORT via variável de ambiente, usa shell para expandir
+CMD ["sh", "-c", "python -m uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
