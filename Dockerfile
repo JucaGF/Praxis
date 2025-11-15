@@ -41,7 +41,7 @@ COPY backend/ /app/backend/
 EXPOSE 8000
 
 # Comando para rodar a aplicação
-# Formato shell permite expansão de variáveis de ambiente
+# Usa python -m uvicorn para garantir que está no PATH correto
 # Railway injeta $PORT automaticamente
-CMD ["sh", "-c", "uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "python -m uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
 
