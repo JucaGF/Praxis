@@ -416,36 +416,76 @@ export default function Profile() {
 
     // Ordenar submissões por data (mais antigas primeiro)
     const sortedSubmissions = [...submissions].sort((a, b) => 
-      new Date(a.submitted_at || a.date) - new Date(b.submitted_at || b.date)
+      new Date(a.submitted_at) - new Date(b.submitted_at)
     );
 
-    // Agrupar por mês
-    const monthlyData = {};
-    sortedSubmissions.forEach((sub) => {
-      const date = new Date(sub.submitted_at || sub.date);
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      const monthLabel = date.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+    // Filtrar apenas último mês
+    const now = new Date();
+    const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+    const lastMonthSubmissions = sortedSubmissions.filter(sub => 
+      new Date(sub.submitted_at) >= oneMonthAgo
+    );
+
+    if (lastMonthSubmissions.length === 0) {
+      // Sem dados no último mês - gráfico zerado
+      return {
+        labels: ["Início"],
+        datasets: [
+          {
+            label: "Pontuação",
+            data: [0],
+            borderColor: "#eab308",
+            backgroundColor: "#eab308",
+            tension: 0.1,
+          },
+          {
+            label: "Atividades",
+            data: [0],
+            borderColor: "#10b981",
+            backgroundColor: "#10b981",
+            tension: 0.1,
+          },
+        ],
+      };
+    }
+
+    // Agrupar por semana
+    const weeklyData = {};
+    lastMonthSubmissions.forEach((sub) => {
+      const date = new Date(sub.submitted_at);
       
-      if (!monthlyData[monthKey]) {
-        monthlyData[monthKey] = {
-          label: monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1),
+      // Calcular diferença em semanas desde a primeira submissão
+      const firstDate = new Date(lastMonthSubmissions[0].submitted_at);
+      const diffTime = date - firstDate;
+      const diffWeeks = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000));
+      const weekKey = `week-${diffWeeks}`;
+      
+      // Label da semana (ex: "Semana 1", "Semana 2")
+      const weekLabel = `Semana ${diffWeeks + 1}`;
+      
+      if (!weeklyData[weekKey]) {
+        weeklyData[weekKey] = {
+          label: weekLabel,
+          weekNum: diffWeeks + 1,
           scores: [],
           count: 0,
         };
       }
       
-      monthlyData[monthKey].scores.push(sub.score || 0);
-      monthlyData[monthKey].count += 1;
+      weeklyData[weekKey].scores.push(sub.score || 0);
+      weeklyData[weekKey].count += 1;
     });
 
-    // Converter para arrays para o gráfico (último mês apenas)
-    const months = Object.keys(monthlyData).sort().slice(-1);
-    const labels = months.map(key => monthlyData[key].label);
-    const scores = months.map(key => {
-      const avg = monthlyData[key].scores.reduce((sum, s) => sum + s, 0) / monthlyData[key].scores.length;
+    // Converter para arrays para o gráfico (ordenar por número da semana)
+    const weeks = Object.keys(weeklyData).sort((a, b) => {
+      return weeklyData[a].weekNum - weeklyData[b].weekNum;
+    });
+    const labels = weeks.map(key => weeklyData[key].label);
+    const scores = weeks.map(key => {
+      const avg = weeklyData[key].scores.reduce((sum, s) => sum + s, 0) / weeklyData[key].scores.length;
       return Math.round(avg);
     });
-    const activities = months.map(key => monthlyData[key].count);
+    const activities = weeks.map(key => weeklyData[key].count);
 
     return {
       labels: labels.length > 0 ? labels : ["Início"],
@@ -473,7 +513,7 @@ export default function Profile() {
     if (!submissions || submissions.length < 2) return 0;
     
     const sortedSubmissions = [...submissions].sort((a, b) => 
-      new Date(a.submitted_at || a.date) - new Date(b.submitted_at || b.date)
+      new Date(a.submitted_at) - new Date(b.submitted_at)
     );
     
     const firstScore = sortedSubmissions[0]?.score || 0;

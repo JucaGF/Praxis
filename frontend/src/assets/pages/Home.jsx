@@ -1651,7 +1651,37 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* Botão Cancelar */}
+              <div className="flex justify-end">
+                <button
+                  onClick={() => {
+                    if (cancelAnalysisStream) {
+                      cancelAnalysisStream();
+                    }
+                    setAnalysisInProgress(false);
+                    setAnalysisProgress(0);
+                    setAnalysisMessage("");
+                    setAnalysisPlaceholder({
+                      resumo_executivo: "",
+                      pontos_fortes: [],
+                      gaps_tecnicos: [],
+                      sugestoes_melhoria: [],
+                      nota_geral: null,
+                      habilidades_evidenciadas: {},
+                    });
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition cursor-pointer"
+                >
+                  Cancelar Análise
+                </button>
+              </div>
+
               {/* Placeholder da análise */}
+              {(analysisPlaceholder.resumo_executivo || 
+                analysisPlaceholder.nota_geral !== null || 
+                analysisPlaceholder.pontos_fortes.length > 0 || 
+                analysisPlaceholder.gaps_tecnicos.length > 0 || 
+                analysisPlaceholder.sugestoes_melhoria.length > 0) && (
               <div className="space-y-3 bg-zinc-50 rounded-lg p-4 border border-zinc-200">
                 {/* Resumo Executivo */}
                 {analysisPlaceholder.resumo_executivo && (
@@ -1742,6 +1772,7 @@ export default function Home() {
                   </div>
                 )}
               </div>
+              )}
             </div>
           )}
 
