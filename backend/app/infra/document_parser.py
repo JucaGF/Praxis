@@ -1,13 +1,37 @@
-# backend/app/infra/document_parser.py
 """
-Parser de documentos usando Unstructured.io
+Parser de documentos - Extração de texto de arquivos
 
-Suporta:
-- PDF (.pdf)
-- Word (.docx, .doc)
-- PowerPoint (.pptx, .ppt)
-- Texto (.txt, .md)
-- Imagens com OCR (.png, .jpg)
+Este módulo fornece funcionalidades para extrair texto de documentos
+em diversos formatos, incluindo PDFs, Word, PowerPoint, texto e imagens.
+
+Funcionalidades:
+- Extração de texto de PDFs (digitais e escaneados com OCR)
+- Extração de texto de documentos Word (.docx, .doc)
+- Extração de texto de apresentações PowerPoint (.pptx, .ppt)
+- Extração de texto de arquivos de texto (.txt, .md)
+- OCR para imagens e PDFs escaneados (.png, .jpg, .tiff)
+- Metadados ricos (páginas, elementos, estrutura)
+- Fallback para métodos simples se Unstructured não disponível
+
+Arquitetura:
+- Usa Unstructured.io como método preferido (extração inteligente)
+- Fallback para PyPDF2/python-docx se Unstructured não disponível
+- Suporte a OCR usando Tesseract (opcional)
+- Validação de tamanho de arquivo (máximo configurável)
+
+Configuração (parser_config.py):
+- USE_OCR: Habilita/desabilita OCR (default: False)
+- STRATEGY: Estratégia de parsing (auto, hi_res, fast)
+- OCR_LANGUAGES: Idiomas para OCR (ex: "por+eng")
+- MAX_FILE_SIZE_MB: Tamanho máximo de arquivo (default: 10MB)
+- USE_UNSTRUCTURED: Usa Unstructured.io ou fallback (default: True)
+
+Formatos suportados:
+- PDF: application/pdf
+- Word: application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/msword
+- PowerPoint: application/vnd.openxmlformats-officedocument.presentationml.presentation, application/vnd.ms-powerpoint
+- Texto: text/plain, text/markdown
+- Imagens: image/png, image/jpeg, image/tiff (com OCR)
 """
 
 from typing import Optional, Dict, Any
@@ -52,9 +76,29 @@ except ImportError:
 class DocumentParser:
     """
     Parser de documentos com suporte a múltiplos formatos.
-
-    Usa Unstructured.io para extração de texto de arquivos.
-    Fallback para métodos simples se Unstructured não disponível.
+    
+    Esta classe fornece métodos para extrair texto de documentos
+    em diversos formatos, usando Unstructured.io como método preferido
+    e fallback para métodos simples se necessário.
+    
+    Métodos:
+    - is_supported(): Verifica se um tipo MIME é suportado
+    - get_extension(): Retorna extensão para um tipo MIME
+    - parse_file(): Extrai texto de um arquivo
+    
+    Estratégias:
+    - Unstructured.io (preferido): Extração inteligente com estrutura
+    - Fallback simples: PyPDF2, python-docx para formatos básicos
+    
+    Configuração:
+    - USE_OCR: Habilita OCR para PDFs escaneados e imagens
+    - STRATEGY: Estratégia de parsing (auto, hi_res, fast)
+    - MAX_FILE_SIZE: Tamanho máximo de arquivo em bytes
+    
+    Attributes:
+        SUPPORTED_TYPES: Dict com tipos MIME suportados
+        MAX_FILE_SIZE: Tamanho máximo de arquivo em bytes
+        use_unstructured: Se True, usa Unstructured.io (preferido)
     """
 
     SUPPORTED_TYPES = {

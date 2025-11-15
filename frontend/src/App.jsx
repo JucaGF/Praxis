@@ -1,4 +1,16 @@
-// src/App.jsx
+/**
+ * Componente principal da aplicação React
+ * 
+ * Este componente configura o roteamento da aplicação usando React Router.
+ * Gerencia rotas públicas e protegidas, autenticação e navegação.
+ * 
+ * Rotas:
+ * - Públicas: /, /login, /cadastro, /github-callback, /cadastro-sucesso, /force-logout
+ * - Protegidas: /home, /perfil, /desafio/:id, /challenge-result, /onboarding
+ * 
+ * @module App
+ */
+
 import React from "react";
 import {
   BrowserRouter as Router,
@@ -26,7 +38,13 @@ import { useAuth } from "./assets/hooks/useAuth";
 // --- Toast Provider ---
 import { ToastProvider } from "./assets/components/ui/Toast";
 
-// --- Componente de Loading ---
+/**
+ * Componente de loading spinner
+ * 
+ * Exibido enquanto a aplicação verifica autenticação do usuário.
+ * 
+ * @returns {JSX.Element} Componente de loading
+ */
 function LoadingSpinner() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-white">
@@ -38,7 +56,16 @@ function LoadingSpinner() {
   );
 }
 
-// --- Rota protegida ---
+/**
+ * Componente de rota protegida
+ * 
+ * Verifica se o usuário está autenticado antes de renderizar o conteúdo.
+ * Se não estiver autenticado, redireciona para /login.
+ * 
+ * @param {Object} props - Propriedades do componente
+ * @param {React.ReactNode} props.children - Componente filho a ser renderizado
+ * @returns {JSX.Element} Componente filho ou redirecionamento
+ */
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
 
@@ -48,7 +75,17 @@ function PrivateRoute({ children }) {
   return children;
 }
 
-// --- Rota pública (redireciona se já estiver logado) ---
+/**
+ * Componente de rota pública
+ * 
+ * Verifica se o usuário está autenticado.
+ * Se estiver autenticado, redireciona para /home.
+ * Se não estiver, renderiza o conteúdo público.
+ * 
+ * @param {Object} props - Propriedades do componente
+ * @param {React.ReactNode} props.children - Componente filho a ser renderizado
+ * @returns {JSX.Element} Componente filho ou redirecionamento
+ */
 function PublicRoute({ children }) {
   const { user, loading } = useAuth();
 
@@ -58,6 +95,14 @@ function PublicRoute({ children }) {
   return children;
 }
 
+/**
+ * Componente principal da aplicação
+ * 
+ * Configura o roteamento da aplicação com React Router.
+ * Envolve a aplicação com ToastProvider para notificações.
+ * 
+ * @returns {JSX.Element} Componente principal da aplicação
+ */
 export default function App() {
   return (
     <ToastProvider>
@@ -66,76 +111,76 @@ export default function App() {
           {/* --- Rota pública (acessível a todos) --- */}
           <Route path="/" element={<Landing />} />
 
-        {/* --- Rota de emergência para forçar logout (sempre acessível) --- */}
-        <Route path="/force-logout" element={<ForceLogout />} />
+          {/* --- Rota de emergência para forçar logout (sempre acessível) --- */}
+          <Route path="/force-logout" element={<ForceLogout />} />
 
-        {/* --- Rotas públicas --- */}
-        <Route
-          path="/login"
-          element={
-            <PublicRoute>
-              <Login />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path="/cadastro"
-          element={
-            <PublicRoute>
-              <Cadastro />
-            </PublicRoute>
-          }
-        />
+          {/* --- Rotas públicas (redirecionam se já estiver logado) --- */}
+          <Route
+            path="/login"
+            element={
+              <PublicRoute>
+                <Login />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="/cadastro"
+            element={
+              <PublicRoute>
+                <Cadastro />
+              </PublicRoute>
+            }
+          />
 
-        {/* --- Rotas de callback OAuth (públicas) --- */}
-        <Route path="/github-callback" element={<GitHubCallback />} />
-        <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
+          {/* --- Rotas de callback OAuth (públicas) --- */}
+          <Route path="/github-callback" element={<GitHubCallback />} />
+          <Route path="/cadastro-sucesso" element={<CadastroSucesso />} />
 
-        {/* --- Rotas protegidas (só para logados) --- */}
-        <Route
-          path="/onboarding"
-          element={
-            <PrivateRoute>
-              <Onboarding />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/home"
-          element={
-            <PrivateRoute>
-              <Home />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/perfil"
-          element={
-            <PrivateRoute>
-              <Profile />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/desafio/:id"
-          element={
-            <PrivateRoute>
-              <Challenge />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/challenge-result"
-          element={
-            <PrivateRoute>
-              <ChallengeResult />
-            </PrivateRoute>
-          }
-        />
+          {/* --- Rotas protegidas (só para logados) --- */}
+          <Route
+            path="/onboarding"
+            element={
+              <PrivateRoute>
+                <Onboarding />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/home"
+            element={
+              <PrivateRoute>
+                <Home />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/perfil"
+            element={
+              <PrivateRoute>
+                <Profile />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/desafio/:id"
+            element={
+              <PrivateRoute>
+                <Challenge />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/challenge-result"
+            element={
+              <PrivateRoute>
+                <ChallengeResult />
+              </PrivateRoute>
+            }
+          />
 
-        {/* --- Fallback --- */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          {/* --- Fallback: redireciona para home se rota não encontrada --- */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </Router>
     </ToastProvider>
   );

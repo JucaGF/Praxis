@@ -1,3 +1,16 @@
+"""
+Aplicação principal FastAPI - Praxis API
+
+Este módulo configura e inicializa a aplicação FastAPI, incluindo:
+- Configuração de logging
+- Middleware CORS
+- Registro de rotas
+- Tratamento global de exceções
+- Servir arquivos estáticos
+
+A aplicação usa configurações centralizadas do módulo app.config.
+"""
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -82,13 +95,29 @@ async def praxis_exception_handler(request: Request, exc: PraxisError):
         content={"detail": str(exc)}
     )
 
-# para o dataset
+# ==================== ARQUIVOS ESTÁTICOS ====================
+
 BASE_DIR = Path(__file__).resolve().parent.parent
+"""
+Diretório base da aplicação (backend/app).
+"""
+
 static_dir = BASE_DIR / "static"
+"""
+Diretório para arquivos estáticos (ex: datasets, templates).
+"""
+
+# Monta diretório estático se existir
+# Permite servir arquivos estáticos via endpoint /static/...
+# Útil para servir datasets, templates ou outros arquivos
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-# CORS com configurações centralizadas
+# ==================== MIDDLEWARE CORS ====================
+
+# Configura CORS (Cross-Origin Resource Sharing)
+# Permite que o frontend (React) faça requisições para a API
+# Todas as configurações vêm de settings (app.config)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,  # ✅ Configurável!
@@ -97,18 +126,48 @@ app.add_middleware(
     allow_headers=settings.CORS_HEADERS,  # ✅ Configurável!
 )
 
-# registra as rotas
-app.include_router(health_router)
-app.include_router(session_router)
-app.include_router(profile_router)  # Perfil do usuário
-app.include_router(attributes_router)
-app.include_router(challenges_router)
-app.include_router(submissions_router)
-app.include_router(resumes_router)  # Análise de currículos
-app.include_router(account_router)  # Gerenciamento de conta
-app.include_router(dev_router)  # Endpoints de desenvolvimento/mock
+# ==================== REGISTRO DE ROTAS ====================
 
+# Router de saúde da API - Endpoint: /health
+app.include_router(health_router)
+
+# Router de sessão e autenticação - Endpoints: /session/*
+app.include_router(session_router)
+
+# Router de perfil do usuário - Endpoints: /profile/*
+app.include_router(profile_router)
+
+# Router de atributos (habilidades, objetivos) - Endpoints: /attributes/*
+app.include_router(attributes_router)
+
+# Router de desafios técnicos - Endpoints: /challenges/*
+app.include_router(challenges_router)
+
+# Router de submissões de código - Endpoints: /submissions/*
+app.include_router(submissions_router)
+
+# Router de análise de currículos - Endpoints: /resumes/*
+app.include_router(resumes_router)
+
+# Router de gerenciamento de conta - Endpoints: /account/*
+app.include_router(account_router)
+
+# Router de desenvolvimento/mock - Endpoints: /dev/*
+# Apenas em ambiente de desenvolvimento
+app.include_router(dev_router)
+
+
+# ==================== ROTA RAIZ ====================
 
 @app.get("/")
 def read_root():
+    """
+    Endpoint raiz da API.
+    
+    Retorna mensagem confirmando que a API está rodando.
+    Útil para verificar se o servidor está ativo.
+    
+    Returns:
+        dict: Mensagem de confirmação
+    """
     return {"message": "API is running"}

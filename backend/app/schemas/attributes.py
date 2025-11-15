@@ -1,22 +1,27 @@
+"""
+Schemas de atributos - Validação e serialização
+
+Este módulo define os schemas Pydantic para atributos (skills e career goal).
+Usado para validação de dados de entrada e serialização de saída.
+
+Schemas:
+- AttributesOut: Atributos completos do perfil (saída)
+- AttributesPatchIn: Atualização parcial de atributos (entrada)
+
+Validação:
+- Skills devem estar entre 0 e 100 (validação automática)
+- Validação de tipos e campos obrigatórios
+- Conversão automática de dados JSONB
+
+Validador Pydantic:
+- field_validator valida campos AUTOMATICAMENTE
+- Se validador retornar erro → HTTP 422 automático
+- Não precisa validar manualmente nos endpoints
+"""
+
 from pydantic import BaseModel, Field, field_validator
 from typing import Dict, Optional, List, Any
 from datetime import datetime
-
-# ==================== EXPLICAÇÃO: Validadores Pydantic ====================
-#
-# field_validator = Decorador que valida campos AUTOMATICAMENTE
-#
-# Como funciona?
-# 1. Pydantic recebe os dados
-# 2. ANTES de criar o objeto, chama o validador
-# 3. Se validador retornar erro → HTTP 422 automático
-# 4. Se validador passar → objeto criado
-#
-# Benefícios:
-# - Validação acontece SEMPRE (não dá pra esquecer)
-# - Erros claros e automáticos
-# - Código dos endpoints fica limpo
-# ===========================================================================
 
 
 class TechSkill(BaseModel):

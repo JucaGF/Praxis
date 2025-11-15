@@ -1,8 +1,19 @@
 """
-Router de desenvolvimento para criar dados mock.
+Router de desenvolvimento - Endpoints mock
 
-Este router só deve ser usado em desenvolvimento!
-Ele cria dados fictícios para testes sem precisar do relatório de currículo.
+Este router fornece endpoints para desenvolvimento e testes.
+⚠️ NUNCA deve ser usado em produção!
+
+Endpoints:
+- POST /dev/setup-mock-data: Cria dados mock para usuário autenticado
+- POST /dev/create-dev-user: Cria usuário mock de desenvolvimento
+- GET /dev/health: Verifica se router está ativo
+- POST /dev/reset-attributes-from-resume: Reseta attributes baseado em currículo
+
+⚠️ SEGURANÇA:
+- Desabilitado automaticamente em produção
+- Use apenas em ambiente de desenvolvimento
+- Não expor em produção (risco de segurança)
 """
 
 from fastapi import APIRouter, Depends, HTTPException

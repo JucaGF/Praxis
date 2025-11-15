@@ -1,7 +1,49 @@
-# app/datasets/templates.py
+"""
+Templates de datasets - Configuração de datasets sintéticos
+
+Este módulo define os templates para geração de datasets sintéticos.
+Cada template define a estrutura, colunas, tipos de dados e configurações.
+
+Templates disponíveis:
+- ecommerce_sales_v1: Dataset de vendas de e-commerce
+- rides_v1: Dataset de corridas de app (esqueleto)
+- sensors_v1: Dataset de sensores IoT (esqueleto)
+
+Estrutura de template:
+- version: Versão do template
+- kind: Tipo de dataset ("table")
+- rows: Número de linhas (sample e full)
+- date_range: Range de datas
+- columns: Lista de colunas com configurações
+- nulls: Configuração de valores nulos
+- outliers: Configuração de outliers
+- seasonality: Sazonalidade dos dados
+
+Tipos de colunas:
+- sequence: Sequência numérica
+- category: Categoria (escolha de valores)
+- date_range: Range de datas
+- by_category_price: Preço condicionado à categoria
+- poisson: Distribuição de Poisson
+- formula: Fórmula matemática
+- bernoulli: Distribuição de Bernoulli
+
+Uso:
+    from app.datasets.templates import TEMPLATES
+    
+    template = TEMPLATES["ecommerce_sales_v1"]
+    # Usa template para gerar dataset
+"""
+
 from typing import Dict, Any
 
 TEMPLATES: Dict[str, Dict[str, Any]] = {
+    """
+    Dicionário de templates de datasets.
+    
+    Cada template define a estrutura de um dataset sintético.
+    Usado pelo generator.py para gerar dados realistas.
+    """
     "ecommerce_sales_v1": {
         "version": 1,
         "kind": "table",

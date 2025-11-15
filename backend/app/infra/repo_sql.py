@@ -1,11 +1,33 @@
 """
-Repository SQL - Implementacao PostgreSQL
+Repository SQL - Implementação PostgreSQL
 
-Implementa a interface IRepository usando SQLModel/PostgreSQL.
-Responsavel por todas as operacoes de banco de dados:
-- CRUD de perfis, desafios, submissoes
+Este módulo implementa a interface IRepository usando SQLModel/PostgreSQL.
+É responsável por todas as operações de banco de dados da aplicação.
+
+Funcionalidades:
+- CRUD completo de perfis, atributos, desafios, submissões, currículos
+- Queries otimizadas com JOINs para evitar N+1 queries
+- Gerenciamento de habilidades e progressão de skills
+- Normalização de dados (ex: dificuldade "Fácil" → "easy")
+- Suporte a UUIDs e strings como IDs
+- Tratamento de JSONB (skills, relatórios, etc)
+
+Arquitetura:
+- Implementa IRepository (interface definida em domain/ports.py)
+- Usa SQLModel para ORM
+- Usa SQLAlchemy para queries complexas
+- Helpers para converter modelos em dicts (para endpoints)
+
+Performance:
 - Queries otimizadas com JOINs
-- Gerenciamento de habilidades e progressao
+- Evita N+1 queries usando get_submissions_with_details()
+- Índices em campos frequentes (email, profile_id, challenge_id)
+
+Tratamento de Dados:
+- Normaliza dificuldades (Fácil/Médio/Difícil → easy/medium/hard)
+- Parseia JSONB fields (skills podem vir como string ou dict)
+- Converte UUIDs e strings de forma flexível
+- Valida existência de recursos antes de operações
 """
 
 # backend/app/infra/repo_sql.py
@@ -121,14 +143,31 @@ def _challenge_out(ch: Challenge) -> dict:
 
 class SqlRepo(IRepository):
     """
-    Implementação SQL do repositório.
-
-    Herda de IRepository, o que significa:
-    - "Eu prometo implementar TODOS os métodos definidos na interface"
-    - Se esquecer algum método, Python vai dar erro
-    - Qualquer código que espera IRepository pode usar SqlRepo
-
-    Adapter que conversa com o Postgres (Supabase) via SQLModel.
+    Implementação SQL do repositório usando PostgreSQL/Supabase.
+    
+    Esta classe implementa a interface IRepository usando SQLModel.
+    Fornece todos os métodos necessários para acesso ao banco de dados.
+    
+    Características:
+    - Implementa todos os métodos da interface IRepository
+    - Usa SQLModel para operações ORM
+    - Suporte a transações (Session context manager)
+    - Queries otimizadas com JOINs
+    - Normalização automática de dados
+    - Tratamento de UUIDs e strings como IDs
+    
+    Métodos principais:
+    - Perfis: upsert_mock_profile(), get_profile(), create_profile()
+    - Atributos: get_attributes(), update_attributes(), get_tech_skills(), update_tech_skills()
+    - Desafios: create_challenges_for_profile(), list_active_challenges(), get_challenge()
+    - Submissões: create_submission(), get_submissions_by_profile(), get_submissions_with_details()
+    - Feedback: create_submission_feedback(), get_feedback_by_submission()
+    - Currículos: create_resume(), get_resumes(), create_resume_analysis(), delete_resume()
+    
+    Performance:
+    - Usa JOINs para evitar N+1 queries
+    - Índices em campos frequentes
+    - Queries paginadas (limit) quando apropriado
     """
 
     def __init__(self, engine_=None):

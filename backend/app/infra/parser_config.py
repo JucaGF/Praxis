@@ -1,5 +1,22 @@
-# Configuração do Parser de Documentos
-# Edite este arquivo para ajustar o comportamento do parser
+"""
+Configuração do Parser de Documentos
+
+Este arquivo contém as configurações do parser de documentos.
+Edite este arquivo para ajustar o comportamento do parser.
+
+Configurações disponíveis:
+- USE_OCR: Habilita/desabilita OCR para PDFs escaneados e imagens
+- STRATEGY: Estratégia de parsing (auto, hi_res, fast)
+- OCR_LANGUAGES: Idiomas para OCR (ex: "por+eng")
+- MAX_FILE_SIZE_MB: Tamanho máximo de arquivo em MB
+- USE_UNSTRUCTURED: Usa Unstructured.io ou fallback simples
+
+IMPORTANTE:
+- USE_OCR=True requer Tesseract instalado
+- USE_UNSTRUCTURED=True requer unstructured[all-docs] instalado
+- Para produção, recomenda-se USE_OCR=False e USE_UNSTRUCTURED=True
+- Para desenvolvimento, pode usar fallback simples (USE_UNSTRUCTURED=False)
+"""
 
 # ==================== ESTRATÉGIA DE PARSING ====================
 

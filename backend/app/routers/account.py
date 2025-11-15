@@ -1,9 +1,15 @@
-# backend/app/routers/account.py
 """
-ROUTER: Account (Gerenciamento de Conta)
+Router de gerenciamento de conta
 
-Responsabilidades:
-- Deletar conta do usuário
+Este router fornece endpoints para gerenciamento da conta do usuário.
+
+Endpoints:
+- DELETE /account/delete: Deleta permanentemente a conta do usuário
+
+⚠️ IMPORTANTE:
+- Todas as ações são irreversíveis
+- Requer autenticação (token JWT válido)
+- Deleta todos os dados relacionados (perfil, atributos, submissões, currículos, etc)
 """
 
 from fastapi import APIRouter, Depends, HTTPException
