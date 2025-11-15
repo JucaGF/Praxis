@@ -1,4 +1,38 @@
-# app/datasets/generator.py
+"""
+Gerador de datasets - Geração de dados sintéticos
+
+Este módulo fornece funcionalidades para gerar datasets sintéticos
+baseados em templates configuráveis.
+
+Funcionalidades:
+- Geração de datasets sintéticos com dados realistas
+- Suporte a múltiplos tipos de dados (categoria, numérico, data, etc)
+- Correlações entre variáveis
+- Sazonalidade e outliers
+- Valores nulos configuráveis
+- Fórmulas matemáticas (avaliação segura)
+
+Arquitetura:
+- Usa templates (definidos em templates.py) para definir estrutura
+- Gera dados usando numpy e pandas
+- Salva datasets em CSV
+- Sementes estáveis para reprodutibilidade
+
+Segurança:
+- Avaliação segura de fórmulas (sem eval() perigoso)
+- Validação de templates
+- Tratamento de erros
+
+Uso:
+    from app.datasets.generator import generate_dataset
+    
+    sample_text, full_path = generate_dataset(
+        template_id="ecommerce_sales_v1",
+        seed_parts=("user123", "challenge456"),
+        size="full"
+    )
+"""
+
 from __future__ import annotations
 import os, hashlib, math, random
 from typing import Tuple
@@ -8,6 +42,9 @@ from datetime import datetime, timedelta
 from .templates import TEMPLATES
 
 STATIC_DIR = "static/data"
+"""
+Diretório para salvar datasets gerados.
+"""
 
 def _safe_formula_eval(expr: str, variables: dict) -> np.ndarray:
     """
@@ -69,9 +106,32 @@ def _date_series(start: str, end: str, n: int, seasonality: str|None, rng: np.ra
 
 def generate_dataset(template_id: str, seed_parts: Tuple[str, ...], size: str = "full") -> Tuple[str, str]:
     """
-    Gera dataset e salva em CSV.
-    Retorna (sample_csv_text, full_csv_path).
-    size: "sample" ou "full" (gera os dois sempre; 'size' determina qual sample_len usar no retorno).
+    Gera dataset sintético e salva em CSV.
+    
+    Gera um dataset baseado em um template, usando sementes estáveis
+    para garantir reprodutibilidade. Sempre gera versões sample e full,
+    mas retorna apenas uma delas baseado no parâmetro 'size'.
+    
+    Args:
+        template_id: ID do template (ex: "ecommerce_sales_v1")
+        seed_parts: Partes da semente (ex: ("user123", "challenge456"))
+        size: Tamanho a retornar ("sample" ou "full")
+    
+    Returns:
+        Tuple com (sample_csv_text, full_csv_path):
+        - sample_csv_text: Texto CSV da versão sample
+        - full_csv_path: Caminho do arquivo CSV completo
+    
+    Raises:
+        KeyError: Se template_id não existe
+        ValueError: Se template inválido ou fórmula inválida
+    
+    Exemplo:
+        sample_text, full_path = generate_dataset(
+            template_id="ecommerce_sales_v1",
+            seed_parts=("user123", "challenge456"),
+            size="full"
+        )
     """
     tpl = TEMPLATES[template_id]
     seed = _stable_seed(template_id, *seed_parts)

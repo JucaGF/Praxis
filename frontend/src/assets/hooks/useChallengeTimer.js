@@ -1,8 +1,51 @@
+/**
+ * Hook useChallengeTimer - Gerenciamento de timer de desafios
+ * 
+ * Este hook gerencia o estado e o timer de um desafio específico.
+ * Mantém o estado no localStorage para persistência entre recarregamentos.
+ * 
+ * Funcionalidades:
+ * - Timer em tempo real (atualiza a cada segundo)
+ * - Persistência no localStorage
+ * - Status do desafio (not_started, in_progress, expired, completed)
+ * - Formatação de tempo (MM:SS ou H:MM:SS)
+ * - Progresso visual (percentual)
+ * - Controle de início, reset e conclusão
+ * 
+ * Uso:
+ * ```javascript
+ * import { useChallengeTimer, ChallengeStatus } from '../hooks/useChallengeTimer';
+ * 
+ * const {
+ *   status,
+ *   formattedTime,
+ *   progress,
+ *   isExpired,
+ *   isInProgress,
+ *   startChallenge,
+ *   resetChallenge,
+ * } = useChallengeTimer(challengeId, durationMinutes);
+ * ```
+ */
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 
+/**
+ * Chave do localStorage para armazenar timers.
+ * 
+ * @type {string}
+ */
 const STORAGE_KEY = 'praxis_challenge_timers';
 
-// Status possíveis do desafio
+/**
+ * Status possíveis do desafio.
+ * 
+ * @type {Object}
+ * @property {string} NOT_STARTED - Desafio não iniciado
+ * @property {string} IN_PROGRESS - Desafio em progresso
+ * @property {string} EXPIRED - Tempo expirado
+ * @property {string} COMPLETED - Desafio completado
+ */
 export const ChallengeStatus = {
   NOT_STARTED: 'not_started',
   IN_PROGRESS: 'in_progress',
@@ -10,7 +53,11 @@ export const ChallengeStatus = {
   COMPLETED: 'completed', // Para uso futuro
 };
 
-// Carregar timers do localStorage
+/**
+ * Carrega timers do localStorage.
+ * 
+ * @returns {Object} Dicionário com timers de desafios
+ */
 const loadTimers = () => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -21,7 +68,11 @@ const loadTimers = () => {
   }
 };
 
-// Salvar timers no localStorage
+/**
+ * Salva timers no localStorage.
+ * 
+ * @param {Object} timers - Dicionário com timers de desafios
+ */
 const saveTimers = (timers) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(timers));
@@ -30,6 +81,29 @@ const saveTimers = (timers) => {
   }
 };
 
+/**
+ * Hook para gerenciar o timer de um desafio.
+ * 
+ * Este hook gerencia o estado e o timer de um desafio específico.
+ * Mantém o estado no localStorage para persistência entre recarregamentos.
+ * 
+ * @param {number|string} challengeId - ID do desafio
+ * @param {number} durationMinutes - Duração do desafio em minutos
+ * @returns {Object} Objeto com estado e funções do timer
+ * @property {string} status - Status atual do desafio
+ * @property {number} elapsedSeconds - Segundos decorridos
+ * @property {number} remainingSeconds - Segundos restantes
+ * @property {string} formattedTime - Tempo formatado (MM:SS ou H:MM:SS)
+ * @property {number} progress - Progresso do timer (0-100)
+ * @property {number|null} completedAt - Timestamp de conclusão (null se não completado)
+ * @property {function(): void} startChallenge - Inicia o desafio
+ * @property {function(): void} resetChallenge - Reseta o desafio (tentar novamente)
+ * @property {function(): void} completeChallenge - Marca o desafio como completado
+ * @property {boolean} isExpired - True se o tempo expirou
+ * @property {boolean} isInProgress - True se o desafio está em progresso
+ * @property {boolean} isCompleted - True se o desafio foi completado
+ * @property {boolean} isNotStarted - True se o desafio não foi iniciado
+ */
 export const useChallengeTimer = (challengeId, durationMinutes) => {
   const [timers, setTimers] = useState(loadTimers);
   const intervalRef = useRef(null);

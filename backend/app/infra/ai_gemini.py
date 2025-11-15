@@ -1,14 +1,29 @@
-# backend/app/infra/ai_gemini.py
 """
-GEMINI AI - Implementação real usando Google Gemini API
+Serviço de IA usando Google Gemini API
 
-Esta implementação substitui o FakeAI por IA generativa real.
+Este módulo implementa a interface IAIService usando o Google Gemini.
+Fornece funcionalidades de geração de desafios, avaliação de submissões
+e análise de currículos usando IA generativa.
 
-Funcionalidades:
-- Gera desafios personalizados por track (Frontend, Backend, Data Engineer)
-- Avalia submissões com análise qualitativa
-- Retorna skill assessment inteligente
-- Tratamento robusto de erros
+Funcionalidades principais:
+- Geração de desafios personalizados por track (Frontend, Backend, Data Engineer)
+- Avaliação de submissões com análise qualitativa e skill assessment
+- Análise de currículos com identificação de gaps e sugestões
+- Streaming de respostas para feedback em tempo real
+- Retry automático com backoff exponencial
+- Tratamento robusto de erros (rate limits, timeouts, etc)
+
+Arquitetura:
+- Implementa IAIService (interface definida em domain/ports.py)
+- Usa Google Generative AI SDK
+- Suporta streaming para respostas longas
+- Validação e recuperação de JSON malformado
+
+Configuração:
+- GEMINI_API_KEY: API key do Google Gemini (obrigatória)
+- GEMINI_MODEL: Modelo a usar (default: gemini-2.5-flash)
+- AI_MAX_RETRIES: Número máximo de tentativas (default: 5)
+- AI_TIMEOUT: Timeout por requisição em segundos (default: 60)
 """
 
 import json
@@ -46,13 +61,26 @@ except ImportError:
 
 class GeminiAI(IAIService):
     """
-    Implementação real da IA usando Google Gemini.
-
+    Implementação do serviço de IA usando Google Gemini.
+    
+    Esta classe implementa a interface IAIService usando o Google Gemini API.
+    Fornece métodos para gerar desafios, avaliar submissões e analisar currículos.
+    
+    Características:
+    - Validação automática de tokens e respostas
+    - Retry com backoff exponencial para erros temporários
+    - Backoff mais longo para erros 503 (serviço sobrecarregado)
+    - Streaming de respostas para feedback em tempo real
+    - Recuperação de JSON malformado
+    - Validação de desafios gerados
+    
     Attributes:
-        api_key: Chave da API do Gemini
-        model_name: Nome do modelo (default: gemini-1.5-flash)
-        max_retries: Número máximo de tentativas em caso de erro
-        timeout: Timeout em segundos para cada chamada
+        api_key: Chave da API do Google Gemini
+        model_name: Nome do modelo (default: gemini-2.5-flash)
+        max_retries: Número máximo de tentativas em caso de erro (default: 5)
+        timeout: Timeout em segundos para cada chamada (default: 60)
+        safety_settings: Configurações de segurança (permite conteúdo técnico)
+        generation_config: Configuração de geração (temperature, tokens, etc)
     """
 
     def __init__(

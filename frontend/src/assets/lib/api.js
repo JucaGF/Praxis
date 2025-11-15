@@ -1,10 +1,33 @@
+/**
+ * Cliente API para comunicação com o backend
+ * 
+ * Este módulo fornece funções para fazer requisições HTTP ao backend,
+ * incluindo autenticação automática, tratamento de erros e helpers
+ * para endpoints específicos.
+ * 
+ * Funcionalidades:
+ * - Autenticação automática via token JWT do Supabase
+ * - Tratamento de erros HTTP (401, 403, 404, etc)
+ * - Helpers para endpoints específicos (challenges, submissions, etc)
+ * - Redirecionamento automático para login em caso de 401
+ * 
+ * @module api
+ */
+
 import { supabase } from "./supabaseClient";
 import logger from "../utils/logger";
 
+/**
+ * URL base da API
+ * 
+ * Lê do ambiente VITE_API_URL ou usa localhost:8000 como padrão.
+ */
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 /**
  * Obtém o token de autenticação atual do Supabase
+ * 
+ * @returns {Promise<string|null>} Token JWT ou null se não houver sessão
  */
 async function getAuthToken() {
   const { data, error } = await supabase.auth.getSession();

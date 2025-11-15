@@ -1,6 +1,23 @@
-# backend/app/routers/resumes.py
 """
 Router para upload e análise de currículos
+
+Este router fornece endpoints para:
+- Upload de currículos (texto ou arquivo)
+- Análise de currículos com IA
+- Listagem de currículos
+- Busca de currículo específico
+- Exclusão de currículos
+- Streaming de análise (SSE)
+
+Endpoints:
+- POST /resumes/upload: Upload de currículo via texto
+- POST /resumes/upload/file: Upload de currículo via arquivo
+- POST /resumes/upload/file/analyze: Upload e análise em um passo (streaming)
+- GET /resumes: Lista todos os currículos do usuário
+- GET /resumes/{resume_id}: Busca currículo específico com análise
+- POST /resumes/{resume_id}/analyze: Analisa currículo com IA
+- GET /resumes/{resume_id}/analyze/stream: Análise com streaming SSE
+- DELETE /resumes/{resume_id}: Deleta currículo e sua análise
 """
 
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
